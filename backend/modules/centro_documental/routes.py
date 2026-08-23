@@ -63,13 +63,15 @@ def register_centro_documental(app, database_path: str, data_dir: str) -> None:
     @blueprint.get("/estado")
     @require_roles(*PROFESSIONAL_ROLES)
     def state():
+        user = _user()
+        capture_enabled = _enabled("ENABLE_CAPTURE_FORMAT", True)
         return jsonify({
             "habilitado": True,
             "mapeo_plantillas": _enabled("ENABLE_TEMPLATE_MAPPING", True),
             "catalogos_respuesta": _enabled("ENABLE_RESPONSE_CATALOGS", True),
             "ia_borradores": _enabled("ENABLE_AI_DOCUMENT_DRAFTS", False),
             "ia_finalizacion": False,
-            "capture": {"estado": "PLANTILLA_PENDIENTE", "generacion_habilitada": False},
+            "capture": repository.capture_status(user["fundacion_id"], capture_enabled),
         })
 
     @blueprint.get("/plantillas")
@@ -103,6 +105,8 @@ def register_centro_documental(app, database_path: str, data_dir: str) -> None:
                 shutil.copy2(temporary, destination)
             code = str(request.form.get("codigo") or Path(safe_original).stem).strip().upper()[:100]
             document_type = str(request.form.get("tipo_documento") or code).strip().upper()[:100]
+            if document_type.replace("_", " ") in {"CACTURE", "FORMATO CACTURE", "FORMATO CAPTURE"}:
+                document_type = "CAPTURE"
             component = str(request.form.get("componente") or "PEDAGOGICO").strip().upper()[:50]
             if document_type == "CAPTURE" and not _enabled("ENABLE_CAPTURE_FORMAT", False):
                 state_value = "MAPEO_PROPUESTO"
@@ -117,6 +121,12 @@ def register_centro_documental(app, database_path: str, data_dir: str) -> None:
             return jsonify({"message":"Plantilla registrada; el original permanece intacto y el mapa requiere aprobación.","plantilla_version":version,"mapeo":mapping}),201
         except ValueError as exc:
             return jsonify({"error":str(exc)}),409
+        except (OSError, RuntimeError, KeyError) as exc:
+            current_app.logger.exception("No se pudo registrar la plantilla documental")
+            return jsonify({
+                "error": "No se pudo inspeccionar o registrar la plantilla. Verifique que el archivo sea un documento válido y vuelva a intentarlo.",
+                "codigo": "TEMPLATE_PROCESSING_FAILED",
+            }), 422
         finally:
             temporary.unlink(missing_ok=True)
 
@@ -143,7 +153,7 @@ def register_centro_documental(app, database_path: str, data_dir: str) -> None:
     def approve_mapping(version_id: int):
         user=_user(); version=repository.get_version(version_id,user["fundacion_id"])
         if not version: return jsonify({"error":"Plantilla no encontrada."}),404
-        if version["tipo_documento"] == "CAPTURE" and not _enabled("ENABLE_CAPTURE_FORMAT",False):
+        if version["tipo_documento"] == "CAPTURE" and not _enabled("ENABLE_CAPTURE_FORMAT",True):
             return jsonify({"error":"CAPTURE permanece desactivado hasta completar su prueba oficial.","codigo":"CAPTURE_PILOT_REQUIRED"}),409
         try: approved=repository.approve_mapping(version_id,user["fundacion_id"],user["id"])
         except ValueError as exc: return jsonify({"error":str(exc)}),409

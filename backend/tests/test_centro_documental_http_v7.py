@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import io
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -11,6 +12,7 @@ from flask import Flask,g,request
 from migrations.migrate_centro_documental_v7 import migrate
 from modules.centro_documental import register_centro_documental
 from modules.seguridad.tenant_context import tenant_storage_root
+from openpyxl import Workbook
 
 
 def run():
@@ -23,6 +25,13 @@ def run():
         assert client.get("/api/documentos/estado").status_code==404
         app.config["ENABLE_DOCUMENT_AUTOMATION"]=True
         state=client.get("/api/documentos/estado"); assert state.status_code==200 and state.json["capture"]["estado"]=="PLANTILLA_PENDIENTE"
+        workbook=Workbook(); sheet=workbook.active; sheet.append(["Documento", "Nombre", "Peso", "Talla"]); capture_file=io.BytesIO(); workbook.save(capture_file); capture_file.seek(0)
+        uploaded=client.post("/api/documentos/plantillas",headers={"X-Role":"COORDINADOR"},data={"codigo":"001","version":"1.0","componente":"SALUD_NUTRICION","tipo_documento":"FORMATO CACTURE","file":(capture_file,"capture.xlsx")},content_type="multipart/form-data")
+        assert uploaded.status_code==201, uploaded.json
+        version_id=uploaded.json["plantilla_version"]["id"]
+        proposed=client.get("/api/documentos/estado"); assert proposed.json["capture"]["estado"]=="MAPEO_PROPUESTO"
+        approved=client.post(f"/api/documentos/plantillas/{version_id}/aprobar",headers={"X-Role":"COORDINADOR"}); assert approved.status_code==200, approved.json
+        active=client.get("/api/documentos/estado"); assert active.json["capture"]["estado"]=="ACTIVA" and active.json["capture"]["generacion_habilitada"] is True
         assert client.get("/api/documentos/estado",headers={"X-Role":"AUXILIAR_ADMINISTRATIVO"}).status_code==200
         planning=client.post("/api/documentos/tema/generar-planeacion",json={"tema":"Juego y vínculos","componente":"PEDAGOGICO"}); assert planning.status_code==200 and planning.json["planeacion"]["clasificacion"]=="PLANEADO"
         created=client.post("/api/documentos",json={"tipo_documento":"ACTA_HOGAR","componente":"PEDAGOGICO","tema":"Juego y vínculos"}); assert created.status_code==201; document_id=created.json["documento"]["id"]

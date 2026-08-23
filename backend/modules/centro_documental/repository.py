@@ -46,6 +46,30 @@ class CentroDocumentalRepository:
                 result.append(item)
         return result
 
+    def capture_status(self, tenant: int, generation_enabled: bool = False) -> dict:
+        """Return the real CAPTURE status for the active foundation."""
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT v.estado, v.id plantilla_version_id, v.version
+                     FROM doc_plantilla_versiones v
+                     JOIN doc_plantillas p ON p.id=v.plantilla_id
+                    WHERE (v.fundacion_id=? OR (v.fundacion_id IS NULL AND p.scope='GLOBAL'))
+                      AND (UPPER(p.tipo_documento)='CAPTURE' OR UPPER(p.codigo)='CAPTURE')
+                    ORDER BY CASE WHEN v.estado IN ('APROBADA','ACTIVA') THEN 0 ELSE 1 END, v.id DESC
+                    LIMIT 1""",
+                (tenant,),
+            ).fetchone()
+        if not row:
+            return {"estado": "PLANTILLA_PENDIENTE", "generacion_habilitada": False}
+        status = str(row["estado"] or "PLANTILLA_PENDIENTE").upper()
+        ready = status in {"APROBADA", "ACTIVA"}
+        return {
+            "estado": "ACTIVA" if ready and generation_enabled else status,
+            "generacion_habilitada": bool(ready and generation_enabled),
+            "plantilla_version_id": int(row["plantilla_version_id"]),
+            "version": row["version"],
+        }
+
     def create_template_version(self, template: dict, version: dict, user_id=None) -> dict:
         tenant = int(template["fundacion_id"])
         with self.connect() as connection:
