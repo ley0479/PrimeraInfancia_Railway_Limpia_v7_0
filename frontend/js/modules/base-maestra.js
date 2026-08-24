@@ -142,7 +142,8 @@
                     ${badge(fuente.estado)}
                 </div>
                 <div class="mt-3 text-2xl font-semibold text-white">${esc(fuente.total_registros || 0)}</div>
-                <div class="text-xs text-slate-400">registros en ${esc(fuente.total_cargas || 0)} carga(s)</div>
+                <div class="text-xs text-slate-400">registros de la última carga vigente</div>
+                <div class="mt-1 text-xs text-slate-500">Historial conservado: ${esc(fuente.total_cargas || 0)} carga(s), sin sumarlas al total.</div>
                 <div class="mt-2 text-xs text-slate-500">Última carga: ${esc(ultima.nombre_archivo_original || 'Sin archivo cargado')} ${ultima.id ? `· #${esc(ultima.id)}` : ''}</div>
             </div>`;
         }).join('');

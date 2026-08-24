@@ -1625,7 +1625,10 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
             'nombre_fuente': nombre,
             'identificador': tipo.upper(),
             'total_cargas': len(cargas_fuente),
-            'total_registros': sum(int(carga.get('total_registros') or 0) for carga in cargas_fuente),
+            # El resumen operativo representa la carga vigente más reciente. La
+            # suma del historial duplicaba visualmente personas al recargar bases.
+            'total_registros': int(ultima.get('total_registros') or 0) if ultima else 0,
+            'total_registros_historicos': sum(int(carga.get('total_registros') or 0) for carga in cargas_fuente),
             'ultima_carga': ultima,
             'estado': ultima.get('estado') if ultima else 'sin_cargar',
         })
