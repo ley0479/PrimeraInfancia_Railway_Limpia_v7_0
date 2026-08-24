@@ -1663,6 +1663,15 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
     talento_filas, talento_carga = latest_rows_for_type(repo, 'talento_humano', fundacion_id)
     equipos: dict[str, dict[str, Any]] = {}
     personal_unico: dict[str, dict[str, Any]] = {}
+    coordinadores_por_unidad: dict[str, set[str]] = defaultdict(set)
+    for fila in talento_filas:
+        rol_fila = normalizar_rol_talento(fila.get('cargo') or fila.get('rol_normalizado') or '')
+        if rol_fila != 'COORDINADOR':
+            continue
+        nombre_coord = normalize_name(clean_text(fila.get('nombre_completo')) or clean_text(fila.get('nombres')) or normalize_doc(fila.get('documento')))
+        unidad_coord = normalize_name(fila.get('unidad_servicio'))
+        if nombre_coord and unidad_coord:
+            coordinadores_por_unidad[unidad_coord].add(nombre_coord)
     duplicados_talento = 0
     for indice, fila in enumerate(talento_filas):
         nombre = clean_text(fila.get('nombre_completo')) or clean_text(fila.get('nombres')) or normalize_doc(fila.get('documento')) or 'SIN NOMBRE'
@@ -1677,12 +1686,28 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
                     anterior[campo] = fila.get(campo)
             continue
         personal_unico[clave_persona] = dict(fila)
+    asignados_por_unidad = 0
+    unidades_ambiguas: set[str] = set()
     for fila in personal_unico.values():
         nombre = clean_text(fila.get('nombre_completo')) or clean_text(fila.get('nombres')) or normalize_doc(fila.get('documento')) or 'SIN NOMBRE'
         rol = normalizar_rol_talento(fila.get('cargo') or fila.get('rol_normalizado') or '')
         coordinador = clean_text(fila.get('coordinador'))
+        origen_asignacion = 'ARCHIVO'
         if rol == 'COORDINADOR':
             coordinador = nombre
+            origen_asignacion = 'REGISTRO_COORDINADOR'
+        elif not coordinador:
+            unidad = normalize_name(fila.get('unidad_servicio'))
+            candidatos = coordinadores_por_unidad.get(unidad, set())
+            if len(candidatos) == 1:
+                coordinador = next(iter(candidatos))
+                origen_asignacion = 'MISMA_UNIDAD'
+                asignados_por_unidad += 1
+            elif len(candidatos) > 1:
+                unidades_ambiguas.add(unidad)
+                origen_asignacion = 'UNIDAD_AMBIGUA'
+            else:
+                origen_asignacion = 'SIN_RELACION'
         coordinador = normalize_name(coordinador) or 'SIN COORDINADOR ASIGNADO'
         equipo = equipos.setdefault(coordinador, {'coordinador': coordinador, 'total_personas': 0, 'cargos': {}, 'integrantes': []})
         equipo['total_personas'] += 1
@@ -1695,6 +1720,7 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
             'unidad_servicio': fila.get('unidad_servicio') or '',
             'telefono': fila.get('telefono') or '',
             'correo': fila.get('correo') or '',
+            'origen_asignacion': origen_asignacion,
         })
     estructura_talento = {
         'carga_id': talento_carga.get('id') if talento_carga else None,
@@ -1702,6 +1728,9 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
         'total_personas': len(personal_unico),
         'duplicados_omitidos': duplicados_talento,
         'sin_cargo': sum(1 for fila in personal_unico.values() if not clean_text(fila.get('cargo'))),
+        'asignados_por_unidad': asignados_por_unidad,
+        'unidades_ambiguas': sorted(unidad for unidad in unidades_ambiguas if unidad),
+        'regla_asignacion': 'ARCHIVO_O_UNICO_COORDINADOR_DE_LA_MISMA_UNIDAD',
         'equipos': sorted(equipos.values(), key=lambda item: item['coordinador']),
     }
     coordinadores_talento = {
