@@ -44,7 +44,7 @@ ALIASES = {
     'coordinador': ['coordinador', 'coordinadora', 'responsable', 'coordinador_responsable', 'coordinador_a_cargo', 'coordinadora_a_cargo', 'nombre_coordinador', 'nombre_de_coordinador', 'jefe_inmediato', 'lider_equipo', 'líder_equipo'],
     'docente': ['docente', 'agente_educativo', 'agente', 'madre_comunitaria'],
     'modalidad': ['modalidad', 'servicio_modalidad', 'nombre_tipo_de_beneficiario', 'tipo_de_unidad'],
-    'cargo': ['cargo', 'rol', 'perfil', 'tipo_equipo', 'funcion', 'función', 'nombre_cargo', 'nombre_del_cargo', 'denominacion_cargo', 'denominación_cargo', 'denominacion_del_cargo', 'denominación_del_cargo', 'cargo_contractual', 'cargo_en_el_contrato', 'perfil_profesional', 'rol_en_el_equipo', 'tipo_de_talento_humano', 'componente', 'profesion', 'profesión', 'ocupacion', 'ocupación'],
+    'cargo': ['cargo', 'rol', 'perfil', 'tipo_cargo', 'tipo_de_cargo', 'tipo_equipo', 'funcion', 'función', 'nombre_cargo', 'nombre_del_cargo', 'denominacion_cargo', 'denominación_cargo', 'denominacion_del_cargo', 'denominación_del_cargo', 'descripcion_cargo', 'descripción_cargo', 'cargo_contractual', 'cargo_en_el_contrato', 'perfil_profesional', 'rol_en_el_equipo', 'tipo_de_talento_humano', 'ocupacion', 'ocupación'],
     'telefono': ['telefono', 'teléfono', 'celular', 'contacto'],
     'correo': ['correo', 'email', 'e_mail'],
     'peso': ['peso', 'peso_kg', 'peso_en_kg'],
@@ -811,8 +811,13 @@ def latest_rows_for_type(repo: BaseMaestraRepository, tipo: str, fundacion_id: i
                     original = json.loads(row.get('datos_json') or '{}')
                 except Exception:
                     original = {}
-                if not clean_text(row.get('cargo')):
-                    row['cargo'] = normalize_name(pick(original, 'cargo'))
+                cargo_detectado = normalize_name(pick(original, 'cargo'))
+                if cargo_detectado:
+                    row['cargo'] = cargo_detectado
+                elif norm_key(row.get('cargo')) == norm_key(original.get('componente')):
+                    # Una versión anterior aceptaba "componente" como cargo y podía
+                    # convertir a todo un equipo en ADMINISTRATIVO/PEDAGÓGICO.
+                    row['cargo'] = ''
                 row['rol_normalizado'] = normalizar_rol_talento(row.get('cargo') or row.get('rol_normalizado') or '')
                 if not clean_text(row.get('coordinador')):
                     row['coordinador'] = normalize_name(pick(original, 'coordinador'))
@@ -1652,7 +1657,22 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
     }
     talento_filas, talento_carga = latest_rows_for_type(repo, 'talento_humano', fundacion_id)
     equipos: dict[str, dict[str, Any]] = {}
-    for fila in talento_filas:
+    personal_unico: dict[str, dict[str, Any]] = {}
+    duplicados_talento = 0
+    for indice, fila in enumerate(talento_filas):
+        nombre = clean_text(fila.get('nombre_completo')) or clean_text(fila.get('nombres')) or normalize_doc(fila.get('documento')) or 'SIN NOMBRE'
+        rol = normalizar_rol_talento(fila.get('cargo') or fila.get('rol_normalizado') or '')
+        documento = normalize_doc(fila.get('documento'))
+        clave_persona = documento or f"{norm_key(nombre)}|{norm_key(rol)}"
+        if clave_persona in personal_unico:
+            duplicados_talento += 1
+            anterior = personal_unico[clave_persona]
+            for campo in ('coordinador', 'unidad_servicio', 'telefono', 'correo', 'cargo'):
+                if not clean_text(anterior.get(campo)) and clean_text(fila.get(campo)):
+                    anterior[campo] = fila.get(campo)
+            continue
+        personal_unico[clave_persona] = dict(fila)
+    for fila in personal_unico.values():
         nombre = clean_text(fila.get('nombre_completo')) or clean_text(fila.get('nombres')) or normalize_doc(fila.get('documento')) or 'SIN NOMBRE'
         rol = normalizar_rol_talento(fila.get('cargo') or fila.get('rol_normalizado') or '')
         coordinador = clean_text(fila.get('coordinador'))
@@ -1673,8 +1693,10 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
         })
     estructura_talento = {
         'carga_id': talento_carga.get('id') if talento_carga else None,
-        'total_personas': len(talento_filas),
-        'sin_cargo': sum(1 for fila in talento_filas if not clean_text(fila.get('cargo'))),
+        'total_filas_origen': len(talento_filas),
+        'total_personas': len(personal_unico),
+        'duplicados_omitidos': duplicados_talento,
+        'sin_cargo': sum(1 for fila in personal_unico.values() if not clean_text(fila.get('cargo'))),
         'equipos': sorted(equipos.values(), key=lambda item: item['coordinador']),
     }
     borradores = repo.fetch_all("SELECT * FROM master_versiones WHERE fundacion_id = ? AND estado = 'BORRADOR' ORDER BY id DESC LIMIT 10", (fundacion_id,))

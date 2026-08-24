@@ -42,7 +42,20 @@ def test_recupera_cargo_de_una_carga_anterior():
     assert rows[0]['unidad_servicio'] == 'UCA NORTE'
 
 
+def test_no_confunde_componente_con_cargo():
+    row = map_staging_row(
+        'talento_humano',
+        {'Documento': '9', 'Nombre': 'Persona', 'Componente': 'Administrativo'},
+        2,
+        11,
+        {'fundacion_id': 1},
+    )
+    assert row['cargo'] == ''
+    assert row['rol_normalizado'] == 'TALENTO_HUMANO'
+
+
 if __name__ == '__main__':
     test_mapea_denominacion_cargo_y_coordinador_a_cargo()
     test_recupera_cargo_de_una_carga_anterior()
+    test_no_confunde_componente_con_cargo()
     print('BASE_MAESTRA_TALENTO_MAPPING_PASS')
