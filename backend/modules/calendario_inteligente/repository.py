@@ -933,6 +933,44 @@ class CalendarioInteligenteRepository:
         preview["archivo"] = os.path.basename(path)
         return preview
 
+    def registrar_preview_actividades(self, actividades_fuente: list[dict[str, Any]], filename: str = "", usuario: str = "sistema", referencia: str = "") -> dict[str, Any]:
+        """Crea una vista previa desde actividades ya revisadas por otro motor.
+
+        No crea entregables: conserva el mismo paso de confirmación humana del
+        cargador de cronogramas y evita volver a ejecutar OCR sobre el original.
+        """
+        actividades=[]; errores=[]
+        for index,item in enumerate(actividades_fuente or [],start=1):
+            fecha=str(item.get("fecha_limite") or item.get("fecha") or "")[:10]
+            titulo=str(item.get("actividad") or item.get("titulo") or "").strip()
+            row_errors=[]
+            if not fecha: row_errors.append("Fecha requerida")
+            if not titulo: row_errors.append("Actividad requerida")
+            if row_errors: errores.append({"fila":index,"error":"; ".join(row_errors)})
+            actividades.append({
+                "id_temp":index,"fecha":fecha,"fecha_limite":fecha,"titulo":titulo,
+                "descripcion":str(item.get("descripcion") or item.get("entregable") or ""),
+                "entregables":str(item.get("entregables") or item.get("entregable") or ""),
+                "responsable_nombre":str(item.get("responsable_nombre") or item.get("responsable") or ""),
+                "coordinador":str(item.get("coordinador") or ""),"unidad":str(item.get("unidad") or ""),
+                "modulo":str(item.get("modulo") or item.get("componente") or "General"),
+                "tipo_formato":str(item.get("tipo_formato") or "General"),"estado":"programado",
+                "prioridad":str(item.get("prioridad") or "Media"),"observaciones":str(item.get("observaciones") or ""),
+                "ok":not row_errors,"errores":row_errors,"advertencias":["Origen: Motor Universal; confirme la lectura antes de guardar."],
+                "confianza":int(float(item.get("confianza") or 0.76)*100) if float(item.get("confianza") or 0.76)<=1 else int(item.get("confianza")),
+                "origen":filename or referencia or "Motor Universal",
+            })
+        validas=sum(1 for item in actividades if item["ok"])
+        preview={"total_filas":len(actividades),"actividades":actividades,"validas":validas,"invalidas":len(actividades)-validas,"duplicados_en_archivo":0,"errores":errores,"advertencias":["Revise las actividades extraídas por el Motor Universal."],"requiere_revision":True,"referencia_origen":referencia}
+        fechas=[item["fecha_limite"] for item in actividades if item["fecha_limite"]]; periodo=min(fechas)[:7] if fechas else date.today().isoformat()[:7]; now=now_iso()
+        with self.connect() as conn:
+            cur=conn.execute("INSERT INTO calendario_cronogramas (nombre_archivo,archivo_guardado,periodo,estado,total_detectadas,total_validas,total_invalidas,requiere_revision,preview_json,usuario_carga,fecha_carga,fundacion_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",(filename,referencia,periodo,"LISTO_PARA_REVISION",len(actividades),validas,len(actividades)-validas,1,json.dumps(preview,ensure_ascii=False),usuario,now,self._tenant_id()))
+            cronograma_id=int(cur.lastrowid)
+            conn.execute("INSERT INTO calendario_auditoria (accion,referencia_tipo,referencia_id,detalle,usuario,created_at,fundacion_id) VALUES (?,?,?,?,?,?,?)",("preview_desde_idp","cronograma",cronograma_id,f"Documento {referencia}; {len(actividades)} actividades",usuario,now,self._tenant_id()))
+            conn.commit()
+        preview.update({"cronograma_id":cronograma_id,"periodo":periodo,"archivo":filename})
+        return preview
+
     def confirmar_cronograma(self, cronograma_id: int, actividades: list[dict[str, Any]], usuario: str = "sistema") -> dict[str, Any]:
         """Guarda actividades revisadas en el calendario operativo."""
         creados = 0

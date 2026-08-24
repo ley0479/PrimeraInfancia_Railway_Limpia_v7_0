@@ -134,6 +134,21 @@ def register_idp_documental(app, database_path: str, data_dir: str) -> None:
         except ValueError as exc: return jsonify({'error':str(exc)}),409
         return jsonify({'message':'Documento aprobado. Aún no se ha importado a módulos funcionales.','documento':repo.get_document(document_id,user['fundacion_id'])})
 
+    @bp.route('/documentos/<int:document_id>/preparar-calendario', methods=['POST'])
+    @require_roles(*ALLOWED_ROLES)
+    def prepare_calendar(document_id: int):
+        user=_user(); document=repo.get_document(document_id,user['fundacion_id'])
+        if not document: return jsonify({'error':'Documento no encontrado.'}),404
+        if document.get('tipo_documento')!='CRONOGRAMA': return jsonify({'error':'Solo los cronogramas o tableros de entregables pueden enviarse al calendario.'}),409
+        if document.get('estado')!='APROBADO': return jsonify({'error':'Primero revise y apruebe la extracción documental.'}),409
+        activities=(document.get('resultado_canonico') or {}).get('actividades') or []
+        if not activities: return jsonify({'error':'No hay actividades estructuradas para enviar. Corrija el mapeo o la lectura OCR.'}),409
+        from modules.calendario_inteligente.repository import CalendarioInteligenteRepository
+        calendar=CalendarioInteligenteRepository(database_path,data_dir)
+        preview=calendar.registrar_preview_actividades(activities,document.get('nombre_original') or '',str(user.get('id') or 'sistema'),f'IDP:{document_id}')
+        repo.audit(user['fundacion_id'],'CALENDARIO_PREPARADO',document_id,user['id'],document.get('estado'),'LISTO_PARA_REVISION',{'cronograma_id':preview['cronograma_id'],'actividades':len(activities)})
+        return jsonify({'message':'Actividades preparadas. Revise la vista previa antes de guardarlas en el calendario.','preview':preview}),201
+
     @bp.route('/documentos/<int:document_id>/reintentar-ocr', methods=['POST'])
     @require_roles(*ALLOWED_ROLES)
     def retry_ocr(document_id: int):

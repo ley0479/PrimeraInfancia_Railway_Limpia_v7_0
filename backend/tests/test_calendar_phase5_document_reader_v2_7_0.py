@@ -40,5 +40,10 @@ def run():
             req(result['creados']==1,'Confirmación humana no creó la actividad')
             with repo.connect() as conn: state=conn.execute('SELECT estado FROM calendario_cronogramas WHERE id=?',(preview['cronograma_id'],)).fetchone()['estado']
             req(state=='APROBADO','Importación confirmada no quedó aprobada')
+            idp_preview=repo.registrar_preview_actividades([{'fecha':'2026-08-28','actividad':'Entregar informe mensual','responsable':'Coordinación','entregable':'Informe y evidencias'}],'entregables agosto.jpeg','coord','IDP:25')
+            req(idp_preview['actividades'][0]['fecha_limite']=='2026-08-28','La conexión IDP no conservó el día de entrega')
+            idp_result=repo.confirmar_cronograma(idp_preview['cronograma_id'],idp_preview['actividades'],'coord')
+            req(idp_result['creados']==1,'La actividad revisada del Motor Universal no llegó al calendario')
+            req(any(item['fecha_limite']=='2026-08-28' and item['titulo']=='Entregar informe mensual' for item in repo.list_entregables({'periodo':'2026-08'})),'El día 28 no muestra la actividad importada desde IDP')
     print('PASS test_calendar_phase5_document_reader_v2_7_0')
 if __name__=='__main__': run()

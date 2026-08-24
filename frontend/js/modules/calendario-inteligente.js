@@ -596,6 +596,12 @@
         `);
     }
 
+    function abrirPreviewExterno(preview) {
+        state.previewCronograma=preview;
+        if(preview?.periodo){state.periodo=preview.periodo;state.anio=preview.periodo.slice(0,4);}
+        abrirPreviewCronograma(preview);
+    }
+
     function previewRowHtml(a, idx) {
         const disabled = a.ok === false ? '' : 'checked';
         const err = (a.errores || []).length ? `<p class="text-[11px] text-rose-300">${esc(a.errores.join('; '))}</p>` : '';
@@ -741,6 +747,7 @@
     window.ciConfirmarChecklistImportado = confirmarChecklistImportado;
     window.ciCargarCronograma = cargarCronograma;
     window.ciConfirmarCronograma = confirmarCronograma;
+    window.ciAbrirPreviewExterno = abrirPreviewExterno;
     window.ciExportarExcel = exportarExcel;
     window.ciExportarPdf = exportarPdf;
     window.ciSubirEvidencia = subirEvidencia;
