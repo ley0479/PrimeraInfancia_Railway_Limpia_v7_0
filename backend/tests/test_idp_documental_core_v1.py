@@ -109,6 +109,8 @@ def main():
         require(schedule_doc['tipo_documento']=='CRONOGRAMA' and len(schedule_doc['resultado_canonico']['actividades'])==1,'No estructuro el cronograma Excel')
         require(schedule_doc['resultado_canonico']['actividades'][0]['fecha']=='2026-08-20','No normalizo la fecha del cronograma')
         require(schedule_doc['validaciones']['semaforo']=='VERDE','Marco incorrectamente el cronograma completo')
+        deliverables_classification=classify_document('RAM, listado de asistencia, informe y acta', 'entregables agosto.jpeg')
+        require(deliverables_classification[0]=='CRONOGRAMA','Clasifico la imagen de entregables como un listado con participantes requeridos')
         schedule_word=root/'CRONOGRAMA_WORD.docx'; word=Document(); table=word.add_table(rows=2,cols=3)
         for column,value in enumerate(['Fecha','Actividad','Responsable']): table.rows[0].cells[column].text=value
         for column,value in enumerate(['21/08/2026','Taller pedagógico','Docente']): table.rows[1].cells[column].text=value

@@ -84,12 +84,17 @@ def col_letter_to_index(value: str) -> int:
 def classify_document(text: str, filename: str) -> tuple[str, float, str]:
     sample = normalize(f'{filename} {text[:15000]}')
     normalized_filename = normalize(filename)
+    # Un tablero o imagen mensual de entregables puede mencionar RAM y
+    # listados como productos, pero no por eso contiene filas de asistentes.
+    # El propósito explícito del nombre debe prevalecer sobre esas menciones.
+    if 'entregable' in normalized_filename:
+        return ('CRONOGRAMA', 0.97, 'nombre de archivo identificado como cronograma de entregables')
     filename_markers = {
         'LISTADO_ASISTENCIA': ('listado asistencia', 'asistencia'),
         'RAM': ('formato ram', ' ram '),
         'RPP': (' rpp ',),
         'BIENESTARINA': ('bienestarina',),
-        'CRONOGRAMA': ('cronograma',),
+        'CRONOGRAMA': ('cronograma', 'entregables'),
         'PLANEACION_PEDAGOGICA': ('planeacion pedagogica', 'planeacion'),
         'PESO_TALLA': ('peso talla', 'valoracion nutricional'),
         'ACTA': ('acta',),
