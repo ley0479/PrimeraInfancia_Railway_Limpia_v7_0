@@ -148,6 +148,29 @@
         }).join('');
     }
 
+    function renderResumenUnidadesFuentes(resumen) {
+        const box = el('bm-carga-resumen-unidades');
+        if (!box) return;
+        const unidades = resumen?.unidades || [];
+        const cargas = resumen?.cargas_fuente || {};
+        const filas = unidades.map(item => `<tr class="hover:bg-slate-900/60">
+            <td class="px-3 py-2 text-slate-200">${esc(item.unidad)}</td>
+            <td class="px-3 py-2 text-right text-cyan-200">${esc(item.cuentame || 0)}</td>
+            <td class="px-3 py-2 text-right text-violet-200">${esc(item.talento_humano || 0)}</td>
+            <td class="px-3 py-2 text-right text-emerald-200">${esc(item.salud_nutricion || 0)}</td>
+        </tr>`).join('');
+        box.className = 'mt-4 rounded-2xl border border-cyan-500/20 bg-slate-950/80 p-4 text-sm text-slate-300';
+        box.innerHTML = `<div class="mb-3 flex flex-col gap-1">
+            <strong class="text-cyan-200">Usuarios detectados por unidad y por fuente</strong>
+            <span class="text-xs text-slate-400">Cada persona se cuenta una sola vez por documento dentro de su unidad. Cargas usadas: Cuéntame #${esc(cargas.cuentame || '—')} · Talento Humano #${esc(cargas.talento_humano || '—')} · Salud y Nutrición #${esc(cargas.salud_nutricion || '—')}.</span>
+        </div>
+        <div class="overflow-auto max-h-80 rounded-xl border border-slate-800"><table class="w-full min-w-[650px] text-xs">
+            <thead class="sticky top-0 bg-slate-900 text-slate-300"><tr><th class="px-3 py-2 text-left">Unidad de atención</th><th class="px-3 py-2 text-right">Usuarios Cuéntame</th><th class="px-3 py-2 text-right">Talento Humano</th><th class="px-3 py-2 text-right">Salud y Nutrición</th></tr></thead>
+            <tbody>${filas || '<tr><td colspan="4" class="px-3 py-4 text-center text-slate-500">Aún no hay registros por unidad.</td></tr>'}</tbody>
+        </table></div>`;
+        box.classList.remove('hidden');
+    }
+
     function renderBorradores(borradores) {
         const select = el('bm-version-borrador');
         if (!select) return;
@@ -237,6 +260,7 @@
         }
         renderCargas(data?.cargas || []);
         renderResumenFuentes(data?.resumen_fuentes || []);
+        renderResumenUnidadesFuentes(data?.resumen_unidades_fuentes || {});
         renderBorradores(data?.borradores || []);
     }
 

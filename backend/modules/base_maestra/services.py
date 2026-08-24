@@ -1604,8 +1604,34 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
             'ultima_carga': ultima,
             'estado': ultima.get('estado') if ultima else 'sin_cargar',
         })
+    unidades_por_fuente: dict[str, dict[str, Any]] = {}
+    cargas_matriz: dict[str, int | None] = {}
+    for tipo in nombres_fuente:
+        filas, carga_fuente = latest_rows_for_type(repo, tipo, fundacion_id)
+        cargas_matriz[tipo] = int(carga_fuente['id']) if carga_fuente else None
+        documentos_contados: set[tuple[str, str]] = set()
+        for indice, fila in enumerate(filas):
+            unidad_original = clean_text(fila.get('unidad_servicio')) or 'SIN UNIDAD IDENTIFICADA'
+            unidad_clave = normalize_name(unidad_original) or 'SIN UNIDAD IDENTIFICADA'
+            documento = normalize_doc(fila.get('documento')) or f'FILA_{indice}'
+            llave = (unidad_clave, documento)
+            if llave in documentos_contados:
+                continue
+            documentos_contados.add(llave)
+            item = unidades_por_fuente.setdefault(unidad_clave, {
+                'unidad': unidad_original,
+                'cuentame': 0,
+                'talento_humano': 0,
+                'salud_nutricion': 0,
+            })
+            item[tipo] += 1
+    resumen_unidades_fuentes = {
+        'criterio': 'usuarios_unicos_por_documento_y_unidad',
+        'cargas_fuente': cargas_matriz,
+        'unidades': sorted(unidades_por_fuente.values(), key=lambda item: normalize_name(item['unidad'])),
+    }
     borradores = repo.fetch_all("SELECT * FROM master_versiones WHERE fundacion_id = ? AND estado = 'BORRADOR' ORDER BY id DESC LIMIT 10", (fundacion_id,))
-    return {'version_activa': version, 'resumen': resumen, 'resumen_fuentes': resumen_fuentes, 'cargas': cargas, 'borradores': borradores}
+    return {'version_activa': version, 'resumen': resumen, 'resumen_fuentes': resumen_fuentes, 'resumen_unidades_fuentes': resumen_unidades_fuentes, 'cargas': cargas, 'borradores': borradores}
 
 
 def listar_unidades(database_path: str, ctx: dict[str, Any] | None = None) -> dict[str, Any]:
