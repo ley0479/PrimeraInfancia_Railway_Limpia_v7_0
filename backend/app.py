@@ -11709,6 +11709,7 @@ def _alpha69_item_beneficiario(data, fuente=''):
         'fuente': fuente,
         'documento': str(_alpha69_documento(data) or '').strip(),
         'documento_normalizado': _alpha69_doc_key(_alpha69_documento(data)),
+        'nui': str(_alpha69_valor(data, 'nui', 'NUI') or '').strip(),
         'tipo_documento': _alpha69_valor(data, 'tipo_documento', 'TipoDocumento', 'tipo_doc'),
         'nombre_completo': _alpha69_nombre(data),
         'fecha_nacimiento': _alpha69_valor(data, 'fecha_nacimiento', 'FechaNacimiento', 'nacimiento'),
@@ -11743,9 +11744,9 @@ def _alpha69_fetch_table(conn, table, limit=7000):
 
 
 def _alpha69_score_match(item, q_text, q_doc):
-    valores = ' '.join(str(item.get(k, '') or '') for k in ['documento','nombre_completo','unidad','docente','coordinador','grupo_etario','estado']).lower()
+    valores = ' '.join(str(item.get(k, '') or '') for k in ['documento','nui','tipo_documento','nombre_completo','unidad','codigo_uds','docente','coordinador','grupo_etario','estado']).lower()
     valores_norm = normalizar_texto_clave(valores)
-    if q_doc and q_doc in _alpha69_doc_key(item.get('documento')):
+    if q_doc and (q_doc in _alpha69_doc_key(item.get('documento')) or q_doc in _alpha69_doc_key(item.get('nui'))):
         return 100
     if q_text and q_text in valores_norm:
         return 80
@@ -11765,21 +11766,27 @@ def _alpha69_buscar_beneficiarios(q='', limit=20):
     conn = None
     try:
         conn = get_db_connection()
-        tablas = _alpha69_tablas_disponibles(conn)
-        for table in ['bm_ninos', 'beneficiarios', 'usuarios', 'master_ninos']:
-            if table not in tablas:
+        tenant_id = int(fundacion_actual_id() or 1)
+        try:
+            rows = conn.execute(
+                "SELECT * FROM master_ninos WHERE activo = 1 AND COALESCE(fundacion_id, 1) = ? ORDER BY nombre_completo, documento",
+                (tenant_id,),
+            ).fetchall()
+        except Exception as exc:
+            _alpha69_log('buscador_global.log', evento='MASTER_NINOS_QUERY_ERROR', fundacion_id=tenant_id, error=str(exc))
+            rows = []
+        for row in rows:
+            data = _alpha69_row_dict(row)
+            item = _alpha69_item_beneficiario(data, fuente='master_ninos')
+            score = _alpha69_score_match(item, q_norm, q_doc)
+            if score <= 0:
                 continue
-            for data in _alpha69_fetch_table(conn, table):
-                item = _alpha69_item_beneficiario(data, fuente=table)
-                score = _alpha69_score_match(item, q_norm, q_doc)
-                if score <= 0:
-                    continue
-                key = item.get('documento_normalizado') or normalizar_texto_clave(item.get('nombre_completo')) + '|' + normalizar_texto_clave(item.get('unidad'))
-                if key in vistos:
-                    continue
-                vistos.add(key)
-                item['score'] = score
-                resultados.append(item)
+            key = item.get('documento_normalizado') or normalizar_texto_clave(item.get('nombre_completo')) + '|' + normalizar_texto_clave(item.get('unidad'))
+            if key in vistos:
+                continue
+            vistos.add(key)
+            item['score'] = score
+            resultados.append(item)
         resultados.sort(key=lambda x: (-int(x.get('score') or 0), x.get('nombre_completo') or ''))
         return resultados[:int(limit)]
     finally:
@@ -11805,11 +11812,8 @@ def _alpha69_ficha_beneficiario(documento):
     conn = None
     try:
         conn = get_db_connection()
-        tablas = _alpha69_tablas_disponibles(conn)
         # Salud/nutrición/peso y talla.
-        for table in ['bm_salud_nutricion', 'sn_valoraciones', 'peso_talla']:
-            if table not in tablas:
-                continue
+        for table in ['master_salud_nutricion', 'sn_valoraciones', 'peso_talla']:
             for data in _alpha69_fetch_table(conn, table):
                 d = _alpha69_doc_key(_alpha69_valor(data, 'documento_nino','documento','Documento','nui','NUI','documento_normalizado'))
                 if doc_key and d == doc_key:
@@ -11825,9 +11829,7 @@ def _alpha69_ficha_beneficiario(documento):
                     })
         # Talento humano/equipo por unidad.
         unidad_key = normalizar_texto_clave(base.get('unidad_normalizada') or base.get('unidad'))
-        for table in ['bm_talento_humano', 'th_personas', 'docentes', 'coordinadores']:
-            if table not in tablas:
-                continue
+        for table in ['master_talento_humano']:
             for data in _alpha69_fetch_table(conn, table):
                 u = normalizar_texto_clave(_alpha69_valor(data, 'unidad', 'unidad_servicio', 'nombre_unidad', 'uds'))
                 if unidad_key and (unidad_key == u or unidad_key in u or u in unidad_key):

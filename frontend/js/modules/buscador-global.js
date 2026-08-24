@@ -70,7 +70,7 @@
           <div class="a70-icon">🔎</div>
           <input id="alpha70-buscador-input" type="search" autocomplete="off" placeholder="Buscar por documento, nombre, UDS, docente, coordinador o grupo etario…" aria-label="Buscar beneficiario" />
         </div>
-        <div class="a70-hint">Escribe al menos 2 caracteres. Los resultados se consultan desde Base Maestra y tablas equivalentes sin modificar datos.</div>
+        <div class="a70-hint">Escribe al menos 2 caracteres. Consulta cualquier participante de la Base Maestra publicada por nombre, documento, NUI, unidad, docente, coordinador, grupo o estado.</div>
         <div id="alpha70-buscador-results" class="a70-results"></div>
       </div>`;
     panel.innerHTML = '';
@@ -127,7 +127,7 @@
     resultsBox.innerHTML = items.map((it, idx) => `
       <div class="a70-item" data-idx="${idx}">
         <div class="a70-name">${htmlEscape(it.nombre_completo || 'SIN NOMBRE')}</div>
-        <div class="a70-meta">Doc: ${htmlEscape(it.documento || '—')} · UDS: ${htmlEscape(it.unidad || '—')} · Grupo: ${htmlEscape(it.grupo_etario || '—')} · Estado: ${htmlEscape(it.estado || '—')}</div>
+        <div class="a70-meta">Doc: ${htmlEscape(it.documento || '—')} · NUI: ${htmlEscape(it.nui || '—')} · UDS: ${htmlEscape(it.unidad || '—')} · Grupo: ${htmlEscape(it.grupo_etario || '—')} · Estado: ${htmlEscape(it.estado || '—')}</div>
       </div>`).join('');
     [...resultsBox.querySelectorAll('.a70-item')].forEach((el) => {
       el.addEventListener('click', () => abrirDetalle(lastResults[Number(el.dataset.idx)]));
