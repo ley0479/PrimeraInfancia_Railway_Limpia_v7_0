@@ -1702,6 +1702,17 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
         'sin_cargo': sum(1 for fila in personal_unico.values() if not clean_text(fila.get('cargo'))),
         'equipos': sorted(equipos.values(), key=lambda item: item['coordinador']),
     }
+    coordinadores_talento = {
+        normalize_name(equipo['coordinador'])
+        for equipo in estructura_talento['equipos']
+        if normalize_name(equipo.get('coordinador')) not in {'', 'SIN COORDINADOR ASIGNADO'}
+    }
+    # El indicador superior debe provenir de Talento Humano. Cuéntame puede no
+    # traer coordinador por niño y por eso el cálculo histórico mostraba cero.
+    if coordinadores_talento:
+        resumen['total_coordinadores'] = len(coordinadores_talento)
+    estructura_talento['total_coordinadores'] = len(coordinadores_talento)
+    estructura_talento['coordinadores_identificados'] = sorted(coordinadores_talento)
     borradores = repo.fetch_all("SELECT * FROM master_versiones WHERE fundacion_id = ? AND estado = 'BORRADOR' ORDER BY id DESC LIMIT 10", (fundacion_id,))
     return {'version_activa': version, 'resumen': resumen, 'resumen_fuentes': resumen_fuentes, 'resumen_unidades_fuentes': resumen_unidades_fuentes, 'estructura_talento': estructura_talento, 'cargas': cargas, 'borradores': borradores}
 

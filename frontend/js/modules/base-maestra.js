@@ -187,7 +187,7 @@
             </details>`;
         }).join('') || '<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">No hay personal de Talento Humano mapeado todavía.</div>';
         const estado = el('bm-estructura-talento-estado');
-        if (estado) estado.textContent = `Carga #${data?.carga_id || '—'} · ${data?.total_personas || 0} personas únicas · ${data?.duplicados_omitidos || 0} filas duplicadas omitidas · ${data?.sin_cargo || 0} sin cargo identificado`;
+        if (estado) estado.textContent = `Carga #${data?.carga_id || '—'} · ${data?.total_coordinadores || 0} coordinadores · ${data?.total_personas || 0} personas únicas · ${data?.duplicados_omitidos || 0} filas duplicadas omitidas · ${data?.sin_cargo || 0} sin cargo identificado`;
     }
 
     function renderBorradores(borradores) {
