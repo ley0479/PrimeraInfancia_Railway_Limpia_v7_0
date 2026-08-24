@@ -1692,6 +1692,52 @@ def exportar_inconsistencias_excel(database_path: str, output_folder: str, ctx: 
     return path
 
 
+def exportar_unidad_fuentes_excel(database_path: str, output_folder: str, unidad: str, ctx: dict[str, Any] | None = None) -> str:
+    ctx = {**get_user_context(), **(ctx or {})}
+    fundacion_id = int(ctx.get('fundacion_id') or 1)
+    unidad_buscada = normalize_name(unidad)
+    if not unidad_buscada:
+        raise ValueError('La unidad de atención es requerida.')
+    repo = BaseMaestraRepository(database_path)
+    repo.init_schema()
+    fuentes = {
+        'cuentame': 'Cuéntame',
+        'talento_humano': 'Talento Humano',
+        'salud_nutricion': 'Salud y Nutrición',
+    }
+    detalle: dict[str, list[dict[str, Any]]] = {}
+    resumen = []
+    for tipo, nombre in fuentes.items():
+        filas, carga = latest_rows_for_type(repo, tipo, fundacion_id)
+        filtradas = [fila for fila in filas if normalize_name(fila.get('unidad_servicio')) == unidad_buscada]
+        unicas = []
+        vistos = set()
+        for indice, fila in enumerate(filtradas):
+            documento = normalize_doc(fila.get('documento')) or f'FILA_{indice}'
+            if documento in vistos:
+                continue
+            vistos.add(documento)
+            unicas.append(fila)
+        detalle[tipo] = unicas
+        resumen.append({
+            'Unidad de atención': unidad,
+            'Fuente': nombre,
+            'Usuarios únicos': len(unicas),
+            'ID carga utilizada': carga.get('id') if carga else None,
+            'Archivo de origen': carga.get('nombre_archivo_original') if carga else 'Sin carga temporal',
+        })
+    os.makedirs(output_folder, exist_ok=True)
+    nombre_seguro = secure_filename(unidad)[:80] or 'UNIDAD'
+    filename = f"REGISTROS_UNIDAD_{nombre_seguro}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+    path = os.path.join(output_folder, filename)
+    with pd.ExcelWriter(path, engine='openpyxl') as writer:
+        pd.DataFrame(resumen).to_excel(writer, sheet_name='Resumen', index=False)
+        pd.DataFrame(detalle['cuentame']).to_excel(writer, sheet_name='Cuentame', index=False)
+        pd.DataFrame(detalle['talento_humano']).to_excel(writer, sheet_name='Talento Humano', index=False)
+        pd.DataFrame(detalle['salud_nutricion']).to_excel(writer, sheet_name='Salud y Nutricion', index=False)
+    return path
+
+
 def exportar_validacion_excel(database_path: str, output_folder: str, validacion_id: int, ctx: dict[str, Any] | None = None) -> str:
     ctx = {**get_user_context(), **(ctx or {})}
     repo = BaseMaestraRepository(database_path)

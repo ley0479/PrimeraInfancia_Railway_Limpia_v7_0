@@ -153,7 +153,7 @@
         if (!box) return;
         const unidades = resumen?.unidades || [];
         const cargas = resumen?.cargas_fuente || {};
-        const filas = unidades.map(item => `<tr class="hover:bg-slate-900/60">
+        const filas = unidades.map(item => `<tr class="cursor-pointer hover:bg-cyan-500/10" title="Doble clic para descargar el Excel de esta unidad" ondblclick="baseMaestraDescargarUnidad(decodeURIComponent('${encodeURIComponent(item.unidad)}'))">
             <td class="px-3 py-2 text-slate-200">${esc(item.unidad)}</td>
             <td class="px-3 py-2 text-right text-cyan-200">${esc(item.cuentame || 0)}</td>
             <td class="px-3 py-2 text-right text-violet-200">${esc(item.talento_humano || 0)}</td>
@@ -162,6 +162,7 @@
         box.className = 'mt-4 rounded-2xl border border-cyan-500/20 bg-slate-950/80 p-4 text-sm text-slate-300';
         box.innerHTML = `<div class="mb-3 flex flex-col gap-1">
             <strong class="text-cyan-200">Usuarios detectados por unidad y por fuente</strong>
+            <span class="text-xs font-semibold text-emerald-300">Haz doble clic sobre una unidad para descargar su Excel detallado.</span>
             <span class="text-xs text-slate-400">Cada persona se cuenta una sola vez por documento dentro de su unidad. Cargas usadas: Cuéntame #${esc(cargas.cuentame || '—')} · Talento Humano #${esc(cargas.talento_humano || '—')} · Salud y Nutrición #${esc(cargas.salud_nutricion || '—')}.</span>
         </div>
         <div class="overflow-auto max-h-80 rounded-xl border border-slate-800"><table class="w-full min-w-[650px] text-xs">
@@ -447,6 +448,15 @@
         }
     }
 
+    async function baseMaestraDescargarUnidad(unidad) {
+        try {
+            await download(`${api()}/unidad-registros/descargar?unidad=${encodeURIComponent(unidad)}`, `REGISTROS_UNIDAD_${unidad}.xlsx`);
+            mensaje(`Excel generado para la unidad ${unidad}.`, 'success');
+        } catch (error) {
+            mensaje(error.message || 'No se pudo descargar el Excel de la unidad.', 'error');
+        }
+    }
+
     function baseMaestraInit() {
         if (!state.initialized) state.initialized = true;
         baseMaestraCargarResumen();
@@ -463,4 +473,5 @@
     window.baseMaestraConsolidar = baseMaestraConsolidar;
     window.baseMaestraPublicarSeleccionada = baseMaestraPublicarSeleccionada;
     window.baseMaestraDescargarInconsistencias = baseMaestraDescargarInconsistencias;
+    window.baseMaestraDescargarUnidad = baseMaestraDescargarUnidad;
 })();

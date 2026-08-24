@@ -11,6 +11,7 @@ from modules.seguridad.tenant_context import tenant_path
 from .repository import BaseMaestraRepository
 from .services import (
     exportar_inconsistencias_excel,
+    exportar_unidad_fuentes_excel,
     exportar_validacion_excel,
     get_user_context,
     guardar_fuente,
@@ -207,5 +208,15 @@ def register_base_maestra(app, database_path: str, upload_folder: str, output_fo
             return send_from_directory(module_output, Path(path).name, as_attachment=True)
         except Exception as exc:
             return jsonify({'error': f'No se pudo descargar inconsistencias: {exc}'}), 400
+
+    @bp.route('/unidad-registros/descargar', methods=['GET'])
+    @require_roles('SUPERADMIN', 'GERENTE', 'COORDINADOR', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA')
+    def descargar_registros_unidad():
+        try:
+            unidad = request.args.get('unidad') or ''
+            path = exportar_unidad_fuentes_excel(database_path, module_output, unidad)
+            return send_from_directory(module_output, Path(path).name, as_attachment=True)
+        except Exception as exc:
+            return jsonify({'error': f'No se pudo generar el Excel de la unidad: {exc}'}), 400
 
     app.register_blueprint(bp)

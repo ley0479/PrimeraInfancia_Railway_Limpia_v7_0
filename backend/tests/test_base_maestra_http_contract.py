@@ -21,6 +21,7 @@ EXPECTED = {
     "/api/base-maestra/consolidar": {"POST"},
     "/api/base-maestra/publicar": {"POST"},
     "/api/base-maestra/inconsistencias/descargar": {"GET"},
+    "/api/base-maestra/unidad-registros/descargar": {"GET"},
 }
 
 
