@@ -41,10 +41,10 @@ ALIASES = {
     'fecha_retiro': ['fecha_retiro', 'fecha_de_retiro', 'retiro'],
     'unidad_servicio': ['nombre_de_la_unidad_de_servicio', 'nombre_unidad_de_servicio', 'unidad_servicio', 'unidad_de_servicio', 'nombre_unidad', 'nombre_uds', 'uds', 'uca', 'unidad', 'servicio'],
     'codigo_unidad': ['codigo_de_la_unidad_de_servicio', 'codigo_unidad_de_servicio', 'codigo_unidad_servicio', 'codigo_unidad', 'código_unidad', 'cod_unidad'],
-    'coordinador': ['coordinador', 'coordinadora', 'responsable', 'coordinador_responsable'],
+    'coordinador': ['coordinador', 'coordinadora', 'responsable', 'coordinador_responsable', 'coordinador_a_cargo', 'coordinadora_a_cargo', 'nombre_coordinador', 'nombre_de_coordinador', 'jefe_inmediato', 'lider_equipo', 'líder_equipo'],
     'docente': ['docente', 'agente_educativo', 'agente', 'madre_comunitaria'],
     'modalidad': ['modalidad', 'servicio_modalidad', 'nombre_tipo_de_beneficiario', 'tipo_de_unidad'],
-    'cargo': ['cargo', 'rol', 'perfil', 'tipo_equipo', 'funcion', 'función'],
+    'cargo': ['cargo', 'rol', 'perfil', 'tipo_equipo', 'funcion', 'función', 'nombre_cargo', 'nombre_del_cargo', 'denominacion_cargo', 'denominación_cargo', 'denominacion_del_cargo', 'denominación_del_cargo', 'cargo_contractual', 'cargo_en_el_contrato', 'perfil_profesional', 'rol_en_el_equipo', 'tipo_de_talento_humano', 'componente', 'profesion', 'profesión', 'ocupacion', 'ocupación'],
     'telefono': ['telefono', 'teléfono', 'celular', 'contacto'],
     'correo': ['correo', 'email', 'e_mail'],
     'peso': ['peso', 'peso_kg', 'peso_en_kg'],
@@ -428,16 +428,22 @@ def normalizar_rol_talento(cargo: str) -> str:
     c = norm_key(cargo)
     if 'coord' in c:
         return 'COORDINADOR'
-    if 'docente' in c or 'agente' in c:
+    if 'docente' in c or 'agente' in c or 'pedagog' in c or 'educador' in c:
         return 'DOCENTE'
     if 'aux' in c:
         return 'AUXILIAR'
     if 'psico' in c:
         return 'PSICOSOCIAL'
+    if 'trabaj' in c and 'social' in c:
+        return 'PSICOSOCIAL'
     if 'nutri' in c:
         return 'NUTRICIONISTA'
     if 'enferm' in c:
         return 'ENFERMERIA'
+    if 'administr' in c:
+        return 'ADMINISTRATIVO'
+    if 'servicios_generales' in c or 'aseo' in c:
+        return 'SERVICIOS_GENERALES'
     return cargo.upper() if cargo else 'TALENTO_HUMANO'
 
 
@@ -798,7 +804,21 @@ def load_existing_table_rows(repo: BaseMaestraRepository, fundacion_id: int, tip
 def latest_rows_for_type(repo: BaseMaestraRepository, tipo: str, fundacion_id: int) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     carga = repo.ultima_carga(tipo, fundacion_id, estados=('validado', 'validado_con_advertencias', 'cargado', 'cargado_con_observaciones'))
     if carga:
-        return repo.staging_rows(tipo, carga_id=int(carga['id'])), carga
+        rows = repo.staging_rows(tipo, carga_id=int(carga['id']))
+        if tipo == 'talento_humano':
+            for row in rows:
+                try:
+                    original = json.loads(row.get('datos_json') or '{}')
+                except Exception:
+                    original = {}
+                if not clean_text(row.get('cargo')):
+                    row['cargo'] = normalize_name(pick(original, 'cargo'))
+                row['rol_normalizado'] = normalizar_rol_talento(row.get('cargo') or row.get('rol_normalizado') or '')
+                if not clean_text(row.get('coordinador')):
+                    row['coordinador'] = normalize_name(pick(original, 'coordinador'))
+                if not clean_text(row.get('unidad_servicio')):
+                    row['unidad_servicio'] = normalize_name(pick(original, 'unidad_servicio'))
+        return rows, carga
     return load_existing_table_rows(repo, fundacion_id, tipo), None
 
 
@@ -1630,8 +1650,35 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
         'cargas_fuente': cargas_matriz,
         'unidades': sorted(unidades_por_fuente.values(), key=lambda item: normalize_name(item['unidad'])),
     }
+    talento_filas, talento_carga = latest_rows_for_type(repo, 'talento_humano', fundacion_id)
+    equipos: dict[str, dict[str, Any]] = {}
+    for fila in talento_filas:
+        nombre = clean_text(fila.get('nombre_completo')) or clean_text(fila.get('nombres')) or normalize_doc(fila.get('documento')) or 'SIN NOMBRE'
+        rol = normalizar_rol_talento(fila.get('cargo') or fila.get('rol_normalizado') or '')
+        coordinador = clean_text(fila.get('coordinador'))
+        if rol == 'COORDINADOR':
+            coordinador = nombre
+        coordinador = normalize_name(coordinador) or 'SIN COORDINADOR ASIGNADO'
+        equipo = equipos.setdefault(coordinador, {'coordinador': coordinador, 'total_personas': 0, 'cargos': {}, 'integrantes': []})
+        equipo['total_personas'] += 1
+        equipo['cargos'][rol] = int(equipo['cargos'].get(rol, 0)) + 1
+        equipo['integrantes'].append({
+            'nombre': nombre,
+            'documento': fila.get('documento'),
+            'cargo': fila.get('cargo') or '',
+            'rol_normalizado': rol,
+            'unidad_servicio': fila.get('unidad_servicio') or '',
+            'telefono': fila.get('telefono') or '',
+            'correo': fila.get('correo') or '',
+        })
+    estructura_talento = {
+        'carga_id': talento_carga.get('id') if talento_carga else None,
+        'total_personas': len(talento_filas),
+        'sin_cargo': sum(1 for fila in talento_filas if not clean_text(fila.get('cargo'))),
+        'equipos': sorted(equipos.values(), key=lambda item: item['coordinador']),
+    }
     borradores = repo.fetch_all("SELECT * FROM master_versiones WHERE fundacion_id = ? AND estado = 'BORRADOR' ORDER BY id DESC LIMIT 10", (fundacion_id,))
-    return {'version_activa': version, 'resumen': resumen, 'resumen_fuentes': resumen_fuentes, 'resumen_unidades_fuentes': resumen_unidades_fuentes, 'cargas': cargas, 'borradores': borradores}
+    return {'version_activa': version, 'resumen': resumen, 'resumen_fuentes': resumen_fuentes, 'resumen_unidades_fuentes': resumen_unidades_fuentes, 'estructura_talento': estructura_talento, 'cargas': cargas, 'borradores': borradores}
 
 
 def listar_unidades(database_path: str, ctx: dict[str, Any] | None = None) -> dict[str, Any]:

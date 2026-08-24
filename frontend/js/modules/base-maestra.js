@@ -172,6 +172,23 @@
         box.classList.remove('hidden');
     }
 
+    function renderEstructuraTalento(data) {
+        const box = el('bm-estructura-talento');
+        if (!box) return;
+        const equipos = data?.equipos || [];
+        box.innerHTML = equipos.map(equipo => {
+            const cargos = Object.entries(equipo.cargos || {}).sort((a, b) => a[0].localeCompare(b[0]));
+            const resumenCargos = cargos.map(([cargo, total]) => `<span class="rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-1 text-xs text-violet-200">${esc(cargo)}: ${esc(total)}</span>`).join('');
+            const integrantes = (equipo.integrantes || []).map(persona => `<tr><td class="px-3 py-2 text-slate-200">${esc(persona.nombre)}</td><td class="px-3 py-2">${esc(persona.cargo || persona.rol_normalizado)}</td><td class="px-3 py-2">${esc(persona.unidad_servicio || '—')}</td><td class="px-3 py-2">${esc(persona.telefono || persona.correo || '—')}</td></tr>`).join('');
+            return `<details class="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
+                <summary class="cursor-pointer list-none"><div class="flex flex-wrap items-center justify-between gap-3"><div><div class="font-semibold text-slate-100">${esc(equipo.coordinador)}</div><div class="text-xs text-slate-500">${esc(equipo.total_personas)} integrantes</div></div><div class="flex flex-wrap gap-1">${resumenCargos}</div></div></summary>
+                <div class="mt-4 overflow-auto"><table class="w-full min-w-[650px] text-xs"><thead class="bg-slate-900 text-slate-300"><tr><th class="px-3 py-2 text-left">Nombre</th><th class="px-3 py-2 text-left">Cargo</th><th class="px-3 py-2 text-left">Unidad</th><th class="px-3 py-2 text-left">Contacto</th></tr></thead><tbody>${integrantes}</tbody></table></div>
+            </details>`;
+        }).join('') || '<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">No hay personal de Talento Humano mapeado todavía.</div>';
+        const estado = el('bm-estructura-talento-estado');
+        if (estado) estado.textContent = `Carga #${data?.carga_id || '—'} · ${data?.total_personas || 0} personas · ${data?.sin_cargo || 0} sin cargo identificado`;
+    }
+
     function renderBorradores(borradores) {
         const select = el('bm-version-borrador');
         if (!select) return;
@@ -262,6 +279,7 @@
         renderCargas(data?.cargas || []);
         renderResumenFuentes(data?.resumen_fuentes || []);
         renderResumenUnidadesFuentes(data?.resumen_unidades_fuentes || {});
+        renderEstructuraTalento(data?.estructura_talento || {});
         renderBorradores(data?.borradores || []);
     }
 
