@@ -1,7 +1,7 @@
 (function () {
     const api = () => `${window.backendUrl || window.getBackendUrl?.() || window.getConfiguredBackendUrl?.() || window.location.origin}/api/base-maestra`;
     const universalApi = () => `${window.backendUrl || window.getBackendUrl?.() || window.getConfiguredBackendUrl?.() || window.location.origin}/api/importaciones`;
-    const state = { initialized: false, dashboard: null, universalImportId: null, universalResult: null };
+    const state = { initialized: false, dashboard: null, universalImportId: null, universalResult: null, talentTeams: [] };
 
     function el(id) { return document.getElementById(id); }
 
@@ -177,17 +177,47 @@
         const box = el('bm-estructura-talento');
         if (!box) return;
         const equipos = data?.equipos || [];
-        box.innerHTML = equipos.map(equipo => {
+        state.talentTeams = equipos;
+        box.innerHTML = equipos.map((equipo, equipoIndex) => {
             const cargos = Object.entries(equipo.cargos || {}).sort((a, b) => a[0].localeCompare(b[0]));
-            const resumenCargos = cargos.map(([cargo, total]) => `<span class="rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-1 text-xs text-violet-200">${esc(cargo)}: ${esc(total)}</span>`).join('');
-            const integrantes = (equipo.integrantes || []).map(persona => `<tr><td class="px-3 py-2 text-slate-200">${esc(persona.nombre)}</td><td class="px-3 py-2">${esc(persona.cargo || persona.rol_normalizado)}</td><td class="px-3 py-2">${esc(persona.unidad_servicio || '—')}</td><td class="px-3 py-2">${esc(persona.telefono || persona.correo || '—')}</td></tr>`).join('');
-            return `<details class="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
+            const resumenCargos = `<button type="button" onclick="baseMaestraFiltrarEquipo(${equipoIndex}, '')" class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-200">Ver todos: ${esc(equipo.total_personas)}</button>` + cargos.map(([cargo, total]) => `<button type="button" onclick="baseMaestraFiltrarEquipo(${equipoIndex}, decodeURIComponent('${encodeURIComponent(cargo)}'))" class="rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-1 text-xs text-violet-200 hover:bg-violet-500/20">${esc(cargo)}: ${esc(total)}</button>`).join('');
+            const integrantes = (equipo.integrantes || []).map(persona => `<tr data-talento-rol="${esc(persona.rol_normalizado)}"><td class="px-3 py-2 text-slate-200">${esc(persona.nombre)}</td><td class="px-3 py-2">${esc(persona.cargo || persona.rol_normalizado)}</td><td class="px-3 py-2">${esc(persona.unidad_servicio || '—')}</td><td class="px-3 py-2">${esc(persona.telefono || persona.correo || '—')}</td></tr>`).join('');
+            return `<details data-talento-equipo="${equipoIndex}" data-filtro-rol="" class="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
                 <summary class="cursor-pointer list-none"><div class="flex flex-wrap items-center justify-between gap-3"><div><div class="font-semibold text-slate-100">${esc(equipo.coordinador)}</div><div class="text-xs text-slate-500">${esc(equipo.total_personas)} integrantes</div></div><div class="flex flex-wrap gap-1">${resumenCargos}</div></div></summary>
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2"><span data-talento-resultado class="text-xs font-semibold text-emerald-300">Mostrando todo el equipo</span><button type="button" onclick="baseMaestraImprimirEquipo(${equipoIndex})" class="bm-btn bm-btn-secondary text-xs">Imprimir selección</button></div>
                 <div class="mt-4 overflow-auto"><table class="w-full min-w-[650px] text-xs"><thead class="bg-slate-900 text-slate-300"><tr><th class="px-3 py-2 text-left">Nombre</th><th class="px-3 py-2 text-left">Cargo</th><th class="px-3 py-2 text-left">Unidad</th><th class="px-3 py-2 text-left">Contacto</th></tr></thead><tbody>${integrantes}</tbody></table></div>
             </details>`;
         }).join('') || '<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">No hay personal de Talento Humano mapeado todavía.</div>';
         const estado = el('bm-estructura-talento-estado');
         if (estado) estado.textContent = `Carga #${data?.carga_id || '—'} · ${data?.total_coordinadores || 0} coordinadores · ${data?.total_personas || 0} personas únicas · ${data?.duplicados_omitidos || 0} filas duplicadas omitidas · ${data?.sin_cargo || 0} sin cargo identificado`;
+    }
+
+    function baseMaestraFiltrarEquipo(equipoIndex, rol) {
+        const panel = document.querySelector(`[data-talento-equipo="${Number(equipoIndex)}"]`);
+        if (!panel) return;
+        panel.open = true;
+        panel.dataset.filtroRol = rol || '';
+        let visibles = 0;
+        panel.querySelectorAll('[data-talento-rol]').forEach(fila => {
+            const mostrar = !rol || fila.dataset.talentoRol === rol;
+            fila.classList.toggle('hidden', !mostrar);
+            if (mostrar) visibles += 1;
+        });
+        const resultado = panel.querySelector('[data-talento-resultado]');
+        if (resultado) resultado.textContent = rol ? `${rol}: ${visibles} personas` : `Mostrando todo el equipo: ${visibles} personas`;
+    }
+
+    function baseMaestraImprimirEquipo(equipoIndex) {
+        const equipo = state.talentTeams?.[Number(equipoIndex)];
+        const panel = document.querySelector(`[data-talento-equipo="${Number(equipoIndex)}"]`);
+        if (!equipo || !panel) return;
+        const rol = panel.dataset.filtroRol || '';
+        const personas = (equipo.integrantes || []).filter(persona => !rol || persona.rol_normalizado === rol);
+        const filas = personas.map(persona => `<tr><td>${esc(persona.nombre)}</td><td>${esc(persona.cargo || persona.rol_normalizado)}</td><td>${esc(persona.unidad_servicio || '—')}</td><td>${esc(persona.telefono || persona.correo || '—')}</td></tr>`).join('');
+        const ventana = window.open('', '_blank', 'width=1000,height=750');
+        if (!ventana) return mensaje('El navegador bloqueó la ventana de impresión.', 'warning');
+        ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Equipo ${esc(equipo.coordinador)}</title><style>body{font-family:Arial,sans-serif;margin:28px;color:#111}h1{font-size:20px;margin-bottom:4px}p{margin:4px 0 18px;color:#444}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #bbb;padding:7px;text-align:left}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>${esc(equipo.coordinador)}</h1><p>${rol ? `Cargo seleccionado: ${esc(rol)}` : 'Equipo completo'} · ${personas.length} personas</p><table><thead><tr><th>Nombre</th><th>Cargo</th><th>Unidad</th><th>Contacto</th></tr></thead><tbody>${filas}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);
+        ventana.document.close();
     }
 
     function renderBorradores(borradores) {
@@ -493,4 +523,6 @@
     window.baseMaestraPublicarSeleccionada = baseMaestraPublicarSeleccionada;
     window.baseMaestraDescargarInconsistencias = baseMaestraDescargarInconsistencias;
     window.baseMaestraDescargarUnidad = baseMaestraDescargarUnidad;
+    window.baseMaestraFiltrarEquipo = baseMaestraFiltrarEquipo;
+    window.baseMaestraImprimirEquipo = baseMaestraImprimirEquipo;
 })();

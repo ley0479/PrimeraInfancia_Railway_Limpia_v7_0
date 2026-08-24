@@ -1610,16 +1610,18 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
     else:
         resumen = resumen_de_version(repo, None, fundacion_id)
     cargas_todas = repo.fetch_all("SELECT * FROM cargas_archivos WHERE fundacion_id = ? ORDER BY fecha_carga DESC, id DESC", (fundacion_id,))
-    cargas = cargas_todas[:20]
     nombres_fuente = {
         'cuentame': 'Base Cuéntame / Niños',
         'talento_humano': 'Talento Humano',
         'salud_nutricion': 'Salud y Nutrición',
     }
     resumen_fuentes = []
+    cargas = []
     for tipo, nombre in nombres_fuente.items():
         cargas_fuente = [carga for carga in cargas_todas if normalize_tipo_fuente(carga.get('tipo_fuente')) == tipo]
         ultima = cargas_fuente[0] if cargas_fuente else None
+        if ultima:
+            cargas.append(ultima)
         resumen_fuentes.append({
             'tipo_fuente': tipo,
             'nombre_fuente': nombre,
@@ -1714,7 +1716,14 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
     estructura_talento['total_coordinadores'] = len(coordinadores_talento)
     estructura_talento['coordinadores_identificados'] = sorted(coordinadores_talento)
     borradores = repo.fetch_all("SELECT * FROM master_versiones WHERE fundacion_id = ? AND estado = 'BORRADOR' ORDER BY id DESC LIMIT 10", (fundacion_id,))
-    return {'version_activa': version, 'resumen': resumen, 'resumen_fuentes': resumen_fuentes, 'resumen_unidades_fuentes': resumen_unidades_fuentes, 'estructura_talento': estructura_talento, 'cargas': cargas, 'borradores': borradores}
+    fuente_oficial = {
+        'regla': 'BASE_MAESTRA_PUBLICADA_UNICA',
+        'version_id': version.get('id') if version else None,
+        'version_numero': version.get('version_numero') if version else None,
+        'tablas': ['master_ninos', 'master_talento_humano', 'master_salud_nutricion', 'master_unidades'],
+        'cargas_temporales_son_oficiales': False,
+    }
+    return {'version_activa': version, 'fuente_oficial': fuente_oficial, 'resumen': resumen, 'resumen_fuentes': resumen_fuentes, 'resumen_unidades_fuentes': resumen_unidades_fuentes, 'estructura_talento': estructura_talento, 'cargas': cargas, 'total_cargas_historicas': len(cargas_todas), 'borradores': borradores}
 
 
 def listar_unidades(database_path: str, ctx: dict[str, Any] | None = None) -> dict[str, Any]:
