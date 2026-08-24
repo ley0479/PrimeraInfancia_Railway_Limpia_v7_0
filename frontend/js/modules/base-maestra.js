@@ -49,6 +49,8 @@
         const resumen = data?.resumen_unidades || {};
         const unidades = resumen.unidades_detectadas || data?.unidades_detectadas || [];
         const alertas = resumen.alertas || data?.alertas_unidades || [];
+        const nombresFuente = { cuentame: 'Base Cuéntame / Niños', talento_humano: 'Talento Humano', salud_nutricion: 'Salud y Nutrición' };
+        const tipoFuente = data?.tipo_fuente || el('bm-tipo-fuente')?.value || 'cuentame';
         if (!resumen || !Object.keys(resumen).length) {
             box.classList.add('hidden');
             box.innerHTML = '';
@@ -64,7 +66,8 @@
         box.className = 'mt-4 rounded-2xl border border-cyan-500/20 bg-slate-950/80 p-4 text-sm text-slate-300';
         box.innerHTML = `
             <div class="flex flex-col gap-1 mb-3">
-                <strong class="text-cyan-200">Resumen de lectura de Base Maestra</strong>
+                <strong class="text-cyan-200">Resumen de lectura: ${esc(nombresFuente[tipoFuente] || tipoFuente)}</strong>
+                <span class="text-xs font-semibold text-cyan-300">Registro independiente · ${esc(String(tipoFuente).toUpperCase())}</span>
                 <span class="text-xs text-slate-400">Hoja seleccionada: ${esc(resumen.hoja_seleccionada || '—')} · Unidades detectadas: ${esc(resumen.total_unidades_detectadas ?? unidades.length)} · Registros sin unidad: ${esc(resumen.registros_sin_unidad || 0)}</span>
             </div>
             ${alertas.length ? `<div class="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-200 text-xs">${alertas.map(esc).join('<br>')}</div>` : ''}
@@ -114,10 +117,11 @@
             tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">Sin cargas.</td></tr>';
             return;
         }
+        const nombresFuente = { cuentame: 'Cuéntame', talento_humano: 'Talento Humano', salud_nutricion: 'Salud y Nutrición' };
         tbody.innerHTML = cargas.map(c => `
             <tr class="hover:bg-slate-900/60">
                 <td class="px-4 py-3 text-slate-300">${esc(c.id)}</td>
-                <td class="px-4 py-3">${esc(c.tipo_fuente)}</td>
+                <td class="px-4 py-3"><div class="font-medium text-slate-200">${esc(nombresFuente[c.tipo_fuente] || c.tipo_fuente)}</div><div class="text-[10px] uppercase tracking-wider text-slate-500">${esc(c.tipo_fuente)}</div></td>
                 <td class="px-4 py-3">${esc(c.total_registros || 0)}</td>
                 <td class="px-4 py-3">${badge(c.estado)}</td>
                 <td class="px-4 py-3">
@@ -125,6 +129,23 @@
                 </td>
             </tr>
         `).join('');
+    }
+
+    function renderResumenFuentes(fuentes) {
+        const box = el('bm-resumen-fuentes');
+        if (!box) return;
+        box.innerHTML = (fuentes || []).map(fuente => {
+            const ultima = fuente.ultima_carga || {};
+            return `<div class="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
+                <div class="flex items-start justify-between gap-3">
+                    <div><div class="font-semibold text-slate-100">${esc(fuente.nombre_fuente)}</div><div class="mt-1 text-[10px] uppercase tracking-wider text-cyan-300">${esc(fuente.identificador)}</div></div>
+                    ${badge(fuente.estado)}
+                </div>
+                <div class="mt-3 text-2xl font-semibold text-white">${esc(fuente.total_registros || 0)}</div>
+                <div class="text-xs text-slate-400">registros en ${esc(fuente.total_cargas || 0)} carga(s)</div>
+                <div class="mt-2 text-xs text-slate-500">Última carga: ${esc(ultima.nombre_archivo_original || 'Sin archivo cargado')} ${ultima.id ? `· #${esc(ultima.id)}` : ''}</div>
+            </div>`;
+        }).join('');
     }
 
     function renderBorradores(borradores) {
@@ -215,6 +236,7 @@
             }
         }
         renderCargas(data?.cargas || []);
+        renderResumenFuentes(data?.resumen_fuentes || []);
         renderBorradores(data?.borradores || []);
     }
 
