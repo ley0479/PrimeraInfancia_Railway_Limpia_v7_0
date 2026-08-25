@@ -5513,7 +5513,7 @@ def talento_fuente_maestra_estado():
 def talento_fuente_maestra_sincronizar():
     from modules.talento_humano.services import TalentoHumanoService
     service = TalentoHumanoService()
-    resultado = service.sincronizar_global(origen='fuente_maestra_endpoint')
+    resultado = service.sincronizar_global(origen='fuente_maestra_endpoint', fuente='base_maestra')
     return jsonify({
         'message': 'Fuente maestra de Talento Humano sincronizada correctamente.',
         'resultado': resultado,

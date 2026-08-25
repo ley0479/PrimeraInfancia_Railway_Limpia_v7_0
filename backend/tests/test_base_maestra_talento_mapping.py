@@ -1,6 +1,6 @@
 import json
 
-from modules.base_maestra.services import latest_rows_for_type, map_staging_row
+from modules.base_maestra.services import asignaciones_talento_por_unidad, latest_rows_for_type, map_staging_row
 
 
 def test_mapea_denominacion_cargo_y_coordinador_a_cargo():
@@ -54,8 +54,24 @@ def test_no_confunde_componente_con_cargo():
     assert row['rol_normalizado'] == 'TALENTO_HUMANO'
 
 
+def test_resuelve_asignaciones_unicas_por_unidad_sin_inventar_ambiguas():
+    asignaciones = asignaciones_talento_por_unidad([
+        {'documento': '1', 'nombre_completo': 'Coordinadora Uno', 'cargo': 'Coordinador técnico', 'unidad_servicio': 'UCA Norte'},
+        {'documento': '2', 'nombre_completo': 'Docente Uno', 'cargo': 'Agente educativo', 'unidad_servicio': 'UCA Norte', 'coordinador': 'Coordinadora Uno'},
+        {'documento': '3', 'nombre_completo': 'Docente Dos', 'cargo': 'Docente', 'unidad_servicio': 'UCA Sur'},
+        {'documento': '4', 'nombre_completo': 'Docente Tres', 'cargo': 'Docente', 'unidad_servicio': 'UCA Sur'},
+        {'documento': '5', 'nombre_completo': 'Nutricionista', 'cargo': 'Nutricionista', 'unidad_servicio': 'UCA Talento'},
+    ])
+    assert asignaciones['UCA NORTE']['docente'] == 'DOCENTE UNO'
+    assert asignaciones['UCA NORTE']['coordinador'] == 'COORDINADORA UNO'
+    assert asignaciones['UCA SUR']['docente'] is None
+    assert asignaciones['UCA SUR']['ambigua_docente'] is True
+    assert asignaciones['UCA TALENTO']['total_talento'] == 1
+
+
 if __name__ == '__main__':
     test_mapea_denominacion_cargo_y_coordinador_a_cargo()
     test_recupera_cargo_de_una_carga_anterior()
     test_no_confunde_componente_con_cargo()
+    test_resuelve_asignaciones_unicas_por_unidad_sin_inventar_ambiguas()
     print('BASE_MAESTRA_TALENTO_MAPPING_PASS')

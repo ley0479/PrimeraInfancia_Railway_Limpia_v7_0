@@ -388,4 +388,20 @@ CREATE TABLE IF NOT EXISTS master_publicaciones (
 );
 
 CREATE INDEX IF NOT EXISTS idx_master_publicaciones_fundacion ON master_publicaciones(fundacion_id, fecha_publicacion);
+
+CREATE TABLE IF NOT EXISTS master_projection_status (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER NOT NULL,
+    version_id INTEGER NOT NULL,
+    modulo TEXT NOT NULL,
+    estado TEXT NOT NULL,
+    total_registros INTEGER DEFAULT 0,
+    detalle_json TEXT,
+    error TEXT,
+    fecha_actualizacion TEXT NOT NULL,
+    UNIQUE(fundacion_id, version_id, modulo)
+);
+
+CREATE INDEX IF NOT EXISTS idx_master_projection_status_version
+ON master_projection_status(fundacion_id, version_id, estado);
 """

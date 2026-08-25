@@ -447,6 +447,48 @@ def normalizar_rol_talento(cargo: str) -> str:
     return cargo.upper() if cargo else 'TALENTO_HUMANO'
 
 
+def asignaciones_talento_por_unidad(talento_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Resuelve asignaciones únicas por UDS sin inventar relaciones ambiguas."""
+    unidades: dict[str, dict[str, Any]] = {}
+    personas_vistas: set[tuple[str, str, str]] = set()
+    for row in talento_rows:
+        unidad = normalize_name(row.get('unidad_servicio'))
+        if not unidad:
+            continue
+        nombre = normalize_name(clean_text(row.get('nombre_completo')) or clean_text(row.get('nombres')) or normalize_doc(row.get('documento')))
+        rol = normalizar_rol_talento(row.get('cargo') or row.get('rol_normalizado') or '')
+        documento = normalize_doc(row.get('documento'))
+        clave_persona = (unidad, documento or norm_key(nombre), rol)
+        if clave_persona in personas_vistas:
+            continue
+        personas_vistas.add(clave_persona)
+        item = unidades.setdefault(unidad, {'unidad': unidad, 'docentes': set(), 'coordinadores': set(), 'total_talento': 0})
+        item['total_talento'] += 1
+        if rol == 'DOCENTE' and nombre:
+            item['docentes'].add(nombre)
+        if rol == 'COORDINADOR' and nombre:
+            item['coordinadores'].add(nombre)
+        coordinador_referido = normalize_name(row.get('coordinador'))
+        if coordinador_referido:
+            item['coordinadores'].add(coordinador_referido)
+
+    resultado: dict[str, dict[str, Any]] = {}
+    for unidad, item in unidades.items():
+        docentes = sorted(item['docentes'])
+        coordinadores = sorted(item['coordinadores'])
+        resultado[unidad] = {
+            'unidad': unidad,
+            'docente': docentes[0] if len(docentes) == 1 else None,
+            'coordinador': coordinadores[0] if len(coordinadores) == 1 else None,
+            'docentes': docentes,
+            'coordinadores': coordinadores,
+            'total_talento': item['total_talento'],
+            'ambigua_docente': len(docentes) > 1,
+            'ambigua_coordinador': len(coordinadores) > 1,
+        }
+    return resultado
+
+
 def get_user_context() -> dict[str, Any]:
     try:
         from flask import g
@@ -919,14 +961,16 @@ def consolidar_base_maestra(database_path: str, ctx: dict[str, Any] | None = Non
 
     ninos = consolidate_by_document(cuentame_rows, repo, version_id, carga_cuentame, 'cuentame', fundacion_id, corporacion_id)
     salud = consolidate_by_document(salud_rows, repo, version_id, carga_salud, 'salud_nutricion', fundacion_id, corporacion_id)
-    talento_by_unidad: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for item in talento_rows:
-        unidad = normalize_name(item.get('unidad_servicio'))
-        if unidad:
-            talento_by_unidad[unidad].append(item)
+    asignaciones_talento = asignaciones_talento_por_unidad(talento_rows)
 
     now = now_iso()
     for doc, nino in list(ninos.items()):
+        unidad_nino = normalize_name(nino.get('unidad_servicio'))
+        asignacion = asignaciones_talento.get(unidad_nino, {})
+        if not clean_text(nino.get('docente')) and asignacion.get('docente'):
+            nino['docente'] = asignacion['docente']
+        if not clean_text(nino.get('coordinador')) and asignacion.get('coordinador'):
+            nino['coordinador'] = asignacion['coordinador']
         sn = salud.get(doc, {})
         for key in ['peso', 'talla', 'perimetro_braquial', 'diagnostico_nutricional', 'estado_nutricional', 'carne_salud', 'control_crecimiento', 'carne_crecimiento', 'vacunas', 'fecha_toma', 'observaciones']:
             if clean_text(sn.get(key)) and not clean_text(nino.get(key)):
@@ -1047,8 +1091,17 @@ def consolidar_base_maestra(database_path: str, ctx: dict[str, Any] | None = Non
             entry['total_ninos'] += 1
             if not entry.get('coordinador') and n.get('coordinador'):
                 entry['coordinador'] = n.get('coordinador')
+        # El catálogo canónico es la unión Cuéntame + Talento Humano.
+        for unidad, asignacion in asignaciones_talento.items():
+            entry = unidades.setdefault(unidad, {
+                'nombre': unidad, 'codigo_unidad': None,
+                'coordinador': asignacion.get('coordinador'),
+                'modalidad': None, 'total_ninos': 0,
+            })
+            if not entry.get('coordinador') and asignacion.get('coordinador'):
+                entry['coordinador'] = asignacion['coordinador']
         for unidad, entry in unidades.items():
-            entry['total_talento'] = len(talento_by_unidad.get(unidad, []))
+            entry['total_talento'] = int((asignaciones_talento.get(unidad) or {}).get('total_talento') or 0)
             cur.execute(
                 """
                 INSERT INTO master_unidades
@@ -1591,7 +1644,49 @@ def publicar_base_maestra(database_path: str, version_id: int, ctx: dict[str, An
     if ctx.get('rol') not in {'SUPERADMIN', 'GERENTE', 'AUXILIAR_ADMINISTRATIVO'}:
         raise PermissionError('No tienes permiso para publicar la Base Maestra.')
     result = repo.publicar_version(version_id, ctx, observaciones=observaciones)
-    result['message'] = 'Base Maestra publicada correctamente. La versión anterior quedó archivada.'
+    fundacion_id = int(ctx.get('fundacion_id') or 1)
+    now = now_iso()
+    propagacion: dict[str, Any]
+    try:
+        from modules.talento_humano.services import TalentoHumanoService
+        sync = TalentoHumanoService().sincronizar_global(
+            origen=f'base_maestra_publicada_v{version_id}',
+            fuente='base_maestra',
+            ctx_override={
+                'fundacion_id': fundacion_id,
+                'rol': ctx.get('rol') or 'SUPERADMIN',
+                'usuario_id': ctx.get('usuario_id'),
+                'username': ctx.get('usuario') or 'sistema',
+            },
+        )
+        total = int(sync.get('talento_base') or 0)
+        propagacion = {'estado': 'COMPLETADA', 'modulo': 'TALENTO_HUMANO_Y_ASIGNACIONES', 'total_registros': total, 'detalle': sync}
+        error = None
+    except Exception as exc:
+        propagacion = {'estado': 'ERROR', 'modulo': 'TALENTO_HUMANO_Y_ASIGNACIONES', 'total_registros': 0, 'error': str(exc)}
+        total = 0
+        error = str(exc)
+    with repo.connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO master_projection_status
+            (fundacion_id,version_id,modulo,estado,total_registros,detalle_json,error,fecha_actualizacion)
+            VALUES (?,?,?,?,?,?,?,?)
+            ON CONFLICT(fundacion_id,version_id,modulo) DO UPDATE SET
+                estado=excluded.estado,total_registros=excluded.total_registros,
+                detalle_json=excluded.detalle_json,error=excluded.error,
+                fecha_actualizacion=excluded.fecha_actualizacion
+            """,
+            (fundacion_id, version_id, 'TALENTO_HUMANO_Y_ASIGNACIONES', propagacion['estado'], total,
+             json.dumps(propagacion.get('detalle') or {}, ensure_ascii=False, default=str), error, now),
+        )
+        conn.commit()
+    result['propagacion'] = propagacion
+    result['message'] = (
+        'Base Maestra publicada y propagada correctamente. La versión anterior quedó archivada.'
+        if propagacion['estado'] == 'COMPLETADA'
+        else 'Base Maestra publicada, pero la propagación de Talento Humano presentó un error verificable.'
+    )
     return result
 
 

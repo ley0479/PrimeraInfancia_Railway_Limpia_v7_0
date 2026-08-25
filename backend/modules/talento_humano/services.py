@@ -213,12 +213,17 @@ class TalentoHumanoService:
             self.sincronizar_global(origen='eliminar_talento' if hard else 'desactivar_talento')
         return ok
 
-    def sincronizar_global(self, origen: str = 'manual') -> dict[str, Any]:
-        ctx = self.context()
+    def sincronizar_global(self, origen: str = 'manual', fuente: str = 'operativa', ctx_override: dict[str, Any] | None = None) -> dict[str, Any]:
+        ctx = {**self.context(), **(ctx_override or {})}
         self.repo.init_schema()
-        filas = self.repo.list_talento(ctx.get('fundacion_id'), ctx.get('rol') == 'SUPERADMIN')
+        fuente_normalizada = str(fuente or 'operativa').strip().lower()
+        if fuente_normalizada == 'base_maestra':
+            filas = self.repo.list_master_talento(int(ctx.get('fundacion_id') or 1))
+        else:
+            filas = self.repo.list_talento(ctx.get('fundacion_id'), ctx.get('rol') == 'SUPERADMIN')
         resultado = {
             'origen': origen,
+            'fuente': 'master_talento_humano' if fuente_normalizada == 'base_maestra' else 'coordinadores',
             'talento_base': len(filas),
             'coordinadores_creados': 0,
             'coordinadores_actualizados': 0,
@@ -333,7 +338,7 @@ class TalentoHumanoService:
                     resultado['docentes_actualizados'] += 1
                 for unidad in unidades_de_row(row):
                     resultado['unidades_actualizadas'] += self.repo.update_unidad_docente(unidad, row, coord_nombre, fundacion_id)
-                    op = self.repo.update_docente_in_operacion(unidad, row.get('nombre') or '')
+                    op = self.repo.update_docente_in_operacion(unidad, row.get('nombre') or '', fundacion_id)
                     resultado['beneficiarios_actualizados'] += op.get('beneficiarios', 0)
                     resultado['usuarios_actualizados'] += op.get('usuarios', 0)
                     if coord_id and self.repo.upsert_unidad_asignada(coord_id, unidad, fundacion_id, ctx):

@@ -144,6 +144,27 @@ class TalentoHumanoRepository(CoreCompatRepository):
             params,
         )
 
+    def list_master_talento(self, fundacion_id: int) -> list[dict[str, Any]]:
+        """Lee exclusivamente la versión publicada de Talento Humano maestro."""
+        return self.fetch_all(
+            """
+            SELECT id, documento, nombre_completo AS nombre, nombres, apellidos,
+                   cargo, unidad_servicio AS unidad, '[]' AS unidades,
+                   '' AS direccion, telefono, coordinador,
+                   rol_normalizado AS tipo_equipo, '' AS contrato, '' AS perfil,
+                   estado, activo, 'BASE_MAESTRA_PUBLICADA' AS archivo,
+                   fecha_consolidacion AS fecha_carga,
+                   fecha_consolidacion AS fecha_ultima_actualizacion,
+                   fundacion_id, NULL AS usuario_creador_id,
+                   fecha_consolidacion AS fecha_creacion,
+                   fecha_consolidacion AS fecha_actualizacion
+            FROM master_talento_humano
+            WHERE fundacion_id=? AND activo=1
+            ORDER BY unidad_servicio, cargo, nombre_completo
+            """,
+            [int(fundacion_id)],
+        )
+
     def get_talento(self, talento_id: int, fundacion_id: int | None = None, superadmin: bool = False) -> dict[str, Any] | None:
         self.init_schema()
         filtro, params = self._fundacion_filter(fundacion_id, superadmin)
@@ -798,7 +819,10 @@ class TalentoHumanoRepository(CoreCompatRepository):
     def update_unidad_docente(self, unidad: str, docente: dict[str, Any], coordinador_nombre: str, fundacion_id: int) -> int:
         if not unidad:
             return 0
-        row = self.fetch_one("SELECT id FROM unidades WHERE nombre = ?", [unidad])
+        row = self.fetch_one(
+            "SELECT id FROM unidades WHERE nombre = ? AND COALESCE(fundacion_id,1) = ?",
+            [unidad, fundacion_id],
+        )
         if row:
             return self.execute_update(
                 """
@@ -842,7 +866,7 @@ class TalentoHumanoRepository(CoreCompatRepository):
         )
         return 1
 
-    def update_docente_in_operacion(self, unidad: str, docente_nombre: str) -> dict[str, int]:
+    def update_docente_in_operacion(self, unidad: str, docente_nombre: str, fundacion_id: int) -> dict[str, int]:
         """Propaga el Agente Educativo responsable a operación.
 
         Las tablas históricas conservan el nombre de columna ``docente`` porque
@@ -862,11 +886,12 @@ class TalentoHumanoRepository(CoreCompatRepository):
             f'UCA {unidad.upper()}'.strip(),
         })
         placeholders = ','.join(['?'] * len(variantes))
-        params = [docente_nombre, *variantes]
+        params = [docente_nombre, *variantes, int(fundacion_id or 1)]
         sql = f"""
             UPDATE {{table}}
             SET docente = ?
             WHERE UPPER(TRIM(COALESCE(unidad,''))) IN ({placeholders})
+              AND COALESCE(fundacion_id,1) = ?
         """
         beneficiarios = self.execute_update(sql.format(table='beneficiarios'), params)
         usuarios = self.execute_update(sql.format(table='usuarios'), params)
