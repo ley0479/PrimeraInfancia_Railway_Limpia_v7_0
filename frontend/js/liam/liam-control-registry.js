@@ -50,7 +50,22 @@
     'componente-psicosocial.unit':{module:'componente-psicosocial',selector:'#ps-unit'},
     'componente-psicosocial.view':{module:'componente-psicosocial',selector:'#ps-view'},
     'componente-psicosocial.cases':{module:'componente-psicosocial',selector:'#ps-cases'},
-    'componente-psicosocial.detail':{module:'componente-psicosocial',selector:'#ps-detail'}
+    'componente-psicosocial.detail':{module:'componente-psicosocial',selector:'#ps-detail'},
+    'gestion-coordinador.period':{module:'gestion-coordinador',selector:'#gc-periodo'},
+    'gestion-coordinador.dashboard':{module:'gestion-coordinador',selector:'#gc-tab-dashboard'},
+    'gestion-coordinador.assignments':{module:'gestion-coordinador',selector:'#gc-tab-asignaciones'},
+    'gestion-coordinador.calendar':{module:'gestion-coordinador',selector:'#gc-tab-calendario'},
+    'gestion-coordinador.alerts':{module:'gestion-coordinador',selector:'#gc-tab-alertas'},
+    'gestion-coordinador.summary':{module:'gestion-coordinador',selector:'#gc-coordinadores-resumen'},
+    'familias-redes.unit':{module:'familias-redes',selector:'#fcr-filter-unit'},
+    'familias-redes.families':{module:'familias-redes',selector:'#fcr-families'},
+    'familias-redes.activities':{module:'familias-redes',selector:'#fcr-activities'},
+    'familias-redes.commitments':{module:'familias-redes',selector:'#fcr-commitments'},
+    'familias-redes.alerts':{module:'familias-redes',selector:'#fcr-alerts'},
+    'expediente-uca.year':{module:'expediente-operativo-uca',selector:'#giu-vigencia'},
+    'expediente-uca.sync':{module:'expediente-operativo-uca',selector:'#expediente-operativo-uca .giu-btn.giu-btn-primary'},
+    'expediente-uca.list':{module:'expediente-operativo-uca',selector:'#giu-expedientes-list'},
+    'expediente-uca.detail':{module:'expediente-operativo-uca',selector:'#giu-detail'}
   };
   function get(id){return Object.prototype.hasOwnProperty.call(definitions,id)?definitions[id]:null}
   function resolve(id){const item=get(id);return item?document.querySelector(item.selector):null}

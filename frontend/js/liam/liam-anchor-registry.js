@@ -34,7 +34,16 @@
     'liam.anchor.management.deliverables':{module:'gestion-pedagogica',control:'gestion-pedagogica.deliverables',devices:['desktop','tablet'],side:'left'},
     'liam.anchor.psychosocial.sync':{module:'componente-psicosocial',control:'componente-psicosocial.sync',devices:['desktop','tablet'],side:'left'},
     'liam.anchor.psychosocial.filter':{module:'componente-psicosocial',control:'componente-psicosocial.unit',devices:['desktop','tablet'],side:'right'},
-    'liam.anchor.psychosocial.cases':{module:'componente-psicosocial',control:'componente-psicosocial.cases',devices:['desktop','tablet'],side:'right'}
+    'liam.anchor.psychosocial.cases':{module:'componente-psicosocial',control:'componente-psicosocial.cases',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.coordinator.period':{module:'gestion-coordinador',control:'gestion-coordinador.period',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.coordinator.tabs':{module:'gestion-coordinador',control:'gestion-coordinador.dashboard',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.coordinator.summary':{module:'gestion-coordinador',control:'gestion-coordinador.summary',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.families.filter':{module:'familias-redes',control:'familias-redes.unit',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.families.activities':{module:'familias-redes',control:'familias-redes.activities',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.families.alerts':{module:'familias-redes',control:'familias-redes.alerts',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.uca.filters':{module:'expediente-operativo-uca',control:'expediente-uca.year',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.uca.list':{module:'expediente-operativo-uca',control:'expediente-uca.list',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.uca.detail':{module:'expediente-operativo-uca',control:'expediente-uca.detail',devices:['desktop','tablet'],side:'left'}
   };
   function device(){return innerWidth<=640?'mobile':innerWidth<=1024?'tablet':'desktop'}
   function get(id){const item=Object.prototype.hasOwnProperty.call(anchors,id)?anchors[id]:null;return item&&item.devices.includes(device())?item:null}

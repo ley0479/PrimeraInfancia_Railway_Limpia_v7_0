@@ -18,3 +18,7 @@ Talento Humano dispone de una guía de carga, sincronización, registro manual y
 ## Componentes pedagógico y psicosocial
 
 Planeación Pedagógica cubre periodo, carga, revisión y evidencias. Gestión Pedagógica explica equipos, entregables, calendario y alertas. Componente Psicosocial orienta sincronización referencial, filtros, vistas y expedientes sin crear diagnósticos ni sustituir la validación profesional.
+
+## Coordinación, familias y expediente UCA
+
+Gestión por Coordinador explica periodo, equipos, asignaciones, calendario y alertas. Familias y Redes cubre filtros, expedientes referenciales, actividades, compromisos y cierres sustentados. Expediente UCA presenta la vista consolidada y dirige cualquier corrección al módulo fuente.

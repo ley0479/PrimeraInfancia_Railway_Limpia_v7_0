@@ -68,6 +68,27 @@
       {control:'componente-psicosocial.view',anchor:'liam.anchor.psychosocial.filter',message:'Selecciona vista de coordinación o intervención según tu rol y permisos.'},
       {control:'componente-psicosocial.cases',anchor:'liam.anchor.psychosocial.cases',message:'Los expedientes son referenciales y se enlazan con Familias y Redes sin duplicar participantes.'},
       {control:'componente-psicosocial.detail',anchor:'liam.anchor.psychosocial.cases',message:'El detalle reúne trazabilidad, planes y acciones. Todo cierre requiere criterio y validación profesional.'}
+    ],
+    'gestion-coordinador.overview':[
+      {control:'gestion-coordinador.period',anchor:'liam.anchor.coordinator.period',message:'Selecciona el periodo para que indicadores, pendientes y cumplimiento correspondan al mismo mes.'},
+      {control:'gestion-coordinador.dashboard',anchor:'liam.anchor.coordinator.tabs',message:'El Dashboard resume coordinadores, unidades, agentes educativos, pendientes y alertas.'},
+      {control:'gestion-coordinador.summary',anchor:'liam.anchor.coordinator.summary',message:'El resumen debe reflejar los equipos vinculados desde Talento Humano, sin crear una asignación paralela.'},
+      {control:'gestion-coordinador.assignments',anchor:'liam.anchor.coordinator.tabs',message:'Asignaciones permite revisar la relación entre coordinador, unidad y equipo.'},
+      {control:'gestion-coordinador.calendar',anchor:'liam.anchor.coordinator.tabs',message:'Calendario organiza las actividades del equipo en el periodo seleccionado.'},
+      {control:'gestion-coordinador.alerts',anchor:'liam.anchor.coordinator.tabs',message:'Alertas muestra pendientes y vencimientos que requieren seguimiento.'}
+    ],
+    'familias-redes.overview':[
+      {control:'familias-redes.unit',anchor:'liam.anchor.families.filter',message:'Filtra por UCA para consultar únicamente familias y acciones del ámbito autorizado.'},
+      {control:'familias-redes.families',anchor:'liam.anchor.families.filter',message:'Los expedientes familiares reutilizan participantes de Base Maestra y no deben duplicarlos.'},
+      {control:'familias-redes.activities',anchor:'liam.anchor.families.activities',message:'Las actividades registran objetivo, fecha, profesional y unidad; sus resultados deben confirmarse posteriormente.'},
+      {control:'familias-redes.commitments',anchor:'liam.anchor.families.activities',message:'Compromisos mantiene responsable, fecha límite y seguimientos verificables.'},
+      {control:'familias-redes.alerts',anchor:'liam.anchor.families.alerts',message:'Las alertas permanecen abiertas hasta un cierre profesional con resultado y evidencia.'}
+    ],
+    'expediente-uca.overview':[
+      {control:'expediente-uca.year',anchor:'liam.anchor.uca.filters',message:'Confirma vigencia y contrato antes de consultar el expediente operativo.'},
+      {control:'expediente-uca.sync',anchor:'liam.anchor.uca.filters',message:'Sincronizar UCA crea referencias a las fuentes existentes; no copia ni duplica sus registros.'},
+      {control:'expediente-uca.list',anchor:'liam.anchor.uca.list',message:'Selecciona una UCA de la lista para consultar su estado integral.'},
+      {control:'expediente-uca.detail',anchor:'liam.anchor.uca.detail',message:'El detalle consolida Base Maestra, componentes, formatos, documentos, calendario e indicadores. Cada corrección se realiza en el módulo fuente.'}
     ]
   };let active=null,index=0,flags={},kind='tour';
   const dashboardControlByModule={

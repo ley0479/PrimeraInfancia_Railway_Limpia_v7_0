@@ -13,10 +13,10 @@ Estado de Fase 0. “Guía” indica contenido actual reutilizable; no significa
 | Salud y Nutrición | Sí | Sí | Sí | Sí | Alta |
 | Planeación Pedagógica | Sí | Sí | Sí | Sí | Media |
 | Gestión Pedagógica | Sí | Sí | Sí | Sí | Media |
-| Gestión por Coordinador | Fallback | No | No | No | Media |
-| Familias y Redes | Sí | No | No | Parcial | Media |
+| Gestión por Coordinador | Sí | Sí | Sí | Sí | Media |
+| Familias y Redes | Sí | Sí | Sí | Sí | Media |
 | Componente Psicosocial | Sí | Sí | Sí | Sí | Media |
-| Expediente UCA | Sí | No | No | Parcial | Media |
+| Expediente UCA | Sí | Sí | Sí | Sí | Media |
 | Planeación Operativa | Sí | No | No | Parcial | Media |
 | Administración | Fallback | No | No | No | Media |
 | Configuración Institucional | Fallback | No | No | No | Media |
