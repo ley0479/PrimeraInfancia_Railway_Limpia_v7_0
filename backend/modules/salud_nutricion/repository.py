@@ -171,8 +171,11 @@ class SaludNutricionRepository(CoreCompatRepository):
         if not self.table_exists('peso_talla'):
             return
         benef = self.fetch_one(
-            "SELECT id FROM beneficiarios WHERE documento = ? OR nui = ? ORDER BY id DESC LIMIT 1",
-            (row.get('documento'), row.get('documento'))
+            """SELECT id FROM beneficiarios
+               WHERE (documento = ? OR nui = ?)
+                 AND COALESCE(fundacion_id,1)=?
+               ORDER BY id DESC LIMIT 1""",
+            (row.get('documento'), row.get('documento'), _ctx_fundacion_id())
         ) or {}
         campos = [
             'beneficiario_id', 'documento', 'nombre', 'unidad', 'peso', 'talla',
@@ -181,7 +184,9 @@ class SaludNutricionRepository(CoreCompatRepository):
         ]
         estado = row.get('estado_control') or 'Pendiente'
         data = {
-            'beneficiario_id': benef.get('id') or 0,
+            # NULL conserva la medición por documento cuando no existe una
+            # proyección histórica; 0 rompe la FK o enlaza datos incorrectos.
+            'beneficiario_id': benef.get('id'),
             'documento': row.get('documento'),
             'nombre': row.get('nombre_completo'),
             'unidad': row.get('unidad'),

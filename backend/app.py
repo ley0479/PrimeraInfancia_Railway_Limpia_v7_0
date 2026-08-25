@@ -4356,8 +4356,8 @@ def obtener_beneficiarios():
 # ==================== RUTAS: NUTRICIÓN ====================
 @app.route('/api/nutricion/registrar', methods=['POST'])
 def registrar_nutricion():
-    """Registra peso y talla de un beneficiario"""
-    data = request.get_json()
+    """Registra una valoración resolviendo la identidad en Base Maestra."""
+    data = request.get_json(silent=True) or {}
     
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -4365,32 +4365,65 @@ def registrar_nutricion():
     try:
         peso = float(data['peso'])
         talla = float(data['talla'])
-        benef_id = int(data['beneficiario_id'])
-        
-        cursor.execute("SELECT fecha_nacimiento FROM beneficiarios WHERE id = ? AND COALESCE(fundacion_id, 1) = ?", (benef_id, fundacion_actual_id()))
+        benef_id = data.get('beneficiario_id')
+        documento = str(data.get('documento') or '').strip()
+        if benef_id not in (None, ''):
+            cursor.execute(
+                """SELECT * FROM master_ninos
+                   WHERE id=? AND activo=1 AND COALESCE(fundacion_id,1)=?""",
+                (int(benef_id), fundacion_actual_id()),
+            )
+        elif documento:
+            cursor.execute(
+                """SELECT * FROM master_ninos
+                   WHERE documento=? AND activo=1 AND COALESCE(fundacion_id,1)=?
+                   ORDER BY id DESC LIMIT 1""",
+                (documento, fundacion_actual_id()),
+            )
+        else:
+            conn.close()
+            return jsonify({'error': 'Debe indicar beneficiario_id o documento.'}), 400
         benef = cursor.fetchone()
         
         if not benef:
+            conn.close()
             return jsonify({'error': 'Beneficiario no encontrado'}), 404
         
-        edad_meses = calcular_edad_meses(benef['fecha_nacimiento'])
+        documento = str(benef['documento'] or '').strip()
+        edad_meses = int(benef['edad_meses'] or 0) if 'edad_meses' in benef.keys() else calcular_edad_meses(benef['fecha_nacimiento'])
         estado = clasificar_nutricional(peso, talla, edad_meses)
         fecha_proximo = (datetime.now() + timedelta(days=AlertaConfiguracion.DIAS_CONTROL_NUTRICION)).isoformat()
-        
-        cursor.execute("""
-            INSERT INTO peso_talla
-            (beneficiario_id, peso, talla, fecha_medicion, responsable, estado_nutricional,
-             fecha_proximo_control, fecha_carga, fundacion_id, usuario_creador_id, fecha_creacion, fecha_actualizacion)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (benef_id, peso, talla, datetime.now().isoformat(),
-              request.args.get('usuario', 'sistema'), estado, fecha_proximo,
-              datetime.now().isoformat(), fundacion_actual_id(), usuario_actual_id(),
-              datetime.now().isoformat(), datetime.now().isoformat()))
-        
-        conn.commit()
         conn.close()
-        
-        return jsonify({'mensaje': 'Registro guardado', 'estado': estado}), 201
+
+        from modules.salud_nutricion.repository import SaludNutricionRepository
+        from modules.salud_nutricion.services import diagnostico_desde_datos
+        ahora = datetime.now()
+        registro = diagnostico_desde_datos({
+            'tipo_documento': benef['tipo_documento'] if 'tipo_documento' in benef.keys() else '',
+            'documento': documento,
+            'nui': documento,
+            'nombre_completo': benef['nombre_completo'],
+            'fecha_nacimiento': benef['fecha_nacimiento'],
+            'edad_meses': edad_meses,
+            'sexo': benef['sexo'] if 'sexo' in benef.keys() else '',
+            'unidad': benef['unidad_servicio'],
+            'docente': benef['docente'] if 'docente' in benef.keys() else '',
+            'fecha_valoracion': ahora.date().isoformat(),
+            'peso_kg': peso,
+            'talla_cm': talla,
+            'periodo': ahora.strftime('%Y-%m'),
+            'trimestre': ((ahora.month - 1) // 3) + 1,
+            'estado_control': 'Al día',
+            'proximo_control': fecha_proximo[:10],
+        })
+        repo = SaludNutricionRepository(DATABASE_PATH)
+        valoracion_id = repo.guardar_valoracion(
+            registro,
+            fuente_archivo='REGISTRO_MANUAL_BASE_MAESTRA',
+            usuario=request.args.get('usuario', 'sistema'),
+        )
+        return jsonify({'mensaje': 'Registro guardado', 'estado': registro.get('diagnostico_global') or estado,
+                        'documento': documento, 'valoracion_id': valoracion_id}), 201
     
     except Exception as e:
         conn.close()
