@@ -36,6 +36,8 @@ schema = read('backend/modules/asistente_capacitacion/schema.py')
 controller = read('frontend/js/liam/liam-controller.js')
 admin_ui = read('frontend/js/liam/elian-admin-config.js')
 html = read('frontend/index.html')
+controls = read('frontend/js/liam/liam-control-registry.js')
+anchors = read('frontend/js/liam/liam-anchor-registry.js')
 for event in ('module-open-requested','module-loading','module-ready','module-guide-started','module-guide-completed','module-guide-paused','module-guide-resumed','module-guide-skipped','tour-completed','tour-failed'):
     assert event in engine
 for control in ('pause','resume','repeat','skip','previous','next','cancel'):
@@ -49,6 +51,10 @@ assert 'd.elian||' in controller
 assert 'elian-admin-config.js' in html
 assert 'administracion.elian.visual-config' in html
 assert "method:'PUT'" in admin_ui
+for control in ('reportes.period','relacion-mes.period','facturacion.dashboard','integrity.summary','manual.current'):
+    assert control in controls
+for anchor in ('liam.anchor.reports.period','liam.anchor.relation.period','liam.anchor.billing.dashboard','liam.anchor.integrity.summary','liam.anchor.manual.current'):
+    assert anchor in anchors
 assert (ROOT / 'frontend/assets/lia/elian-afro-institutional-male-v1.png').stat().st_size > 100_000
 assert (ROOT / 'frontend/assets/lia/elian-afro-institutional-female-v1.png').stat().st_size > 100_000
 for forbidden in ('eval(', 'new Function', 'document.write('):

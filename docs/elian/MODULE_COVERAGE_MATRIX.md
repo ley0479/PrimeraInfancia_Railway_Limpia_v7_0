@@ -15,15 +15,15 @@ La autorización real se obtiene del backend; una ruta no autorizada nunca se in
 | 90 | Gestión Psicosocial | `componente-psicosocial` | Sí | Sí | Sí | Implementado |
 | 100 | Familias y Redes | `familias-redes` | Sí | Sí | Sí | Implementado |
 | 110 | Formatos | `formatos` | Sí | Sí | Sí | Implementado |
-| 120 | Reportes | `reportes-gerenciales` | Sí | Sí | Pendiente específico | Parcial |
-| 130 | Relación del Mes | `relacion-mes` | Sí | Sí | Pendiente específico | Parcial |
+| 120 | Reportes | `reportes-gerenciales` | Sí | Sí | Sí | Implementado |
+| 130 | Relación del Mes | `relacion-mes` | Sí | Sí | Sí | Implementado |
 | 140 | Expediente UCA | `expediente-operativo-uca` | Sí | Sí | Sí | Implementado |
 | 150 | Administración | `administracion` | Sí | Sí | Sí | Implementado |
-| 160 | Créditos y Licencias | `facturacion` | Sí | Sí | Pendiente específico | Parcial |
-| 170 | Auditoría e Integridad | `integrity-stability` | Sí | Sí | Pendiente específico | Parcial |
-| 180 | Ayuda y Soporte | `manual-operativo` | Sí | Sí | Pendiente específico | Parcial |
+| 160 | Créditos y Licencias | `facturacion` | Sí | Sí | Sí | Implementado |
+| 170 | Auditoría e Integridad | `integrity-stability` | Sí | Sí | Sí | Implementado |
+| 180 | Ayuda y Soporte | `manual-operativo` | Sí | Sí | Sí | Implementado |
 
-Todos tienen explicación estructurada de propósito, usuarios autorizados, entradas, fuente, validaciones, resultados, consumidores, errores y siguiente paso. “Parcial” significa que navega y explica el módulo, pero todavía falta registrar controles internos para señalamiento detallado.
+Todos tienen explicación estructurada de propósito, usuarios autorizados, entradas, fuente, validaciones, resultados, consumidores, errores y siguiente paso. Los controles principales del recorrido están registrados para señalamiento seguro.
 
 ## Recursos visuales
 

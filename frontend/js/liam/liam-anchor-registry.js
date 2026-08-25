@@ -50,7 +50,17 @@
     'liam.anchor.admin.foundation':{module:'administracion',control:'administracion.foundation.form',devices:['desktop','tablet'],side:'right'},
     'liam.anchor.admin.users':{module:'administracion',control:'administracion.users.list',devices:['desktop','tablet'],side:'left'},
     'liam.anchor.identity.logo':{module:'configuracion-institucional',control:'configuracion-institucional.logo.file',devices:['desktop','tablet'],side:'right'},
-    'liam.anchor.identity.assets':{module:'configuracion-institucional',control:'configuracion-institucional.assets',devices:['desktop','tablet'],side:'left'}
+    'liam.anchor.identity.assets':{module:'configuracion-institucional',control:'configuracion-institucional.assets',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.reports.period':{module:'reportes-gerenciales',control:'reportes.period',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.reports.indicators':{module:'reportes-gerenciales',control:'reportes.indicators',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.relation.period':{module:'relacion-mes',control:'relacion-mes.period',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.relation.download':{module:'relacion-mes',control:'relacion-mes.download',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.billing.dashboard':{module:'facturacion',control:'facturacion.dashboard',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.billing.credits':{module:'facturacion',control:'facturacion.credits',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.integrity.summary':{module:'integrity-stability',control:'integrity.summary',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.integrity.diagnostic':{module:'integrity-stability',control:'integrity.diagnostic',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.manual.upload':{module:'manual-operativo',control:'manual.upload',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.manual.current':{module:'manual-operativo',control:'manual.current',devices:['desktop','tablet'],side:'left'}
   };
   function device(){return innerWidth<=640?'mobile':innerWidth<=1024?'tablet':'desktop'}
   function get(id){const item=Object.prototype.hasOwnProperty.call(anchors,id)?anchors[id]:null;return item&&item.devices.includes(device())?item:null}

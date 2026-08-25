@@ -79,7 +79,19 @@
     'configuracion-institucional.logo.type':{module:'configuracion-institucional',selector:'#ci-logo-tipo'},
     'configuracion-institucional.logo.file':{module:'configuracion-institucional',selector:'#ci-logo-file'},
     'configuracion-institucional.logo.form':{module:'configuracion-institucional',selector:'#ci-logo-form'},
-    'configuracion-institucional.assets':{module:'configuracion-institucional',selector:'#ci-assets-grid'}
+    'configuracion-institucional.assets':{module:'configuracion-institucional',selector:'#ci-assets-grid'},
+    'reportes.period':{module:'reportes-gerenciales',selector:'#rg-periodo'},
+    'reportes.indicators':{module:'reportes-gerenciales',selector:'#rg-indicadores'},
+    'reportes.history':{module:'reportes-gerenciales',selector:'#rg-historial'},
+    'relacion-mes.period':{module:'relacion-mes',selector:'#relacion-periodo'},
+    'relacion-mes.download':{module:'relacion-mes',selector:'#relacion-descarga'},
+    'facturacion.dashboard':{module:'facturacion',selector:'#fac-dashboard-cards'},
+    'facturacion.credits':{module:'facturacion',selector:'#fac-creditos-list'},
+    'integrity.summary':{module:'integrity-stability',selector:'#ies-summary'},
+    'integrity.diagnostic':{module:'integrity-stability',selector:'#ies-diagnostic'},
+    'manual.upload':{module:'manual-operativo',selector:'#mo-upload-form'},
+    'manual.current':{module:'manual-operativo',selector:'#mo-vigente-card'},
+    'manual.history':{module:'manual-operativo',selector:'#mo-list'}
   };
   function get(id){return Object.prototype.hasOwnProperty.call(definitions,id)?definitions[id]:null}
   function resolve(id){const item=get(id);return item?document.querySelector(item.selector):null}

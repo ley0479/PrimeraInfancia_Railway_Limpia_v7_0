@@ -51,7 +51,9 @@ def _detail(module_id: str, title: str, purpose: str) -> dict:
             'dashboard', 'base-maestra', 'talento', 'salud-nutricion',
             'calendario-inteligente', 'motor-documental', 'planeacion-pedagogica',
             'gestion-pedagogica', 'componente-psicosocial', 'familias-redes',
-            'formatos', 'expediente-operativo-uca', 'administracion',
+            'formatos', 'reportes-gerenciales', 'relacion-mes',
+            'expediente-operativo-uca', 'administracion', 'facturacion',
+            'integrity-stability', 'manual-operativo',
         },
     }
 
@@ -65,4 +67,3 @@ ELIAN_MODULE_REGISTRY = tuple(
 def authorized_modules(allowed_module_ids) -> list[dict]:
     allowed = set(allowed_module_ids or [])
     return [dict(item) for item in ELIAN_MODULE_REGISTRY if item['module_id'] in allowed]
-

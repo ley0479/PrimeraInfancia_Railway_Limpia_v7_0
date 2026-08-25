@@ -1,6 +1,7 @@
 (function(){
   'use strict';
   let tour=null,index=0,status='not_started',mode='automatic',paused=false,options={};
+  const primaryControl={dashboard:'dashboard.cuentame.upload','base-maestra':'base-maestra.file.upload',talento:'talento.file.select','salud-nutricion':'salud-nutricion.tab.dashboard','calendario-inteligente':'calendario.pending.list','motor-documental':'motor-documental.file.upload','planeacion-pedagogica':'planeacion-pedagogica.period','gestion-pedagogica':'gestion-pedagogica.dashboard','componente-psicosocial':'componente-psicosocial.unit','familias-redes':'familias-redes.unit',formatos:'formatos.template.type','reportes-gerenciales':'reportes.period','relacion-mes':'relacion-mes.period','expediente-operativo-uca':'expediente-uca.year',administracion:'administracion.foundation.form',facturacion:'facturacion.dashboard','integrity-stability':'integrity.summary','manual-operativo':'manual.current'};
   const emit=(name,detail={})=>document.dispatchEvent(new CustomEvent(`elian:${name}`,{detail}));
   const current=()=>tour?.modules?.[index]||null;
   const messageFor=m=>[
@@ -43,7 +44,7 @@
     try{
       await waitReady(module);emit('module-guide-started',{module_id:module.module_id,index,total:tour.modules.length});
       window.LIAM_STATE?.set('guiding');
-      const text=messageFor(module);await options.announceAsync(text);
+      const text=messageFor(module),control=primaryControl[module.module_id];if(control)window.LIAM_ANIMATION?.highlight(control,`Herramienta principal de ${module.title}`);await options.announceAsync(text);window.LIAM_ANIMATION?.clear();
       emit('module-guide-completed',{module_id:module.module_id,index});
       if(!tour.completed_modules.includes(module.module_id))tour.completed_modules.push(module.module_id);
       await save('in_progress');
