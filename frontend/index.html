@@ -2278,16 +2278,16 @@
                                 <p class="mt-2 text-sm text-slate-300 max-w-3xl">Cruce de bases, historial nutricional, alertas, calendario trimestral, dashboard ejecutivo y reportes Excel/PDF sin afectar el módulo histórico de Nutrición y Talla.</p>
                             </div>
                             <div class="flex flex-wrap gap-2">
-                                <button onclick="snMostrarVista('dashboard')" class="sn-tab active" data-sn-tab="dashboard">Dashboard</button>
-                                <button onclick="snMostrarVista('integral')" class="sn-tab" data-sn-tab="integral">Expediente Integral</button>
+                                <button data-help-id="salud-nutricion.tab.dashboard" onclick="snMostrarVista('dashboard')" class="sn-tab active" data-sn-tab="dashboard">Dashboard</button>
+                                <button data-help-id="salud-nutricion.tab.integral" onclick="snMostrarVista('integral')" class="sn-tab" data-sn-tab="integral">Expediente Integral</button>
                                 <button onclick="snMostrarVista('jornadas')" class="sn-tab" data-sn-tab="jornadas">Jornadas</button>
                                 <button onclick="snMostrarVista('rutas')" class="sn-tab" data-sn-tab="rutas">Rutas y Seguimientos</button>
                                 <button onclick="snMostrarVista('importar')" class="sn-tab" data-sn-tab="importar">Importar</button>
                                 <button onclick="snMostrarVista('cruce')" class="sn-tab" data-sn-tab="cruce">Cruce Bases</button>
                                 <button onclick="snMostrarVista('historial')" class="sn-tab" data-sn-tab="historial">Historial</button>
-                                <button onclick="snMostrarVista('alertas')" class="sn-tab" data-sn-tab="alertas">Alertas</button>
+                                <button data-help-id="salud-nutricion.tab.alertas" onclick="snMostrarVista('alertas')" class="sn-tab" data-sn-tab="alertas">Alertas</button>
                                 <button onclick="snMostrarVista('calendario')" class="sn-tab" data-sn-tab="calendario">Calendario</button>
-                                <button onclick="snMostrarVista('entregables')" class="sn-tab" data-sn-tab="entregables">Entregables</button>
+                                <button data-help-id="salud-nutricion.tab.entregables" onclick="snMostrarVista('entregables')" class="sn-tab" data-sn-tab="entregables">Entregables</button>
                             </div>
                         </div>
                     </div>
@@ -2340,7 +2340,7 @@
                                     <p class="mt-2 text-sm text-slate-400 max-w-4xl">Referencia Base Maestra sin duplicarla, controla afiliación, vacunación, valoración integral, salud bucal, tamizaje, controles prenatales, discapacidad, lactancia y canalizaciones. La clasificación automática se muestra como sugerencia y requiere validación profesional.</p>
                                 </div>
                                 <div class="flex flex-wrap gap-2">
-                                    <input id="sn-integral-unidad" class="sn-ent-input w-64" placeholder="Filtrar por UCA (opcional)">
+                                    <input id="sn-integral-unidad" data-help-id="salud-nutricion.integral.unit-filter" class="sn-ent-input w-64" placeholder="Filtrar por UCA (opcional)">
                                     <button onclick="snIntegralSincronizar()" class="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Sincronizar Base Maestra</button>
                                     <button onclick="snIntegralCargar()" class="rounded-xl bg-cyan-600 hover:bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Actualizar</button>
                                 </div>
@@ -2449,7 +2449,7 @@
                         <div class="sn-card">
                             <div class="flex items-center justify-between mb-3">
                                 <h3 class="font-semibold">Alertas nutricionales</h3>
-                                <button onclick="snCargarAlertas()" class="rounded-xl bg-amber-600 hover:bg-amber-500 px-3 py-2 text-sm font-medium text-white">Actualizar</button>
+                                <button data-help-id="salud-nutricion.alerts.refresh" onclick="snCargarAlertas()" class="rounded-xl bg-amber-600 hover:bg-amber-500 px-3 py-2 text-sm font-medium text-white">Actualizar</button>
                             </div>
                             <div class="overflow-x-auto">
                                 <table class="w-full text-left text-xs text-slate-400 sn-table">
@@ -2527,10 +2527,10 @@
                         <div class="grid gap-4 lg:grid-cols-3">
                             <div>
                                 <label class="block text-sm font-medium text-slate-300 mb-2">Archivo talento humano</label>
-                                <input id="input-talento" type="file" accept=".xlsx,.xls,.xlsm,.csv,.txt" class="w-full text-slate-200" />
+                                <input id="input-talento" data-help-id="talento.file.select" type="file" accept=".xlsx,.xls,.xlsm,.csv,.txt" class="w-full text-slate-200" />
                             </div>
                             <div class="flex items-end">
-                                <button onclick="subirTalento()" class="bg-violet-600 hover:bg-violet-500 text-white font-medium px-6 py-2.5 rounded-xl text-sm transition">Guardar talento</button>
+                                <button data-help-id="talento.file.upload" onclick="subirTalento()" class="bg-violet-600 hover:bg-violet-500 text-white font-medium px-6 py-2.5 rounded-xl text-sm transition">Guardar talento</button>
                             </div>
                         </div>
                         <p id="talento-message" class="mt-4 text-sm text-slate-300"></p>
@@ -2548,7 +2548,7 @@
                                     Planeación Pedagógica, Cuentas de Cobro, Relación del Mes, formatos y agentes educativos por unidad.
                                 </p>
                             </div>
-                            <button onclick="sincronizarTalentoGlobal()" class="rounded-xl bg-cyan-600 hover:bg-cyan-500 px-4 py-2.5 text-sm font-medium text-white transition">
+                            <button data-help-id="talento.sync.global" onclick="sincronizarTalentoGlobal()" class="rounded-xl bg-cyan-600 hover:bg-cyan-500 px-4 py-2.5 text-sm font-medium text-white transition">
                                 Sincronizar toda la plataforma
                             </button>
                         </div>
@@ -2636,7 +2636,7 @@
                             <input id="talento-telefono" type="text" placeholder="Teléfono" class="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-200" />
                             <input id="talento-coordinador" type="text" placeholder="Coordinador responsable" class="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-200" />
                             <input id="talento-contrato" type="text" placeholder="Contrato / equipo" class="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-200" />
-                            <button onclick="guardarTalentoManual()" class="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition">Guardar registro</button>
+                            <button data-help-id="talento.manual.save" onclick="guardarTalentoManual()" class="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition">Guardar registro</button>
                         </div>
                     </div>
 
@@ -2671,7 +2671,7 @@
                                         <th class="px-4 py-3">Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody id="talento-list" class="divide-y divide-slate-800">
+                                <tbody id="talento-list" data-help-id="talento.people.list" class="divide-y divide-slate-800">
                                     <tr>
                                         <td colspan="10" class="px-6 py-8 text-center text-slate-500">No hay talento humano registrado todavía.</td>
                                     </tr>
@@ -3774,7 +3774,7 @@
     <script src="./js/lia-assistant/help-registry.js?v=2.7.0-1"></script>
     <script src="./js/lia-assistant/avatar-controller.js?v=2.7.0-1"></script>
     <script src="./js/lia-assistant/speech-controller.js?v=2.7.3-mic-direct-start"></script>
-    <script src="./js/liam/liam-controller.js?v=2.7.3-liam-3"></script>
+    <script src="./js/liam/liam-controller.js?v=2.7.3-liam-4"></script>
     <script src="./js/modules/asistente-capacitacion.js?v=2.7.3-mic-diagnostics"></script>
     <script src="./js/modules/gestion-pedagogica.js?v=2.1.3"></script>
     <script src="./js/modules/gestion-coordinador.js?v=2.1.6"></script>

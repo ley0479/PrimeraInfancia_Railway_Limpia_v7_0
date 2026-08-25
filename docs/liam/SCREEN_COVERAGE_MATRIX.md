@@ -9,8 +9,8 @@ Estado de Fase 0. “Guía” indica contenido actual reutilizable; no significa
 | Calendario Inteligente | Fallback | No | No | Parcial | Alta |
 | Motor Documental | Fallback | No | No | No | Alta |
 | Formatos ICBF | Fallback | No | No | No | Alta |
-| Talento Humano | Sí | No | No | Parcial | Alta |
-| Salud y Nutrición | Sí | No | No | Parcial | Alta |
+| Talento Humano | Sí | Sí | Sí | Sí | Alta |
+| Salud y Nutrición | Sí | Sí | Sí | Sí | Alta |
 | Planeación Pedagógica | Sí | No | No | Parcial | Media |
 | Gestión Pedagógica | Sí | No | No | Parcial | Media |
 | Gestión por Coordinador | Fallback | No | No | No | Media |
@@ -23,4 +23,3 @@ Estado de Fase 0. “Guía” indica contenido actual reutilizable; no significa
 | Resto de módulos autorizados | Fallback | No | No | No | Baja |
 
 La incorporación se realizará por prioridad y rol. Ninguna pantalla podrá usar caminata hasta tener controles y anclajes explícitos.
-

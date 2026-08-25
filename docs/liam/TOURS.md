@@ -10,3 +10,7 @@ Los eventos `base-file-selected`, `document-file-selected` y `document-received`
 ## Presentación institucional
 
 “Conocer la plataforma” inicia una exposición navegable. Presenta identidad confirmada, versión, cantidad de módulos permitidos por el rol, propósito de cada módulo autorizado y flujo general. No muestra módulos sin permiso ni inventa autoría o fechas ausentes.
+
+## Talento Humano y Salud y Nutrición
+
+Talento Humano dispone de una guía de carga, sincronización, registro manual y revisión del listado. Salud y Nutrición cubre Dashboard, expediente integral, filtro por UCA, alertas y entregables. Ambos recorridos orientan y resaltan; nunca guardan, sincronizan ni emiten diagnósticos automáticamente.

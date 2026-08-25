@@ -19,7 +19,14 @@
     'liam.anchor.idp.results':{module:'motor-documental',control:'motor-documental.document.detail',devices:['desktop','tablet'],side:'left'},
     'liam.anchor.formats.type':{module:'formatos',control:'formatos.template.type',devices:['desktop','tablet'],side:'right'},
     'liam.anchor.formats.file':{module:'formatos',control:'formatos.template.file',devices:['desktop','tablet'],side:'right'},
-    'liam.anchor.formats.save':{module:'formatos',control:'formatos.template.save',devices:['desktop','tablet'],side:'left'}
+    'liam.anchor.formats.save':{module:'formatos',control:'formatos.template.save',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.talent.file':{module:'talento',control:'talento.file.select',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.talent.sync':{module:'talento',control:'talento.sync.global',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.talent.list':{module:'talento',control:'talento.people.list',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.nutrition.tabs':{module:'salud-nutricion',control:'salud-nutricion.tab.dashboard',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.nutrition.integral':{module:'salud-nutricion',control:'salud-nutricion.tab.integral',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.nutrition.alerts':{module:'salud-nutricion',control:'salud-nutricion.tab.alertas',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.nutrition.deliverables':{module:'salud-nutricion',control:'salud-nutricion.tab.entregables',devices:['desktop','tablet'],side:'left'}
   };
   function device(){return innerWidth<=640?'mobile':innerWidth<=1024?'tablet':'desktop'}
   function get(id){const item=Object.prototype.hasOwnProperty.call(anchors,id)?anchors[id]:null;return item&&item.devices.includes(device())?item:null}

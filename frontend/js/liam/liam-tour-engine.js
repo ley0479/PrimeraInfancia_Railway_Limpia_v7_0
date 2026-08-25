@@ -33,6 +33,20 @@
       {control:'formatos.template.file',anchor:'liam.anchor.formats.file',message:'Adjunta la plantilla sin modificar su estructura oficial.'},
       {control:'formatos.template.save',anchor:'liam.anchor.formats.save',message:'Guarda la plantilla para registrarla y conservar su versión.'},
       {control:'formatos.template.list',anchor:'liam.anchor.formats.save',message:'Comprueba aquí el estado y la versión registrada.'}
+    ],
+    'talento.overview':[
+      {control:'talento.file.select',anchor:'liam.anchor.talent.file',wait_for:'talent-file-selected',message:'Selecciona la base autorizada de Talento Humano. Verifica que corresponda a la fundación y vigencia correctas.'},
+      {control:'talento.file.upload',anchor:'liam.anchor.talent.file',message:'Guardar talento procesa el archivo; LIAM no activa este botón ni confirma información por ti.'},
+      {control:'talento.sync.global',anchor:'liam.anchor.talent.sync',message:'La sincronización global propaga las asignaciones confirmadas a los módulos consumidores. Úsala después de revisar coordinadores, cargos y unidades.'},
+      {control:'talento.manual.save',anchor:'liam.anchor.talent.sync',message:'El formulario manual permite corregir o agregar una persona verificada sin duplicar documentos.'},
+      {control:'talento.people.list',anchor:'liam.anchor.talent.list',message:'La lista muestra el personal registrado. Revisa cargo, unidad, coordinador y estado antes de continuar.'}
+    ],
+    'salud-nutricion.overview':[
+      {control:'salud-nutricion.tab.dashboard',anchor:'liam.anchor.nutrition.tabs',message:'El Dashboard resume indicadores de Salud y Nutrición sin reemplazar los registros fuente.'},
+      {control:'salud-nutricion.tab.integral',anchor:'liam.anchor.nutrition.integral',message:'Expediente Integral organiza el seguimiento autorizado por participante y unidad.'},
+      {control:'salud-nutricion.integral.unit-filter',anchor:'liam.anchor.nutrition.integral',message:'Filtra por UCA para evitar mezclar unidades durante la revisión.'},
+      {control:'salud-nutricion.tab.alertas',anchor:'liam.anchor.nutrition.alerts',message:'Alertas reúne situaciones que requieren verificación profesional. Una alerta no constituye por sí sola un diagnóstico.'},
+      {control:'salud-nutricion.tab.entregables',anchor:'liam.anchor.nutrition.deliverables',message:'Entregables permite consultar actividades, soportes y estados del componente.'}
     ]
   };let active=null,index=0,flags={},kind='tour';
   const dashboardControlByModule={

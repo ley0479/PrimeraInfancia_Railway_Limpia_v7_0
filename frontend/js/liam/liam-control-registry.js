@@ -24,7 +24,18 @@
     'formatos.template.type':{module:'formatos',selector:'[data-help-id="formatos.template.type"]'},
     'formatos.template.file':{module:'formatos',selector:'[data-help-id="formatos.template.file"]'},
     'formatos.template.save':{module:'formatos',selector:'[data-help-id="formatos.template.save"]'},
-    'formatos.template.list':{module:'formatos',selector:'#plantillas-list'}
+    'formatos.template.list':{module:'formatos',selector:'#plantillas-list'},
+    'talento.file.select':{module:'talento',selector:'#input-talento'},
+    'talento.file.upload':{module:'talento',selector:'[data-help-id="talento.file.upload"]'},
+    'talento.sync.global':{module:'talento',selector:'[data-help-id="talento.sync.global"]'},
+    'talento.manual.save':{module:'talento',selector:'[data-help-id="talento.manual.save"]'},
+    'talento.people.list':{module:'talento',selector:'#talento-list'},
+    'salud-nutricion.tab.dashboard':{module:'salud-nutricion',selector:'[data-help-id="salud-nutricion.tab.dashboard"]'},
+    'salud-nutricion.tab.integral':{module:'salud-nutricion',selector:'[data-help-id="salud-nutricion.tab.integral"]'},
+    'salud-nutricion.tab.alertas':{module:'salud-nutricion',selector:'[data-help-id="salud-nutricion.tab.alertas"]'},
+    'salud-nutricion.tab.entregables':{module:'salud-nutricion',selector:'[data-help-id="salud-nutricion.tab.entregables"]'},
+    'salud-nutricion.integral.unit-filter':{module:'salud-nutricion',selector:'#sn-integral-unidad'},
+    'salud-nutricion.alerts.refresh':{module:'salud-nutricion',selector:'[data-help-id="salud-nutricion.alerts.refresh"]'}
   };
   function get(id){return Object.prototype.hasOwnProperty.call(definitions,id)?definitions[id]:null}
   function resolve(id){const item=get(id);return item?document.querySelector(item.selector):null}
