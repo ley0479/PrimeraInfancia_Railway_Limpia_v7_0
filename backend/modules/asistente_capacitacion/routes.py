@@ -11,6 +11,7 @@ from .assistant_service import respond
 from .platform_profile import get_platform_profile
 from .tool_registry import ALLOWED_TOOLS, execute
 from .rate_limit import allow
+from .provider_adapter import provider_status
 import json, uuid
 
 
@@ -99,7 +100,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     @bp.get('/health')
     def health():
         flags = public_flags()
-        return jsonify({'status':'ok', 'enabled':flags['enabled'], 'mode':'static' if not flags['ai_enabled'] else 'provider'}), 200
+        provider=provider_status()
+        return jsonify({'status':'ok','enabled':flags['enabled'],'mode':'institutional_static' if not provider['ready'] else 'provider','provider_ready':provider['ready'],'realtime_enabled':flags['realtime_enabled']}), 200
 
     @bp.get('/tools')
     def tools_available():

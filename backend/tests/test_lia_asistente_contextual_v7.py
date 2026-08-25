@@ -10,7 +10,7 @@ assert 'Línea Inteligente de Ayuda' in frontend
 speech = (ROOT / 'frontend/js/lia-assistant/speech-controller.js').read_text(encoding='utf-8')
 assert 'SpeechRecognition' in speech and 'webkitSpeechRecognition' in speech
 assert 'La transcripción está lista' in frontend
-assert 'mis-pendientes' in frontend
+assert 'tools/get_pending_activities_summary' in frontend
 assert 'showWhere' in frontend and 'lia-target' in styles
 assert 'Nunca modifica información sin tu autorización' in frontend
 assert 'LÍA — Línea Inteligente de Ayuda' in readme
