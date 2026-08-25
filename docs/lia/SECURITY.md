@@ -7,3 +7,6 @@
 - El contenido se presenta escapado.
 - La primera versión no contiene herramientas de escritura.
 - IA, voz de backend y tiempo real están apagados por defecto.
+- Los diagnósticos usan un lenguaje sereno: separan hechos confirmados,
+  posibilidades e información insuficiente, sin minimizar riesgos reales ni
+  alarmar al usuario.

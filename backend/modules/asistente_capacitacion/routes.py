@@ -110,4 +110,29 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         audit_lia(ctx,'TOOL_COMPLETED',tool=tool_name,request_id=request_id,metadata={'read_only':True})
         return jsonify({'tool':tool_name,'result':result,'read_only':True,'request_id':request_id}),200
 
+    @bp.route('/preferences',methods=['GET','PUT'])
+    def preferences():
+        if not public_flags()['enabled']: return jsonify({'error':'LÍA está desactivada.'}),404
+        ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0);conn=connect()
+        if request.method=='GET':
+            row=conn.execute('SELECT voice_enabled,auto_speak_enabled,muted,speech_rate,reduced_motion,language FROM lia_user_preferences WHERE fundacion_id=? AND usuario_id=?',(fid,uid)).fetchone();conn.close()
+            return jsonify({'preferences':dict(row) if row else {'voice_enabled':0,'auto_speak_enabled':0,'muted':0,'speech_rate':.95,'reduced_motion':0,'language':'es-CO'}}),200
+        data=request.get_json(silent=True) or {}
+        try: rate=max(.6,min(1.5,float(data.get('speech_rate') or .95)))
+        except (TypeError,ValueError): conn.close();return jsonify({'error':'La velocidad de voz no es válida.'}),422
+        now=datetime.now().isoformat(timespec='seconds')
+        values=(1 if data.get('voice_enabled') else 0,1 if data.get('auto_speak_enabled') else 0,1 if data.get('muted') else 0,rate,1 if data.get('reduced_motion') else 0,'es-CO')
+        conn.execute('''INSERT INTO lia_user_preferences(fundacion_id,usuario_id,voice_enabled,auto_speak_enabled,muted,speech_rate,reduced_motion,language,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(fundacion_id,usuario_id) DO UPDATE SET voice_enabled=excluded.voice_enabled,auto_speak_enabled=excluded.auto_speak_enabled,muted=excluded.muted,speech_rate=excluded.speech_rate,reduced_motion=excluded.reduced_motion,language=excluded.language,updated_at=excluded.updated_at''',(fid,uid,*values,now,now));conn.commit();conn.close();audit_lia(ctx,'PREFERENCES_UPDATED',metadata={'voice_enabled':bool(values[0]),'muted':bool(values[2])})
+        return jsonify({'message':'Preferencias de LÍA actualizadas.'}),200
+
+    @bp.post('/feedback')
+    def feedback():
+        flags=public_flags()
+        if not flags['enabled'] or not flags['feedback_enabled']: return jsonify({'error':'La retroalimentación está desactivada.'}),404
+        ctx=get_request_user_context();data=request.get_json(silent=True) or {};rating=int(data.get('rating') or 0)
+        if rating not in {-1,1}: return jsonify({'error':'Valoración no válida.'}),422
+        reason=str(data.get('reason') or '')[:240];module=str(data.get('module') or '')[:80];request_id=str(data.get('request_id') or '')[:64];conn=connect();now=datetime.now().isoformat(timespec='seconds')
+        conn.execute('INSERT INTO lia_feedback(fundacion_id,usuario_id,request_id,rating,reason,module,created_at) VALUES(?,?,?,?,?,?,?)',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),request_id,rating,reason,module,now));conn.commit();conn.close();audit_lia(ctx,'FEEDBACK_RECORDED',module=module,request_id=request_id,metadata={'rating':rating})
+        return jsonify({'message':'Gracias. Registramos tu valoración sin guardar datos personales de la conversación.'}),201
+
     app.register_blueprint(bp)

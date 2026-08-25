@@ -21,8 +21,9 @@ def respond(*, question: str, module: str, role: str) -> dict:
         message = f'Te mostraré el acceso registrado de {guide["titulo"]}. LÍA no pulsará ni guardará nada por ti.'
         actions = [{'type':'scroll_to','target':f'{module}.open'}, {'type':'highlight','target':f'{module}.open'}]
     elif any(word in q for word in ('error', 'falló', 'fallo', 'no carga', 'no descarga', 'validación')):
-        message = ('Información insuficiente para confirmar la causa. Revisa el código y mensaje exactos, '
-                   'el estado del proceso y los requisitos visibles. Comparte el error estructurado sin datos personales.')
+        message = ('Podemos revisarlo con calma. Todavía no hay información suficiente para confirmar la causa. '
+                   'Primero revisa el código y mensaje exactos, el estado del proceso y los requisitos visibles. '
+                   'Si compartes el error estructurado sin datos personales, podré orientarte con mayor precisión.')
         confidence = 'insufficient'
     elif any(word in q for word in ('cómo', 'como', 'paso', 'qué hago', 'que hago', 'pantalla')):
         message = f'{guide.get("proposito", guide["resumen"])}\n' + '\n'.join(f'{i}. {step}' for i, step in enumerate(guide.get('pasos', []), 1))
