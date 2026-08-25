@@ -22,3 +22,7 @@ Planeación Pedagógica cubre periodo, carga, revisión y evidencias. Gestión P
 ## Coordinación, familias y expediente UCA
 
 Gestión por Coordinador explica periodo, equipos, asignaciones, calendario y alertas. Familias y Redes cubre filtros, expedientes referenciales, actividades, compromisos y cierres sustentados. Expediente UCA presenta la vista consolidada y dirige cualquier corrección al módulo fuente.
+
+## Planeación, administración e identidad
+
+Centro de Planeación explica filtros, agenda consolidada y alertas. Administración orienta fundaciones y usuarios sin ejecutar operaciones sensibles. Configuración Institucional cubre la identidad efectiva, tipos de logo, carga e historial; cuando una fundación no configura identidad propia, explica el respaldo global.

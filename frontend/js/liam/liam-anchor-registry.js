@@ -43,7 +43,14 @@
     'liam.anchor.families.alerts':{module:'familias-redes',control:'familias-redes.alerts',devices:['desktop','tablet'],side:'left'},
     'liam.anchor.uca.filters':{module:'expediente-operativo-uca',control:'expediente-uca.year',devices:['desktop','tablet'],side:'left'},
     'liam.anchor.uca.list':{module:'expediente-operativo-uca',control:'expediente-uca.list',devices:['desktop','tablet'],side:'right'},
-    'liam.anchor.uca.detail':{module:'expediente-operativo-uca',control:'expediente-uca.detail',devices:['desktop','tablet'],side:'left'}
+    'liam.anchor.uca.detail':{module:'expediente-operativo-uca',control:'expediente-uca.detail',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.planning.filters':{module:'centro-planeacion',control:'centro-planeacion.period',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.planning.agenda':{module:'centro-planeacion',control:'centro-planeacion.activities',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.planning.alerts':{module:'centro-planeacion',control:'centro-planeacion.notifications',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.admin.foundation':{module:'administracion',control:'administracion.foundation.form',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.admin.users':{module:'administracion',control:'administracion.users.list',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.identity.logo':{module:'configuracion-institucional',control:'configuracion-institucional.logo.file',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.identity.assets':{module:'configuracion-institucional',control:'configuracion-institucional.assets',devices:['desktop','tablet'],side:'left'}
   };
   function device(){return innerWidth<=640?'mobile':innerWidth<=1024?'tablet':'desktop'}
   function get(id){const item=Object.prototype.hasOwnProperty.call(anchors,id)?anchors[id]:null;return item&&item.devices.includes(device())?item:null}

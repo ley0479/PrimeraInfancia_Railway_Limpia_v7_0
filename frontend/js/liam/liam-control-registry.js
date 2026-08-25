@@ -65,7 +65,21 @@
     'expediente-uca.year':{module:'expediente-operativo-uca',selector:'#giu-vigencia'},
     'expediente-uca.sync':{module:'expediente-operativo-uca',selector:'#expediente-operativo-uca .giu-btn.giu-btn-primary'},
     'expediente-uca.list':{module:'expediente-operativo-uca',selector:'#giu-expedientes-list'},
-    'expediente-uca.detail':{module:'expediente-operativo-uca',selector:'#giu-detail'}
+    'expediente-uca.detail':{module:'expediente-operativo-uca',selector:'#giu-detail'},
+    'centro-planeacion.period':{module:'centro-planeacion',selector:'#cpo-period'},
+    'centro-planeacion.unit':{module:'centro-planeacion',selector:'#cpo-unit'},
+    'centro-planeacion.view':{module:'centro-planeacion',selector:'#cpo-view'},
+    'centro-planeacion.activities':{module:'centro-planeacion',selector:'#cpo-activities'},
+    'centro-planeacion.notifications':{module:'centro-planeacion',selector:'#cpo-notifications'},
+    'administracion.foundation.form':{module:'administracion',selector:'#fundacion-form-panel'},
+    'administracion.foundation.save':{module:'administracion',selector:'#fundacion-save-button'},
+    'administracion.user.save':{module:'administracion',selector:'#usuario-save-button'},
+    'administracion.users.list':{module:'administracion',selector:'#usuarios-list'},
+    'configuracion-institucional.preview':{module:'configuracion-institucional',selector:'#ci-preview-logo-fallback'},
+    'configuracion-institucional.logo.type':{module:'configuracion-institucional',selector:'#ci-logo-tipo'},
+    'configuracion-institucional.logo.file':{module:'configuracion-institucional',selector:'#ci-logo-file'},
+    'configuracion-institucional.logo.form':{module:'configuracion-institucional',selector:'#ci-logo-form'},
+    'configuracion-institucional.assets':{module:'configuracion-institucional',selector:'#ci-assets-grid'}
   };
   function get(id){return Object.prototype.hasOwnProperty.call(definitions,id)?definitions[id]:null}
   function resolve(id){const item=get(id);return item?document.querySelector(item.selector):null}

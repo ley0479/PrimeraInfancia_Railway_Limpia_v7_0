@@ -17,9 +17,9 @@ Estado de Fase 0. “Guía” indica contenido actual reutilizable; no significa
 | Familias y Redes | Sí | Sí | Sí | Sí | Media |
 | Componente Psicosocial | Sí | Sí | Sí | Sí | Media |
 | Expediente UCA | Sí | Sí | Sí | Sí | Media |
-| Planeación Operativa | Sí | No | No | Parcial | Media |
-| Administración | Fallback | No | No | No | Media |
-| Configuración Institucional | Fallback | No | No | No | Media |
+| Planeación Operativa | Sí | Sí | Sí | Sí | Media |
+| Administración | Sí | Sí | Sí | Sí | Media |
+| Configuración Institucional | Sí | Sí | Sí | Sí | Media |
 | Resto de módulos autorizados | Fallback | No | No | No | Baja |
 
 La incorporación se realizará por prioridad y rol. Ninguna pantalla podrá usar caminata hasta tener controles y anclajes explícitos.

@@ -89,6 +89,25 @@
       {control:'expediente-uca.sync',anchor:'liam.anchor.uca.filters',message:'Sincronizar UCA crea referencias a las fuentes existentes; no copia ni duplica sus registros.'},
       {control:'expediente-uca.list',anchor:'liam.anchor.uca.list',message:'Selecciona una UCA de la lista para consultar su estado integral.'},
       {control:'expediente-uca.detail',anchor:'liam.anchor.uca.detail',message:'El detalle consolida Base Maestra, componentes, formatos, documentos, calendario e indicadores. Cada corrección se realiza en el módulo fuente.'}
+    ],
+    'centro-planeacion.overview':[
+      {control:'centro-planeacion.period',anchor:'liam.anchor.planning.filters',message:'Selecciona el periodo de la agenda operativa.'},
+      {control:'centro-planeacion.unit',anchor:'liam.anchor.planning.filters',message:'Filtra por UCA para consultar responsabilidades y dependencias de una unidad.'},
+      {control:'centro-planeacion.view',anchor:'liam.anchor.planning.filters',message:'La vista coordinación muestra el ámbito autorizado completo; Mi agenda limita la consulta al rol actual.'},
+      {control:'centro-planeacion.activities',anchor:'liam.anchor.planning.agenda',message:'La agenda consolida actividades existentes. Los datos se corrigen en el módulo que los originó.'},
+      {control:'centro-planeacion.notifications',anchor:'liam.anchor.planning.alerts',message:'Recordatorios y alertas ayudan a priorizar fechas, bloqueos y dependencias.'}
+    ],
+    'administracion.overview':[
+      {control:'administracion.foundation.form',anchor:'liam.anchor.admin.foundation',message:'Fundaciones permite registrar y actualizar organizaciones dentro del alcance del superadministrador.'},
+      {control:'administracion.foundation.save',anchor:'liam.anchor.admin.foundation',message:'Guardar fundación es una acción sensible. LIAM solo explica el formulario y nunca lo ejecuta.'},
+      {control:'administracion.user.save',anchor:'liam.anchor.admin.users',message:'Los usuarios deben crearse con la fundación, rol y datos verificados. La autorización siempre se valida en el servidor.'},
+      {control:'administracion.users.list',anchor:'liam.anchor.admin.users',message:'La lista muestra usuarios, roles, fundación y estado. No se exponen contraseñas.'}
+    ],
+    'configuracion-institucional.overview':[
+      {control:'configuracion-institucional.preview',anchor:'liam.anchor.identity.logo',message:'La vista previa muestra la identidad efectiva de la sesión.'},
+      {control:'configuracion-institucional.logo.type',anchor:'liam.anchor.identity.logo',message:'Selecciona el uso del recurso: plataforma, encabezado, reportes, formatos o documentos.'},
+      {control:'configuracion-institucional.logo.file',anchor:'liam.anchor.identity.logo',message:'Carga un archivo permitido. Si la fundación no configura uno, debe mantenerse la identidad global como respaldo.'},
+      {control:'configuracion-institucional.assets',anchor:'liam.anchor.identity.assets',message:'Archivos de identidad visual conserva el historial y permite reactivar versiones autorizadas.'}
     ]
   };let active=null,index=0,flags={},kind='tour';
   const dashboardControlByModule={
