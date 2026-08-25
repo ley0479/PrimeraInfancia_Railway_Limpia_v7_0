@@ -56,7 +56,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             item=GUIDES.get(key)
             if item: modules.append({'module':key,'title':item.get('titulo'),'purpose':item.get('proposito') or item.get('resumen')})
         profile=get_platform_profile();audit_lia(ctx,'PLATFORM_PRESENTATION_OPENED',module='dashboard',metadata={'modules':len(modules)})
-        return jsonify({'profile':profile,'modules':modules,'role':ctx.get('rol'),'total':len(modules)}),200
+        workflow=['Confirmar sesión, fundación y periodo.','Actualizar las fuentes autorizadas en Base Maestra.','Revisar unidades, participantes y equipo humano.','Consultar calendario, actividades y entregables.','Trabajar en el módulo correspondiente según el rol.','Cargar evidencias o generar borradores.','Confirmar el resultado y atender revisiones o devoluciones.']
+        return jsonify({'profile':profile,'modules':modules,'role':ctx.get('rol'),'total':len(modules),'workflow':workflow}),200
 
     @bp.post('/progreso')
     def progreso():
@@ -93,7 +94,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         allowed = set(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''), []))
         if allowed and module not in allowed:
             return jsonify({'error':'Módulo no autorizado para el rol actual.'}), 403
-        result=respond(question=question, module=module, role=str(ctx.get('rol') or ''))
+        result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed))
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
         return jsonify(result), 200
 

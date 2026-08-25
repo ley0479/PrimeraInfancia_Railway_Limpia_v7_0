@@ -11,4 +11,5 @@ def get_platform_profile() -> dict:
         'created_date': created or None,
         'description': description or 'Plataforma de gestión integral para la operación autorizada de Primera Infancia.',
         'identity_confirmed': bool(designer and created),
+        'version': os.getenv('APP_VERSION', '2.7.2-document-center').strip() or '2.7.2-document-center',
     }
