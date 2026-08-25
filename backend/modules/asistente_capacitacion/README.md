@@ -1,11 +1,12 @@
-# Asistente inteligente de ayuda y capacitación
+# LÍA — Línea Inteligente de Ayuda
 
 ## Alcance
 
-Capa transversal de solo orientación. Detecta el rol autenticado y el módulo
-visible, muestra requisitos y pasos curados, ofrece recorrido de primera entrada
-y lectura en voz alta. Nunca invoca endpoints operativos ni modifica registros
-misionales.
+Capa transversal multimodal de solo orientación. Detecta el rol autenticado y
+el módulo visible, responde por escrito, admite dictado cuando el navegador lo
+permite, muestra requisitos y pasos curados, señala el acceso del módulo,
+consulta pendientes y ofrece lectura en voz alta. Nunca modifica registros
+misionales ni confirma acciones en nombre del usuario.
 
 ## Arquitectura
 
