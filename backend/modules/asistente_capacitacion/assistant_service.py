@@ -3,13 +3,21 @@ from __future__ import annotations
 import uuid
 from .guides import DEFAULT_GUIDE, GUIDES
 from .privacy_service import redact
+from .platform_profile import get_platform_profile
 
 def respond(*, question: str, module: str, role: str) -> dict:
     guide = dict(GUIDES.get(module, DEFAULT_GUIDE))
     q = question.casefold()
     actions = []
     confidence = 'confirmed'
-    if any(word in q for word in ('dónde', 'donde', 'clic', 'botón', 'boton')):
+    if any(word in q for word in ('quién diseñó', 'quien diseño', 'quién creó', 'quien creo', 'fecha de creación', 'fecha de creacion', 'presenta la plataforma', 'presentar la plataforma')):
+        profile = get_platform_profile()
+        if profile['identity_confirmed']:
+            message = f'{profile["description"]} Fue diseñada por {profile["designer"]} y su fecha institucional de creación es {profile["created_date"]}.'
+        else:
+            message = f'{profile["description"]} La autoría y la fecha de creación todavía no han sido confirmadas en la configuración institucional; no debo inventarlas.'
+            confidence = 'insufficient'
+    elif any(word in q for word in ('dónde', 'donde', 'clic', 'botón', 'boton')):
         message = f'Te mostraré el acceso registrado de {guide["titulo"]}. LÍA no pulsará ni guardará nada por ti.'
         actions = [{'type':'scroll_to','target':f'{module}.open'}, {'type':'highlight','target':f'{module}.open'}]
     elif any(word in q for word in ('error', 'falló', 'fallo', 'no carga', 'no descarga', 'validación')):

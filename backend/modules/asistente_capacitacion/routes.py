@@ -8,6 +8,7 @@ from .guides import DEFAULT_GUIDE, GUIDES
 from .schema import SCHEMA_SQL
 from .config import public_flags
 from .assistant_service import respond
+from .platform_profile import get_platform_profile
 
 
 def register_asistente_capacitacion(app, database_path: str) -> None:
@@ -19,7 +20,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.get('/config')
     def config_publica():
-        return jsonify({'lia': public_flags()}), 200
+        return jsonify({'lia': public_flags(), 'platform_profile': get_platform_profile()}), 200
 
     @bp.get('/contexto')
     def contexto():
