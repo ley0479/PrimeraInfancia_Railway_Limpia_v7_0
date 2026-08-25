@@ -67,6 +67,12 @@ for _role in ('SUPERADMIN','GERENTE','COORDINADOR','AUXILIAR_ADMINISTRATIVO'):
 for _role in ('SUPERADMIN','GERENTE'):
     if 'integraciones-configuracion' not in ROLE_MENU_PERMISSIONS[_role]:
         ROLE_MENU_PERMISSIONS[_role].append('integraciones-configuracion')
+for _role in ('SUPERADMIN','GERENTE','COORDINADOR','AUXILIAR_ADMINISTRATIVO','DOCENTE','NUTRICIONISTA','PSICOSOCIAL'):
+    if 'centro-planeacion' not in ROLE_MENU_PERMISSIONS[_role]:
+        ROLE_MENU_PERMISSIONS[_role].append('centro-planeacion')
+for _role in ('SUPERADMIN','GERENTE','COORDINADOR','PSICOSOCIAL'):
+    if 'componente-psicosocial' not in ROLE_MENU_PERMISSIONS[_role]:
+        ROLE_MENU_PERMISSIONS[_role].append('componente-psicosocial')
 
 ALL_ROLES = frozenset(ROLES_SISTEMA)
 MANAGEMENT = frozenset({'SUPERADMIN', 'GERENTE'})

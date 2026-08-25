@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="./css/current-date-time.css?v=2.1.14">
     <link rel="stylesheet" href="./css/gestion-pedagogica.css?v=2.1.2">
     <link rel="stylesheet" href="./css/asistente-capacitacion.css?v=2.7.3-lia-presentation">
-    <link rel="stylesheet" href="./css/liam-assistant.css?v=2.7.3-liam-1">
+    <link rel="stylesheet" href="./css/liam-assistant.css?v=2.7.3-elian-1">
     <link rel="stylesheet" href="./css/planeacion-pedagogica.css?v=2.1.7">
     <link rel="stylesheet" href="./css/gestion-coordinador.css?v=2.1.6">
     <link rel="stylesheet" href="./css/salud-nutricion.css?v=2.6.0-integral-postgresql">
@@ -1332,6 +1332,28 @@
                         <p class="mt-2 text-sm text-slate-400">Control de acceso por fundación, rol, usuario activo y trazabilidad. La información de una fundación queda separada de las demás.</p>
                         <div id="admin-message" class="mt-4 hidden rounded-xl px-4 py-3 text-sm"></div>
                     </div>
+
+                    <section id="elian-admin-config" class="bg-slate-950 border border-cyan-500/30 p-6 rounded-2xl" data-help-id="administracion.elian.visual-config">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <p class="text-xs uppercase tracking-[0.2em] text-cyan-300">Asistente institucional</p>
+                                <h3 class="mt-1 text-lg font-semibold text-white">Apariencia y voz de ELIAN</h3>
+                                <p class="mt-2 text-sm text-slate-400">La configuración pertenece a la fundación activa. La lógica, los permisos y los recorridos no cambian al seleccionar otro personaje.</p>
+                            </div>
+                            <img id="elian-admin-preview" src="./assets/lia/elian-afro-institutional-male-v1.png" alt="Vista previa de ELIAN" class="h-40 w-32 rounded-2xl border border-cyan-500/30 bg-slate-900 object-contain" />
+                        </div>
+                        <div class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                            <label class="text-xs text-slate-400">Nombre<input id="elian-config-name" maxlength="40" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200" value="ELIAN" /></label>
+                            <label class="text-xs text-slate-400">Presentación<select id="elian-config-gender" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200"><option value="male">Hombre</option><option value="female">Mujer</option></select></label>
+                            <label class="text-xs text-slate-400">Variante<select id="elian-config-variant" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200"><option value="afro_colombian_institutional">Afrocolombiano institucional</option><option value="afro_colombian_technological">Afrocolombiano tecnológico</option><option value="afro_colombian_educational">Afrocolombiano educativo</option></select></label>
+                            <label class="text-xs text-slate-400">Movimiento<select id="elian-config-motion" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200"><option value="full">Completo</option><option value="light">Ligero</option><option value="reduced">Reducido</option></select></label>
+                            <label class="text-xs text-slate-400">Voz<select id="elian-config-voice" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200"><option value="male">Masculina</option><option value="female">Femenina</option></select></label>
+                            <label class="text-xs text-slate-400">Velocidad<input id="elian-config-speed" type="number" min="0.6" max="1.5" step="0.05" value="0.95" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200" /></label>
+                            <label class="flex items-center gap-2 text-xs text-slate-300"><input id="elian-config-hologram" type="checkbox" checked /> Base holográfica</label>
+                            <label class="flex items-center gap-2 text-xs text-slate-300"><input id="elian-config-tablet" type="checkbox" checked /> Tablet</label>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center gap-2"><button id="elian-config-save" type="button" class="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500">Guardar configuración</button><button id="elian-config-reset" type="button" class="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800">Restaurar predeterminada</button><span id="elian-config-message" class="text-xs text-slate-400" aria-live="polite"></span></div>
+                    </section>
 
                     <div class="grid gap-6 lg:grid-cols-2">
                         <div id="fundacion-form-panel" class="bg-slate-950 border border-slate-800 p-6 rounded-2xl">
@@ -3774,7 +3796,8 @@
     <script src="./js/lia-assistant/help-registry.js?v=2.7.0-1"></script>
     <script src="./js/lia-assistant/avatar-controller.js?v=2.7.0-1"></script>
     <script src="./js/lia-assistant/speech-controller.js?v=2.7.3-mic-direct-start"></script>
-    <script src="./js/liam/liam-controller.js?v=2.7.3-liam-7"></script>
+    <script src="./js/liam/liam-controller.js?v=2.7.3-elian-1"></script>
+    <script src="./js/liam/elian-admin-config.js?v=2.7.3-elian-1"></script>
     <script src="./js/modules/asistente-capacitacion.js?v=2.7.3-mic-diagnostics"></script>
     <script src="./js/modules/gestion-pedagogica.js?v=2.1.3"></script>
     <script src="./js/modules/gestion-coordinador.js?v=2.1.6"></script>

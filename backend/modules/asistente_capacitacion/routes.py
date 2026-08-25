@@ -6,7 +6,8 @@ from modules.dbapi_compat import sqlite3
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS, get_request_user_context
 from .guides import DEFAULT_GUIDE, GUIDES
 from .schema import SCHEMA_SQL
-from .config import public_flags, public_liam_flags
+from .config import public_flags, public_liam_flags, public_elian_flags
+from .elian_module_registry import authorized_modules
 from .assistant_service import respond
 from .platform_profile import get_platform_profile
 from .tool_registry import ALLOWED_TOOLS, execute
@@ -44,7 +45,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.get('/config')
     def config_publica():
-        return jsonify({'lia': public_flags(), 'liam': public_liam_flags(), 'platform_profile': get_platform_profile()}), 200
+        return jsonify({'lia': public_flags(), 'liam': public_liam_flags(), 'elian': public_elian_flags(), 'platform_profile': get_platform_profile()}), 200
 
     @bp.get('/contexto')
     def contexto():
@@ -69,6 +70,66 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         profile=get_platform_profile();audit_lia(ctx,'PLATFORM_PRESENTATION_OPENED',module='dashboard',metadata={'modules':len(modules)})
         workflow=['Confirmar sesión, fundación y periodo.','Actualizar las fuentes autorizadas en Base Maestra.','Revisar unidades, participantes y equipo humano.','Consultar calendario, actividades y entregables.','Trabajar en el módulo correspondiente según el rol.','Cargar evidencias o generar borradores.','Confirmar el resultado y atender revisiones o devoluciones.']
         return jsonify({'profile':profile,'modules':modules,'role':ctx.get('rol'),'total':len(modules),'workflow':workflow}),200
+
+    @bp.get('/elian/platform-tour')
+    def elian_platform_tour():
+        if not public_elian_flags()['enabled'] or not public_elian_flags()['platform_tour_enabled']:
+            return jsonify({'error':'El recorrido general de ELIAN está desactivado.'}),404
+        ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0)
+        allowed=ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''),[])
+        modules=authorized_modules(allowed)
+        conn=connect();row=conn.execute('SELECT * FROM elian_platform_tour_progress WHERE fundacion_id=? AND usuario_id=? AND tour_id=?',(fid,uid,'platform-overview')).fetchone();conn.close()
+        progress=dict(row) if row else None
+        if progress:
+            for field in ('completed_modules_json','skipped_modules_json','pending_modules_json'):
+                progress[field[:-5]]=json.loads(progress.pop(field) or '[]')
+        audit_lia(ctx,'ELIAN_PLATFORM_TOUR_OPENED',module='dashboard',metadata={'modules':len(modules)})
+        return jsonify({'tour_id':'platform-overview','tour_version':1,'profile':get_platform_profile(),'role':ctx.get('rol'),'modules':modules,'total':len(modules),'progress':progress,'navigation_policy':'registered_routes_only'}),200
+
+    @bp.route('/elian/platform-tour/progress',methods=['GET','PUT'])
+    def elian_platform_tour_progress():
+        if not public_elian_flags()['enabled']: return jsonify({'error':'ELIAN está desactivado.'}),404
+        ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0);tour_id='platform-overview';conn=connect()
+        if request.method=='GET':
+            row=conn.execute('SELECT * FROM elian_platform_tour_progress WHERE fundacion_id=? AND usuario_id=? AND tour_id=?',(fid,uid,tour_id)).fetchone();conn.close()
+            if not row:return jsonify({'progress':None}),200
+            value=dict(row)
+            for field in ('completed_modules_json','skipped_modules_json','pending_modules_json'):value[field[:-5]]=json.loads(value.pop(field) or '[]')
+            return jsonify({'progress':value}),200
+        data=request.get_json(silent=True) or {};allowed_ids=[m['module_id'] for m in authorized_modules(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''),[]))];allowed_set=set(allowed_ids)
+        status=str(data.get('status') or 'in_progress');mode=str(data.get('mode') or 'automatic')
+        if status not in {'not_started','in_progress','paused','completed','cancelled','outdated','failed'} or mode not in {'automatic','interactive','pending','module'}:
+            conn.close();return jsonify({'error':'Estado o modo de recorrido no válido.'}),422
+        current=str(data.get('current_module_id') or '')
+        if current and current not in allowed_set:conn.close();return jsonify({'error':'Módulo no autorizado para el recorrido.'}),403
+        def clean_list(name):
+            values=data.get(name) or []
+            return [item for item in dict.fromkeys(str(v) for v in values) if item in allowed_set]
+        completed=clean_list('completed_modules');skipped=clean_list('skipped_modules');pending=[m for m in allowed_ids if m not in set(completed+skipped)]
+        now=datetime.now().isoformat(timespec='seconds');completed_at=now if status=='completed' else None
+        conn.execute('''INSERT INTO elian_platform_tour_progress(fundacion_id,usuario_id,tour_id,tour_version,current_module_id,current_step,completed_modules_json,skipped_modules_json,pending_modules_json,mode,status,created_at,updated_at,completed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(fundacion_id,usuario_id,tour_id) DO UPDATE SET tour_version=excluded.tour_version,current_module_id=excluded.current_module_id,current_step=excluded.current_step,completed_modules_json=excluded.completed_modules_json,skipped_modules_json=excluded.skipped_modules_json,pending_modules_json=excluded.pending_modules_json,mode=excluded.mode,status=excluded.status,updated_at=excluded.updated_at,completed_at=excluded.completed_at''',(fid,uid,tour_id,1,current,max(0,int(data.get('current_step') or 0)),json.dumps(completed),json.dumps(skipped),json.dumps(pending),mode,status,now,now,completed_at));conn.commit();conn.close()
+        audit_lia(ctx,'ELIAN_PLATFORM_TOUR_PROGRESS',module=current or 'dashboard',metadata={'status':status,'completed':len(completed),'skipped':len(skipped)})
+        return jsonify({'message':'Progreso de ELIAN actualizado.','progress':{'tour_id':tour_id,'tour_version':1,'current_module_id':current,'current_step':max(0,int(data.get('current_step') or 0)),'completed_modules':completed,'skipped_modules':skipped,'pending_modules':pending,'mode':mode,'status':status}}),200
+
+    @bp.route('/elian/visual-config',methods=['GET','PUT'])
+    def elian_visual_config():
+        ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0)
+        variants={
+            'afro_colombian_institutional':{'label':'Afrocolombiano institucional','asset':'./assets/lia/elian-afro-institutional-male-v1.png','ready':True},
+            'afro_colombian_technological':{'label':'Afrocolombiano tecnológico','asset':'./assets/lia/elian-afro-institutional-male-v1.png','ready':False},
+            'afro_colombian_educational':{'label':'Afrocolombiano educativo','asset':'./assets/lia/elian-afro-institutional-male-v1.png','ready':False},
+        }
+        defaults={'assistant_name':'ELIAN','avatar_gender':'male','avatar_variant':'afro_colombian_institutional','skin_tone':'dark','hair_style':'short_coily','clothing_style':'institutional_vest','primary_color':'#123A63','secondary_color':'#16C6D8','voice_gender':'male','voice_speed':.95,'headset_enabled':1,'tablet_enabled':1,'hologram_enabled':1,'animation_enabled':1,'walk_enabled':0,'lip_sync_enabled':0,'motion_level':'light','avatar_asset_path':variants['afro_colombian_institutional']['asset']}
+        conn=connect();row=conn.execute('SELECT * FROM elian_visual_configuration WHERE fundacion_id=?',(fid,)).fetchone()
+        if request.method=='GET':
+            conn.close();config={**defaults,**(dict(row) if row else {})};return jsonify({'configuration':config,'variants':variants,'genders':['male','female'],'editable':str(ctx.get('rol') or '') in {'SUPERADMIN','GERENTE'},'fallback_active':not variants.get(config['avatar_variant'],{}).get('ready',False)}),200
+        if str(ctx.get('rol') or '') not in {'SUPERADMIN','GERENTE'}:conn.close();return jsonify({'error':'Solo un administrador autorizado puede cambiar la apariencia global.'}),403
+        data=request.get_json(silent=True) or {};gender=str(data.get('avatar_gender') or defaults['avatar_gender']);variant=str(data.get('avatar_variant') or defaults['avatar_variant']);motion=str(data.get('motion_level') or defaults['motion_level'])
+        if gender not in {'male','female'} or variant not in variants or motion not in {'full','light','reduced'}:conn.close();return jsonify({'error':'La variante visual solicitada no está registrada.'}),422
+        asset=variants[variant]['asset'];name=str(data.get('assistant_name') or 'ELIAN').strip()[:40] or 'ELIAN';now=datetime.now().isoformat(timespec='seconds')
+        values=(name,gender,variant,str(data.get('skin_tone') or 'dark')[:30],str(data.get('hair_style') or 'short_coily')[:40],str(data.get('clothing_style') or 'institutional_vest')[:40],str(data.get('primary_color') or '#123A63')[:16],str(data.get('secondary_color') or '#16C6D8')[:16],str(data.get('voice_gender') or gender)[:12],max(.6,min(1.5,float(data.get('voice_speed') or .95))),1 if data.get('headset_enabled',True) else 0,1 if data.get('tablet_enabled',True) else 0,1 if data.get('hologram_enabled',True) else 0,1 if data.get('animation_enabled',True) else 0,1 if data.get('walk_enabled',False) else 0,1 if data.get('lip_sync_enabled',False) else 0,motion,asset)
+        conn.execute('''INSERT INTO elian_visual_configuration(fundacion_id,assistant_name,avatar_gender,avatar_variant,skin_tone,hair_style,clothing_style,primary_color,secondary_color,voice_gender,voice_speed,headset_enabled,tablet_enabled,hologram_enabled,animation_enabled,walk_enabled,lip_sync_enabled,motion_level,avatar_asset_path,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(fundacion_id) DO UPDATE SET assistant_name=excluded.assistant_name,avatar_gender=excluded.avatar_gender,avatar_variant=excluded.avatar_variant,skin_tone=excluded.skin_tone,hair_style=excluded.hair_style,clothing_style=excluded.clothing_style,primary_color=excluded.primary_color,secondary_color=excluded.secondary_color,voice_gender=excluded.voice_gender,voice_speed=excluded.voice_speed,headset_enabled=excluded.headset_enabled,tablet_enabled=excluded.tablet_enabled,hologram_enabled=excluded.hologram_enabled,animation_enabled=excluded.animation_enabled,walk_enabled=excluded.walk_enabled,lip_sync_enabled=excluded.lip_sync_enabled,motion_level=excluded.motion_level,avatar_asset_path=excluded.avatar_asset_path,updated_by=excluded.updated_by,updated_at=excluded.updated_at''',(fid,*values,uid,now,now));conn.commit();conn.close();audit_lia(ctx,'ELIAN_VISUAL_CONFIGURATION_UPDATED',module='administracion',metadata={'variant':variant,'gender':gender,'asset_ready':variants[variant]['ready']})
+        return jsonify({'message':'Configuración visual de ELIAN actualizada.','configuration':{'assistant_name':name,'avatar_gender':gender,'avatar_variant':variant,'motion_level':motion,'avatar_asset_path':asset},'asset_ready':variants[variant]['ready']}),200
 
     @bp.post('/progreso')
     def progreso():

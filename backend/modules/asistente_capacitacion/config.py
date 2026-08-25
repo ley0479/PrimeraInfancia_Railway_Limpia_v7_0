@@ -65,3 +65,19 @@ def public_liam_flags() -> dict:
         'performance_mode': performance,
         'default_motion_level': motion,
     }
+
+
+def public_elian_flags() -> dict:
+    """Identidad nueva con fallback compatible a la activación actual de LIAM."""
+    legacy = public_liam_flags()
+    explicitly_enabled = os.getenv('ENABLE_ELIAN_ASSISTANT')
+    enabled = legacy['enabled'] if explicitly_enabled is None else _bool('ENABLE_ELIAN_ASSISTANT', False)
+    return {
+        **legacy,
+        'enabled': enabled,
+        'assistant_name': (os.getenv('ELIAN_ASSISTANT_NAME') or 'ELIAN').strip()[:40] or 'ELIAN',
+        'platform_tour_enabled': enabled and _bool('ELIAN_PLATFORM_TOUR_ENABLED', True),
+        'avatar_gender': (os.getenv('ELIAN_AVATAR_GENDER') or 'male').strip().lower(),
+        'avatar_variant': (os.getenv('ELIAN_AVATAR_VARIANT') or 'afro_colombian_institutional').strip().lower(),
+        'skin_tone': (os.getenv('ELIAN_SKIN_TONE') or 'dark').strip().lower(),
+    }
