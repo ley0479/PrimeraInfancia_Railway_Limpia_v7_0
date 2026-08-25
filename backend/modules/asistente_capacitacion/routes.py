@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 from modules.dbapi_compat import sqlite3
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS, get_request_user_context
 from .guides import DEFAULT_GUIDE, GUIDES
@@ -9,6 +9,9 @@ from .schema import SCHEMA_SQL
 from .config import public_flags
 from .assistant_service import respond
 from .platform_profile import get_platform_profile
+from .tool_registry import ALLOWED_TOOLS, execute
+from .rate_limit import allow
+import json, uuid
 
 
 def register_asistente_capacitacion(app, database_path: str) -> None:
@@ -17,6 +20,15 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     conn = connect(); conn.executescript(SCHEMA_SQL); conn.commit(); conn.close()
     bp = Blueprint('asistente_capacitacion', __name__, url_prefix='/api/asistente-capacitacion')
+
+    def audit_lia(ctx, event_type, *, module=None, tool=None, success=True, request_id=None, metadata=None):
+        conn=connect();conn.execute('''INSERT INTO lia_audit_events
+          (fundacion_id,usuario_id,event_type,modulo,tool_name,success,request_id,metadata_redacted,created_at)
+          VALUES(?,?,?,?,?,?,?,?,?)''',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),event_type,module,tool,1 if success else 0,request_id,json.dumps(metadata or {},ensure_ascii=False),datetime.now().isoformat(timespec='seconds')));conn.commit();conn.close()
+
+    def limited(ctx):
+        flags=public_flags();key=f"{ctx.get('fundacion_id')}:{ctx.get('usuario_id')}"
+        return not allow(key,flags['rate_limit_per_minute'])
 
     @bp.get('/config')
     def config_publica():
@@ -57,6 +69,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if not flags['enabled'] or not flags['text_enabled']:
             return jsonify({'error':'El chat de LÍA está desactivado.'}), 404
         ctx = get_request_user_context()
+        if limited(ctx): return jsonify({'error':'Demasiadas solicitudes a LÍA. Espera un momento.'}),429
         data = request.get_json(silent=True) or {}
         question = str(data.get('message') or '').strip()
         module = str(data.get('module') or 'dashboard').strip()
@@ -67,11 +80,34 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         allowed = set(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''), []))
         if allowed and module not in allowed:
             return jsonify({'error':'Módulo no autorizado para el rol actual.'}), 403
-        return jsonify(respond(question=question, module=module, role=str(ctx.get('rol') or ''))), 200
+        result=respond(question=question, module=module, role=str(ctx.get('rol') or ''))
+        audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
+        return jsonify(result), 200
 
     @bp.get('/health')
     def health():
         flags = public_flags()
         return jsonify({'status':'ok', 'enabled':flags['enabled'], 'mode':'static' if not flags['ai_enabled'] else 'provider'}), 200
+
+    @bp.get('/tools')
+    def tools_available():
+        if not public_flags()['enabled']: return jsonify({'error':'LÍA está desactivada.'}),404
+        get_request_user_context()
+        return jsonify({'tools':sorted(ALLOWED_TOOLS),'write_tools':[]}),200
+
+    @bp.post('/tools/<string:tool_name>')
+    def run_tool(tool_name: str):
+        if not public_flags()['enabled']: return jsonify({'error':'LÍA está desactivada.'}),404
+        ctx=get_request_user_context(); user=dict(getattr(g,'current_user',None) or {})
+        if limited(ctx): return jsonify({'error':'Demasiadas solicitudes a LÍA. Espera un momento.'}),429
+        if not user.get('id'): user={'id':ctx.get('usuario_id'),'rol':ctx.get('rol')}
+        request_id=uuid.uuid4().hex
+        try:
+            result=execute(tool_name,args=request.get_json(silent=True) or {},database_path=database_path,tenant_id=int(ctx.get('fundacion_id') or 1),user=user)
+        except PermissionError as exc: audit_lia(ctx,'TOOL_REJECTED',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),403
+        except LookupError as exc: audit_lia(ctx,'TOOL_NOT_FOUND',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),404
+        except ValueError as exc: audit_lia(ctx,'TOOL_INVALID_ARGUMENT',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),422
+        audit_lia(ctx,'TOOL_COMPLETED',tool=tool_name,request_id=request_id,metadata={'read_only':True})
+        return jsonify({'tool':tool_name,'result':result,'read_only':True,'request_id':request_id}),200
 
     app.register_blueprint(bp)
