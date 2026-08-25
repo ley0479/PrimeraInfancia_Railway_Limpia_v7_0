@@ -33,6 +33,51 @@ class GeneradorFormatos:
         conn.row_factory = sqlite3.Row
         return conn
 
+    def _participantes_unidad(self, unidad):
+        """Lee una UDS desde la versión maestra activa, con fallback pre-migración."""
+        fid = int(current_tenant_id(default=1) or 1)
+        conn = self.get_db_connection()
+        try:
+            cur = conn.cursor()
+            try:
+                version = cur.execute(
+                    "SELECT id FROM master_versiones WHERE fundacion_id=? AND activa=1 ORDER BY id DESC LIMIT 1",
+                    (fid,),
+                ).fetchone()
+            except Exception:
+                version = None
+            if version:
+                rows = cur.execute(
+                    """SELECT *, unidad_servicio AS unidad, documento AS nui
+                       FROM master_ninos
+                       WHERE activo=1 AND fundacion_id=?
+                         AND LOWER(TRIM(COALESCE(unidad_servicio,'')))=LOWER(TRIM(?))
+                       ORDER BY nombre_completo, documento""",
+                    (fid, unidad),
+                ).fetchall()
+            else:
+                rows = cur.execute(
+                    """SELECT * FROM beneficiarios
+                       WHERE COALESCE(fundacion_id,1)=?
+                         AND LOWER(TRIM(COALESCE(unidad,'')))=LOWER(TRIM(?))
+                         AND UPPER(COALESCE(estado,'ACTIVO')) NOT IN ('INACTIVO','RETIRADO','FALLECIDO')
+                       ORDER BY COALESCE(NULLIF(nombres,''),documento), documento""",
+                    (fid, unidad),
+                ).fetchall()
+            salida = []
+            for row in rows:
+                data = dict(row)
+                try:
+                    extra = json.loads(data.get('datos_json') or '{}')
+                    if isinstance(extra, dict):
+                        data = {**extra, **data}
+                except Exception:
+                    pass
+                salida.append(data)
+            return salida
+        finally:
+            conn.close()
+
     def _aplicar_impresion_y_guardar(self, ruta, tipo_formato):
         """Aplica la tabla maestra de impresión a un Excel ya generado."""
         try:
@@ -141,7 +186,7 @@ class GeneradorFormatos:
         def full_name(row):
             if not row:
                 return ''
-            direct = row_value(row, 'nombre', 'nombres_y_apellidos', 'Nombre', 'NOMBRE')
+            direct = row_value(row, 'nombre', 'nombre_completo', 'nombres_y_apellidos', 'Nombre', 'NOMBRE')
             if direct:
                 return limpiar(direct).upper()
             return ' '.join(limpiar(row_value(row, k)) for k in ('nombres', 'apellidos') if limpiar(row_value(row, k))).upper()
@@ -186,17 +231,8 @@ class GeneradorFormatos:
             except Exception:
                 fundacion_db = {}
 
-            try:
-                filas_b = cursor.execute("SELECT * FROM beneficiarios WHERE unidad = ? LIMIT 1", (unidad,)).fetchall()
-                if not filas_b:
-                    filas_b = cursor.execute("SELECT * FROM beneficiarios LIMIT 2000").fetchall()
-                for fila in filas_b:
-                    data = dict(fila)
-                    if not beneficiario_ref and (not unidad_norm or norm(data.get('unidad')) == unidad_norm):
-                        beneficiario_ref = data
-                        break
-            except Exception:
-                beneficiario_ref = {}
+            participantes = self._participantes_unidad(unidad)
+            beneficiario_ref = participantes[0] if participantes else {}
 
             try:
                 for fila in cursor.execute("SELECT * FROM unidades").fetchall():
@@ -207,9 +243,18 @@ class GeneradorFormatos:
             except Exception:
                 unidad_db = {}
 
-            for tabla in ('coordinadores', 'th_personas'):
+            for tabla in ('master_talento_humano', 'coordinadores', 'th_personas'):
                 try:
-                    filas = cursor.execute(f"SELECT * FROM {tabla}").fetchall()
+                    if tabla == 'master_talento_humano':
+                        filas = cursor.execute(
+                            "SELECT * FROM master_talento_humano WHERE activo=1 AND fundacion_id=?",
+                            (fundacion_id,),
+                        ).fetchall()
+                    else:
+                        filas = cursor.execute(
+                            f"SELECT * FROM {tabla} WHERE COALESCE(fundacion_id,1)=?",
+                            (fundacion_id,),
+                        ).fetchall()
                 except Exception:
                     continue
                 for fila in filas:
@@ -328,25 +373,7 @@ class GeneradorFormatos:
         vacías las marcas diarias cuando no existe un registro electrónico
         verificable de asistencia.
         """
-        conn = self.get_db_connection()
-        try:
-            fundacion_id = int(current_tenant_id(default=1) or 1)
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT b.*
-                  FROM beneficiarios b
-                 WHERE COALESCE(b.fundacion_id, 1) = ?
-                   AND LOWER(TRIM(COALESCE(b.unidad,''))) = LOWER(TRIM(?))
-                   AND UPPER(COALESCE(b.estado,'ACTIVO')) NOT IN ('INACTIVO','RETIRADO','FALLECIDO')
-                 ORDER BY COALESCE(NULLIF(b.primer_nombre,''), b.nombres, b.documento),
-                          COALESCE(NULLIF(b.primer_apellido,''), b.apellidos, '')
-                """,
-                (fundacion_id, unidad),
-            )
-            beneficiarios = [dict(row) for row in cursor.fetchall()]
-        finally:
-            conn.close()
+        beneficiarios = self._participantes_unidad(unidad)
 
         metadata = self._metadata_oficial(mes, año, unidad)
         metadata.update({'mes_numero': int(mes), 'mes_nombre': metadata.get('mes_nombre') or metadata.get('mes')})
@@ -364,34 +391,8 @@ class GeneradorFormatos:
     # ==================== BIENESTARINA ====================
     def generar_bienestarina(self, mes, año, unidad, bolsas_por_beneficiario=1):
         """Genera formato de entrega de Bienestarina"""
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-        
-        # Obtener beneficiarios activos de la unidad
-        cursor.execute("""
-            SELECT b.id, b.documento, b.nui, b.nombres, b.apellidos,
-                   b.primer_nombre, b.segundo_nombre,
-                   b.primer_apellido, b.segundo_apellido,
-                   b.nombre_acudiente, b.documento_acudiente, b.parentesco,
-                   b.fecha_nacimiento, b.fecha_carga
-            FROM beneficiarios b
-            WHERE b.unidad = ? AND b.estado = ?
-            ORDER BY COALESCE(NULLIF(b.primer_nombre, ''), b.nombres),
-                     COALESCE(NULLIF(b.primer_apellido, ''), b.apellidos)
-        """, (unidad, EstadoUsuario.ACTIVO))
-        
-        beneficiarios = [dict(row) for row in cursor.fetchall()]
-        
-        # Obtener coordinador de la unidad
-        cursor.execute("""
-            SELECT c.nombres, c.apellidos
-            FROM coordinadores c
-            WHERE c.unidad = ? OR c.unidades LIKE ?
-            LIMIT 1
-        """, (unidad, f'%"{unidad}"%'))
-        
-        coordinador = cursor.fetchone()
-        conn.close()
+        beneficiarios = self._participantes_unidad(unidad)
+        coordinador = None
 
         if self._plantilla_oficial_disponible('bienestarina'):
             nombre_archivo = f"BIENESTARINA_{unidad}_{año}{mes:02d}.xlsx"
@@ -404,7 +405,7 @@ class GeneradorFormatos:
         
         # Crear DataFrame
         df = pd.DataFrame()
-        df['BENEFICIARIO'] = [b['nombres'] for b in beneficiarios]
+        df['BENEFICIARIO'] = [b.get('nombres') or b.get('nombre_completo') or '' for b in beneficiarios]
         df['NUI'] = [b.get('nui', '') for b in beneficiarios]
         df['DOCUMENTO'] = [b['documento'] for b in beneficiarios]
         df['RESPONSABLE'] = ''
@@ -468,36 +469,23 @@ class GeneradorFormatos:
     # ==================== RAN (Registro Asistencia Nutrición) ====================
     def generar_ran(self, mes, año, unidad):
         """Genera RAN (Registro Asistencia Nutrición)"""
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-        
-        # Obtener beneficiarios por grupo etario
-        grupos_etarios = {
-            'GESTANTES': ("b.tipo_beneficiario = 'GESTANTE'", 0, 40),
-            '0-5 MESES': ("b.tipo_beneficiario = 'NINO'", 0, 5),
-            '6-11 MESES': ("b.tipo_beneficiario = 'NINO'", 6, 11),
-            '1-2 AÑOS': ("b.tipo_beneficiario = 'NINO'", 12, 23),
-            '3-5 AÑOS': ("b.tipo_beneficiario = 'NINO'", 24, 59),
-        }
-        
-        resultados = {}
-        
-        for grupo, (tipo_sql, edad_min, edad_max) in grupos_etarios.items():
-            cursor.execute(f"""
-                SELECT COUNT(*) as total
-                FROM beneficiarios b
-                WHERE b.unidad = ? AND b.estado = ? AND {tipo_sql}
-            """, (unidad, EstadoUsuario.ACTIVO))
-            
-            total = cursor.fetchone()['total']
-            resultados[grupo] = total
+        beneficiarios = self._participantes_unidad(unidad)
+        resultados = {'GESTANTES': 0, '0-5 MESES': 0, '6-11 MESES': 0, '1-2 AÑOS': 0, '3-5 AÑOS': 0}
+        for b in beneficiarios:
+            tipo = str(b.get('tipo_beneficiario') or b.get('grupo_etario') or '').upper()
+            try: edad = int(float(b.get('edad_meses') or 0))
+            except Exception: edad = 0
+            if 'GESTANTE' in tipo: grupo = 'GESTANTES'
+            elif edad <= 5: grupo = '0-5 MESES'
+            elif edad <= 11: grupo = '6-11 MESES'
+            elif edad <= 35: grupo = '1-2 AÑOS'
+            else: grupo = '3-5 AÑOS'
+            resultados[grupo] += 1
         
         # Crear DataFrame
         df = pd.DataFrame(list(resultados.items()), columns=['GRUPO_ETARIO', 'CANTIDAD'])
         df['FECHA'] = datetime(año, mes, 1).strftime('%d/%m/%Y')
         df['RESPONSABLE'] = ''
-        
-        conn.close()
         
         # Guardar
         nombre_archivo = f"RAN_{unidad}_{año}{mes:02d}.xlsx"
@@ -510,25 +498,8 @@ class GeneradorFormatos:
     # ==================== RPP (Registro Procedencia Procedimiento) ====================
     def generar_rpp(self, mes, año, unidad):
         """Genera RPP desde plantilla oficial si está disponible."""
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            SELECT b.*
-            FROM beneficiarios b
-            WHERE b.unidad = ? AND b.estado = ?
-            ORDER BY COALESCE(NULLIF(b.nombres, ''), b.documento), b.documento
-        """, (unidad, EstadoUsuario.ACTIVO))
-        beneficiarios = [dict(row) for row in cursor.fetchall()]
-
-        cursor.execute("""
-            SELECT c.nombres, c.apellidos
-            FROM coordinadores c
-            WHERE c.unidad = ? OR c.unidades LIKE ?
-            LIMIT 1
-        """, (unidad, f'%"{unidad}"%'))
-        coordinador = cursor.fetchone()
-        conn.close()
+        beneficiarios = self._participantes_unidad(unidad)
+        coordinador = None
 
         if self._plantilla_oficial_disponible('rpp'):
             nombre_archivo = f"RPP_{unidad}_{año}{mes:02d}.xlsx"
