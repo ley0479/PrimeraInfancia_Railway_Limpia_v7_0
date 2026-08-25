@@ -6,6 +6,7 @@ from modules.dbapi_compat import sqlite3
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS, get_request_user_context
 from .guides import DEFAULT_GUIDE, GUIDES
 from .schema import SCHEMA_SQL
+from .config import public_flags
 
 
 def register_asistente_capacitacion(app, database_path: str) -> None:
@@ -15,8 +16,14 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     conn = connect(); conn.executescript(SCHEMA_SQL); conn.commit(); conn.close()
     bp = Blueprint('asistente_capacitacion', __name__, url_prefix='/api/asistente-capacitacion')
 
+    @bp.get('/config')
+    def config_publica():
+        return jsonify({'lia': public_flags()}), 200
+
     @bp.get('/contexto')
     def contexto():
+        if not public_flags()['enabled']:
+            return jsonify({'error':'LÍA está desactivada.'}), 404
         ctx = get_request_user_context(); modulo = str(request.args.get('modulo') or 'dashboard').strip()
         allowed = set(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''), []))
         if allowed and modulo not in allowed: return jsonify({'error':'Módulo no autorizado para el rol actual.'}), 403
@@ -26,6 +33,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.post('/progreso')
     def progreso():
+        if not public_flags()['enabled']:
+            return jsonify({'error':'LÍA está desactivada.'}), 404
         ctx=get_request_user_context(); data=request.get_json(silent=True) or {}; modulo=str(data.get('modulo') or '').strip()
         if not modulo: return jsonify({'error':'Módulo requerido.'}),400
         allowed=set(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''), []))
