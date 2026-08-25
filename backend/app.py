@@ -5792,12 +5792,27 @@ def obtener_docente_relacion(unidad: str) -> str:
     conn = database_connection()
     cursor = conn.cursor()
     ensure_runtime_schema(cursor)
-    fila = cursor.execute("""
-        SELECT nombre FROM coordinadores
-        WHERE unidad = ? AND activo = 1
-          AND (UPPER(COALESCE(tipo_equipo, '')) LIKE '%DOCENTE%' OR UPPER(COALESCE(cargo, '')) LIKE '%AGENTE%' OR UPPER(COALESCE(cargo, '')) LIKE '%DOCENTE%')
-        ORDER BY nombre LIMIT 1
-    """, (unidad_norm,)).fetchone()
+    fila = None
+    try:
+        fila = cursor.execute("""
+            SELECT nombre_completo AS nombre FROM master_talento_humano
+            WHERE activo = 1 AND COALESCE(fundacion_id,1) = ?
+              AND UPPER(TRIM(COALESCE(unidad_servicio,''))) = UPPER(TRIM(?))
+              AND (UPPER(COALESCE(rol_normalizado,'')) LIKE '%DOCENTE%'
+                   OR UPPER(COALESCE(rol_normalizado,'')) LIKE '%AGENTE%'
+                   OR UPPER(COALESCE(cargo,'')) LIKE '%AGENTE%'
+                   OR UPPER(COALESCE(cargo,'')) LIKE '%DOCENTE%')
+            ORDER BY nombre_completo LIMIT 1
+        """, (fundacion_actual_id(), unidad_norm)).fetchone()
+    except Exception:
+        fila = None
+    if not fila:
+        fila = cursor.execute("""
+            SELECT nombre FROM coordinadores
+            WHERE unidad = ? AND activo = 1
+              AND (UPPER(COALESCE(tipo_equipo, '')) LIKE '%DOCENTE%' OR UPPER(COALESCE(cargo, '')) LIKE '%AGENTE%' OR UPPER(COALESCE(cargo, '')) LIKE '%DOCENTE%')
+            ORDER BY nombre LIMIT 1
+        """, (unidad_norm,)).fetchone()
     conn.close()
     return fila['nombre'] if fila else ''
 
@@ -5813,45 +5828,36 @@ def relacion_mes_generar():
     cursor = conn.cursor()
     ensure_runtime_schema(cursor)
     filas = cursor.execute("""
-        SELECT unidad_servicio AS unidad, grupo_etario AS tipo_beneficiario, edad_meses, estado
+        SELECT unidad_servicio AS unidad, grupo_etario, edad_meses, fecha_nacimiento,
+               estado, docente, datos_json
         FROM master_ninos
         WHERE activo = 1 AND COALESCE(fundacion_id,1) = ?
     """, (fundacion_actual_id(),)).fetchall()
     conn.close()
 
-    resumen = {}
-    for fila in filas:
-        unidad = normalize_unidad(fila['unidad']) or 'SIN UNIDAD'
-        if unidad not in resumen:
-            resumen[unidad] = {'gestantes': 0, 'menores_6': 0, 'seis_11': 0, 'uno_2': 0, 'tres_5': 0}
-        tipo = normalizar_texto_clave(fila['tipo_beneficiario'])
-        edad = int(fila['edad_meses'] or calcular_edad_meses(''))
-        if 'gestante' in tipo:
-            resumen[unidad]['gestantes'] += 1
-        elif edad < 6:
-            resumen[unidad]['menores_6'] += 1
-        elif 6 <= edad <= 11:
-            resumen[unidad]['seis_11'] += 1
-        elif 12 <= edad <= 35:
-            resumen[unidad]['uno_2'] += 1
-        else:
-            resumen[unidad]['tres_5'] += 1
+    from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente
+    resumen = consolidar_por_unidad((dict(fila) for fila in filas), anio, mes)
 
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
     wb = Workbook()
     ws = wb.active
     ws.title = f'RELACION {mes_nombre_es(mes)}'
     headers = [
         'UNIDAD DE ATENCIÓN', 'DOCENTE', 'GESTANTES', 'MENORES 6 MESES', '6 A 11 MESES',
-        '1 A 2 AÑOS 11 MESES', '3 A 5 AÑOS 11 MESES', 'TOTAL PARTICIPANTES',
-        'HUEVOS 30 UNID.', 'HUEVOS 15 UNID.', 'TOTAL HUEVOS', 'VERDURAS',
-        'OLLA COMUNITARIA', 'BIENESTARINA'
+        '1 A 2 AÑOS 11 MESES', '3 A 5 AÑOS 11 MESES', 'SIN CLASIFICAR / REVISAR',
+        'TOTAL USUARIOS', 'HUEVOS PARA GRUPOS DE 30', 'HUEVOS PARA 6 A 11 (15)',
+        'TOTAL HUEVOS (UNIDADES)', 'CUBETAS DE 30', 'PAQUETES COMPLETOS (7 CUBETAS)',
+        'CUBETAS SUELTAS', 'VERDURAS', 'OLLA COMUNITARIA', 'BIENESTARINA'
     ]
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
     ws.cell(1, 1).value = f'RELACIÓN DEL MES DE {mes_nombre_es(mes)} {anio}'
     ws.cell(1, 1).font = Font(bold=True, size=14)
     ws.cell(1, 1).alignment = Alignment(horizontal='center')
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(headers))
+    ws.cell(2, 1).value = 'Regla: 30 huevos por usuario; 6 a 11 meses recibe 15. Una cubeta contiene 30 huevos y un paquete contiene 7 cubetas.'
+    ws.cell(2, 1).alignment = Alignment(horizontal='left', wrap_text=True)
     for col, h in enumerate(headers, start=1):
         cell = ws.cell(3, col)
         cell.value = h
@@ -5867,14 +5873,12 @@ def relacion_mes_generar():
     row = 4
     for unidad in sorted(resumen):
         d = resumen[unidad]
-        total = d['gestantes'] + d['menores_6'] + d['seis_11'] + d['uno_2'] + d['tres_5']
-        huevos_30 = (d['menores_6'] + d['uno_2'] + d['tres_5']) * 30
-        huevos_15 = d['seis_11'] * 15
-        verduras = (d['menores_6'] + d['seis_11'] + d['uno_2'] + d['tres_5']) + (d['gestantes'] * 2)
+        docente = docente_mas_frecuente(d) or obtener_docente_relacion(unidad) or 'SIN DOCENTE ASIGNADO'
         valores = [
-            unidad, obtener_docente_relacion(unidad), d['gestantes'], d['menores_6'], d['seis_11'],
-            d['uno_2'], d['tres_5'], total, huevos_30, huevos_15, huevos_30 + huevos_15,
-            verduras, 1 if total else 0, total
+            unidad, docente, d['gestantes'], d['menores_6'], d['seis_11'], d['uno_2'], d['tres_5'],
+            d['sin_clasificar'], f'=SUM(C{row}:H{row})', f'=(C{row}+D{row}+F{row}+G{row}+H{row})*30',
+            f'=E{row}*15', f'=SUM(J{row}:K{row})', f'=ROUNDUP(L{row}/30,0)', f'=QUOTIENT(M{row},7)',
+            f'=MOD(M{row},7)', f'=I{row}', f'=IF(I{row}>0,1,0)', f'=I{row}'
         ]
         for col, v in enumerate(valores, start=1):
             c = ws.cell(row, col)
@@ -5892,8 +5896,25 @@ def relacion_mes_generar():
             elif col == 7:
                 c.fill = fill_3_5
         row += 1
+    total_row = row
+    ws.cell(total_row, 1).value = 'TOTAL GENERAL'
+    ws.cell(total_row, 1).font = Font(bold=True)
+    for col in range(3, len(headers) + 1):
+        cell = ws.cell(total_row, col)
+        cell.value = f'=SUM({get_column_letter(col)}4:{get_column_letter(col)}{total_row - 1})'
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill('solid', fgColor='B6D7A8')
+        cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    ws.auto_filter.ref = f'A3:{get_column_letter(len(headers))}{total_row - 1}'
+    ws.freeze_panes = 'C4'
     for col in range(1, len(headers) + 1):
-        ws.column_dimensions[chr(64 + col) if col <= 26 else 'A'].width = 18
+        ws.column_dimensions[get_column_letter(col)].width = 20 if col > 2 else 30
+    try:
+        wb.calculation.fullCalcOnLoad = True
+        wb.calculation.forceFullCalc = True
+        wb.calculation.calcMode = 'auto'
+    except Exception:
+        pass
     nombre = f'RELACION_MES_{periodo}.xlsx'
     salida = os.path.join(OUTPUT_FOLDER, nombre)
     wb.save(salida)

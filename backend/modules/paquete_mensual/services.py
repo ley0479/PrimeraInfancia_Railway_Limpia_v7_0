@@ -15,6 +15,7 @@ from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 
 from .schema import PM_SCHEMA_SQL, CATEGORIAS_PAQUETE
+from services.relacion_mes_service import cantidades, consolidar_por_unidad, docente_mas_frecuente
 
 
 MESES_ES = {
@@ -193,30 +194,8 @@ class PaqueteMensualService:
             return f'{anios} años'
         return f'{meses} meses'
 
-    def grupos_por_unidad(self, beneficiarios: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
-        resumen: dict[str, dict[str, int]] = {}
-        for b in beneficiarios:
-            estado = normalizar_texto(b.get('estado') or '')
-            if estado and estado not in {'activo', 'activa'}:
-                continue
-            unidad = (b.get('unidad') or 'SIN UNIDAD').strip() or 'SIN UNIDAD'
-            resumen.setdefault(unidad, {'gestantes': 0, 'menores_6': 0, 'seis_11': 0, 'uno_2': 0, 'tres_5': 0})
-            tipo = normalizar_texto(b.get('tipo_beneficiario') or '')
-            try:
-                edad = int(b.get('edad_meses') or 0)
-            except Exception:
-                edad = 0
-            if 'gestante' in tipo:
-                resumen[unidad]['gestantes'] += 1
-            elif edad < 6:
-                resumen[unidad]['menores_6'] += 1
-            elif 6 <= edad <= 11:
-                resumen[unidad]['seis_11'] += 1
-            elif 12 <= edad <= 35:
-                resumen[unidad]['uno_2'] += 1
-            else:
-                resumen[unidad]['tres_5'] += 1
-        return resumen
+    def grupos_por_unidad(self, beneficiarios: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        return consolidar_por_unidad(beneficiarios)
 
     def write_excel(self, path: Path, title: str, sheets: dict[str, dict[str, Any]]) -> None:
         wb = Workbook()
@@ -524,25 +503,45 @@ class PaqueteMensualService:
     def reporte_relacion_mes(self, package_dir: Path, conn: sqlite3.Connection, paquete_id: int, mes: int, anio: int, fundacion_nombre: str, fundacion_id: int | None) -> None:
         beneficiarios = self.get_beneficiarios(fundacion_id)
         talento = self.get_talento(fundacion_id)
-        resumen = self.grupos_por_unidad(beneficiarios)
+        resumen = consolidar_por_unidad(beneficiarios, anio, mes)
         rows = []
-        for unidad in sorted(resumen):
+        pdf_rows = []
+        first_excel_row = 7  # dos metadatos, línea en blanco y encabezado
+        for index, unidad in enumerate(sorted(resumen)):
             d = resumen[unidad]
-            total = sum(d.values())
-            huevos_30 = (d['menores_6'] + d['uno_2'] + d['tres_5']) * 30
-            huevos_15 = d['seis_11'] * 15
-            verduras = (d['menores_6'] + d['seis_11'] + d['uno_2'] + d['tres_5']) + (d['gestantes'] * 2)
+            qty = cantidades(d)
+            excel_row = first_excel_row + index
+            docente = docente_mas_frecuente(d) or self.docente_unidad(unidad, talento)
             rows.append([
-                unidad, self.docente_unidad(unidad, talento), d['gestantes'], d['menores_6'], d['seis_11'], d['uno_2'], d['tres_5'],
-                total, huevos_30, huevos_15, huevos_30 + huevos_15, verduras, 1 if total else 0, total
+                unidad, docente, d['gestantes'], d['menores_6'], d['seis_11'], d['uno_2'], d['tres_5'], d['sin_clasificar'],
+                f'=SUM(C{excel_row}:H{excel_row})', f'=(C{excel_row}+D{excel_row}+F{excel_row}+G{excel_row}+H{excel_row})*30',
+                f'=E{excel_row}*15', f'=SUM(J{excel_row}:K{excel_row})', f'=ROUNDUP(L{excel_row}/30,0)',
+                f'=QUOTIENT(M{excel_row},7)', f'=MOD(M{excel_row},7)', f'=I{excel_row}',
+                f'=IF(I{excel_row}>0,1,0)', f'=I{excel_row}'
             ])
-        headers = ['Unidad', 'Docente', 'Gestantes', 'Menores 6 meses', '6 a 11 meses', '1 a 2 años', '3 a 5 años', 'Total', 'Huevos 30', 'Huevos 15', 'Total huevos', 'Verduras', 'Olla comunitaria', 'Bienestarina']
+            pdf_rows.append([
+                unidad, docente, d['gestantes'], d['menores_6'], d['seis_11'], d['uno_2'], d['tres_5'], d['sin_clasificar'],
+                qty['total'], qty['huevos_30'], qty['huevos_15'], qty['total_huevos'], qty['cubetas_30'],
+                qty['paquetes_7'], qty['cubetas_sueltas'], qty['verduras'], qty['olla_comunitaria'], qty['bienestarina']
+            ])
+        if rows:
+            total_row = first_excel_row + len(rows)
+            rows.append(['TOTAL GENERAL', ''] + [f'=SUM({get_column_letter(col)}{first_excel_row}:{get_column_letter(col)}{total_row - 1})' for col in range(3, 19)])
+        headers = [
+            'Unidad', 'Docente', 'Gestantes', 'Menores 6 meses', '6 a 11 meses', '1 a 2 años 11 meses',
+            '3 a 5 años 11 meses', 'Sin clasificar / revisar', 'Total usuarios', 'Huevos grupos de 30',
+            'Huevos 6 a 11 (15)', 'Total huevos (unidades)', 'Cubetas de 30',
+            'Paquetes completos (7 cubetas)', 'Cubetas sueltas', 'Verduras', 'Olla comunitaria', 'Bienestarina'
+        ]
         folder = ensure_dir(package_dir / '04_Relacion_Mes')
         xlsx = folder / f'RELACION_MES_{anio}_{mes:02d}.xlsx'
         pdf = folder / f'RELACION_MES_{anio}_{mes:02d}.pdf'
-        meta = [('Fundación', fundacion_nombre), ('Periodo', f'{MESES_ES[mes]} {anio}')]
+        meta = [
+            ('Fundación', fundacion_nombre),
+            ('Periodo', f'{MESES_ES[mes]} {anio}. Regla huevos: 30 por usuario; 6 a 11 meses recibe 15. Paquete = 7 cubetas de 30.'),
+        ]
         self.write_excel(xlsx, f'Relación del mes - {MESES_ES[mes]} {anio}', {'Relación': {'headers': headers, 'rows': rows, 'meta': meta}})
-        self.write_pdf(pdf, f'Relación del mes - {MESES_ES[mes]} {anio}', headers, rows, meta)
+        self.write_pdf(pdf, f'Relación del mes - {MESES_ES[mes]} {anio}', headers, pdf_rows, meta)
         self.add_file_record(conn, paquete_id, '04_Relacion_Mes', xlsx, 'xlsx')
         self.add_file_record(conn, paquete_id, '04_Relacion_Mes', pdf, 'pdf')
 
