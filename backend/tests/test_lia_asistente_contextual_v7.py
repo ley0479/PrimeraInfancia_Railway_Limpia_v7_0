@@ -7,7 +7,9 @@ styles = (ROOT / 'frontend/css/asistente-capacitacion.css').read_text(encoding='
 readme = (ROOT / 'backend/modules/asistente_capacitacion/README.md').read_text(encoding='utf-8')
 
 assert 'Línea Inteligente de Ayuda' in frontend
-assert 'SpeechRecognition' in frontend and 'webkitSpeechRecognition' in frontend
+speech = (ROOT / 'frontend/js/lia-assistant/speech-controller.js').read_text(encoding='utf-8')
+assert 'SpeechRecognition' in speech and 'webkitSpeechRecognition' in speech
+assert 'La transcripción está lista' in frontend
 assert 'mis-pendientes' in frontend
 assert 'showWhere' in frontend and 'lia-target' in styles
 assert 'Nunca modifica información sin tu autorización' in frontend
