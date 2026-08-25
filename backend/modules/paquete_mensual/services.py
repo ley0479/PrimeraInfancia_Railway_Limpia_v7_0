@@ -516,13 +516,13 @@ class PaqueteMensualService:
                 unidad, docente, d['gestantes'], d['menores_6'], d['seis_11'], d['uno_2'], d['tres_5'], d['sin_clasificar'],
                 f'=SUM(C{excel_row}:H{excel_row})', f'=(C{excel_row}+D{excel_row}+F{excel_row}+G{excel_row}+H{excel_row})*30',
                 f'=E{excel_row}*15', f'=SUM(J{excel_row}:K{excel_row})', f'=ROUNDUP(L{excel_row}/30,0)',
-                f'=ROUNDUP(M{excel_row}/7,0)', f'=N{excel_row}*7-M{excel_row}', d['verduras_dobles'],
+                f'=QUOTIENT(M{excel_row},7)', f'=MOD(M{excel_row},7)', d['verduras_dobles'],
                 f'=I{excel_row}+P{excel_row}', f'=IF(I{excel_row}>0,1,0)', f'=I{excel_row}'
             ])
             pdf_rows.append([
                 unidad, docente, d['gestantes'], d['menores_6'], d['seis_11'], d['uno_2'], d['tres_5'], d['sin_clasificar'],
                 qty['total'], qty['huevos_30'], qty['huevos_15'], qty['total_huevos'], qty['cubetas_30'],
-                qty['panales_7'], qty['cubetas_excedentes'], d['verduras_dobles'], qty['verduras'],
+                qty['panales_7'], qty['cubetas_sueltas'], d['verduras_dobles'], qty['verduras'],
                 qty['olla_comunitaria'], qty['bienestarina']
             ])
         if rows:
@@ -532,7 +532,7 @@ class PaqueteMensualService:
             'Unidad', 'Docente', 'Gestantes', 'Menores 6 meses', '6 a 11 meses', '1 a 2 años 11 meses',
             '3 a 5 años 11 meses', 'Sin clasificar / revisar', 'Total usuarios', 'Huevos grupos de 30',
             'Huevos 6 a 11 (15)', 'Total huevos (unidades)', 'Cubetas de 30',
-            'Panales requeridos (7 cubetas)', 'Cubetas excedentes por redondeo', 'Gestantes/lactantes con doble verdura',
+            'Panales completos (7 cubetas)', 'Cubetas sueltas', 'Gestantes/lactantes con doble verdura',
             'Total verduras', 'Olla comunitaria', 'Bienestarina'
         ]
         folder = ensure_dir(package_dir / '04_Relacion_Mes')
@@ -540,7 +540,7 @@ class PaqueteMensualService:
         pdf = folder / f'RELACION_MES_{anio}_{mes:02d}.pdf'
         meta = [
             ('Fundación', fundacion_nombre),
-            ('Periodo', f'{MESES_ES[mes]} {anio}. Regla huevos: 30 por usuario; 6 a 11 meses recibe 15. Panal = 7 cubetas de 30; se redondea hacia arriba.'),
+            ('Periodo', f'{MESES_ES[mes]} {anio}. Regla huevos: 30 por usuario; 6 a 11 meses recibe 15. Panal = 7 cubetas de 30; entrega exacta en panales completos más cubetas sueltas.'),
         ]
         self.write_excel(xlsx, f'Relación del mes - {MESES_ES[mes]} {anio}', {'Relación': {'headers': headers, 'rows': rows, 'meta': meta}})
         self.write_pdf(pdf, f'Relación del mes - {MESES_ES[mes]} {anio}', headers, pdf_rows, meta)
