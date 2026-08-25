@@ -185,7 +185,20 @@
     }
 
     function aplicarIdentidadInstitucional(config) {
-        configuracionActual = config || configuracionActual || {};
+        const anterior = configuracionActual || {};
+        const entrante = config || {};
+        configuracionActual = { ...anterior, ...entrante };
+        // Al abrir una corporación también se carga su formulario local. Ese
+        // registro puede traer campos visuales vacíos, pero no debe borrar la
+        // identidad global efectiva que ya está visible en el encabezado.
+        [
+            'logo_principal_url', 'logo_reportes_url', 'logo_formatos_url',
+            'favicon_url', 'foto_admin_url', 'nombre_admin', 'cargo_admin'
+        ].forEach((key) => {
+            if ((entrante[key] === null || entrante[key] === undefined || entrante[key] === '') && anterior[key]) {
+                configuracionActual[key] = anterior[key];
+            }
+        });
         const plataforma = configuracionActual.nombre_plataforma || 'Primera Infancia';
         const nombre = configuracionActual.nombre_corporacion || 'Organización de prueba';
         const sigla = configuracionActual.sigla || 'ORGDEMO';

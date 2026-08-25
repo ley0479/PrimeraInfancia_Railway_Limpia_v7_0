@@ -14,4 +14,6 @@ assert "?scope=${scope}" in frontend
 assert "await cargarCatalogoIdentidadVisual(true);" in frontend
 assert 'institucional-logo-header' in html
 assert 'institucional-foto-admin-header' in html
+assert "entrante[key] === null" in frontend
+assert "'favicon_url', 'foto_admin_url', 'nombre_admin', 'cargo_admin'" in frontend
 print('IDENTIDAD_CATALOGO_GLOBAL_HEADER_V7_PASS')
