@@ -7,6 +7,7 @@ from modules.seguridad.services import ROLE_MENU_PERMISSIONS, get_request_user_c
 from .guides import DEFAULT_GUIDE, GUIDES
 from .schema import SCHEMA_SQL
 from .config import public_flags
+from .assistant_service import respond
 
 
 def register_asistente_capacitacion(app, database_path: str) -> None:
@@ -48,5 +49,28 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         veces_abierto=ayuda_progreso_usuario.veces_abierto+1,ultima_apertura=excluded.ultima_apertura,fecha_actualizacion=excluded.fecha_actualizacion""",
         (ctx.get('fundacion_id') or 1,ctx.get('usuario_id'),modulo,completed,skipped,now,now,now)); conn.commit(); conn.close()
         return jsonify({'message':'Progreso de aprendizaje actualizado.'}),200
+
+    @bp.post('/chat')
+    def chat():
+        flags = public_flags()
+        if not flags['enabled'] or not flags['text_enabled']:
+            return jsonify({'error':'El chat de LÍA está desactivado.'}), 404
+        ctx = get_request_user_context()
+        data = request.get_json(silent=True) or {}
+        question = str(data.get('message') or '').strip()
+        module = str(data.get('module') or 'dashboard').strip()
+        if not question:
+            return jsonify({'error':'La pregunta es obligatoria.'}), 400
+        if len(question) > flags['max_message_length']:
+            return jsonify({'error':'La pregunta supera el límite permitido.'}), 413
+        allowed = set(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''), []))
+        if allowed and module not in allowed:
+            return jsonify({'error':'Módulo no autorizado para el rol actual.'}), 403
+        return jsonify(respond(question=question, module=module, role=str(ctx.get('rol') or ''))), 200
+
+    @bp.get('/health')
+    def health():
+        flags = public_flags()
+        return jsonify({'status':'ok', 'enabled':flags['enabled'], 'mode':'static' if not flags['ai_enabled'] else 'provider'}), 200
 
     app.register_blueprint(bp)
