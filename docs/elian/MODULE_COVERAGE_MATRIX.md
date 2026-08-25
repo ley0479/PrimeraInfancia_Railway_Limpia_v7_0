@@ -25,3 +25,9 @@ La autorización real se obtiene del backend; una ruta no autorizada nunca se in
 
 Todos tienen explicación estructurada de propósito, usuarios autorizados, entradas, fuente, validaciones, resultados, consumidores, errores y siguiente paso. “Parcial” significa que navega y explica el módulo, pero todavía falta registrar controles internos para señalamiento detallado.
 
+## Recursos visuales
+
+- Afrocolombiano institucional masculino: disponible.
+- Afrocolombiana institucional femenina: disponible.
+- Variante tecnológica masculina y femenina: usa respaldo institucional; arte definitivo pendiente.
+- Variante educativa masculina y femenina: usa respaldo institucional; arte definitivo pendiente.

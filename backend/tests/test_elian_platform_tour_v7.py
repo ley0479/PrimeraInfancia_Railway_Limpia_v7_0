@@ -50,6 +50,7 @@ assert 'elian-admin-config.js' in html
 assert 'administracion.elian.visual-config' in html
 assert "method:'PUT'" in admin_ui
 assert (ROOT / 'frontend/assets/lia/elian-afro-institutional-male-v1.png').stat().st_size > 100_000
+assert (ROOT / 'frontend/assets/lia/elian-afro-institutional-female-v1.png').stat().st_size > 100_000
 for forbidden in ('eval(', 'new Function', 'document.write('):
     assert forbidden not in engine
 
