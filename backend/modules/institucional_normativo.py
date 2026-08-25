@@ -270,18 +270,17 @@ def resolver_identidad_efectiva(
         'nombre_plataforma': choose('nombre_plataforma', 'nombre_plataforma'),
         'nombre_corporacion': choose('nombre_corporacion', 'nombre_plataforma'),
         'sigla': choose('sigla', 'sigla_plataforma'),
-        # El administrador general pertenece a la identidad global. Los datos
-        # locales se conservan en ``administrador_fundacion``, pero no deben
-        # reemplazarlo en el encabezado común de las demás sesiones.
-        'nombre_admin': global_cfg.get('nombre_administrador_general') or GLOBAL_FALLBACK['nombre_admin'],
-        'cargo_admin': global_cfg.get('cargo_administrador_general') or GLOBAL_FALLBACK['cargo_admin'],
+        # Cada campo local reemplaza al global únicamente cuando tiene valor.
+        # Una fundación sin identidad propia conserva íntegra la identidad global.
+        'nombre_admin': choose('nombre_admin', 'nombre_administrador_general'),
+        'cargo_admin': choose('cargo_admin', 'cargo_administrador_general'),
         'color_primario': choose('color_primario', 'color_primario_global'),
         'color_secundario': choose('color_secundario', 'color_secundario_global'),
         'logo_principal_url': asset('logo_principal_url', 'logo_global_key', 'logo'),
         'logo_reportes_url': asset('logo_reportes_url', 'logo_reportes_global_key', 'logo-reportes'),
         'logo_formatos_url': asset('logo_formatos_url', 'logo_formatos_global_key', 'logo-formatos'),
         'favicon_url': asset('favicon_url', 'favicon_global_key', 'favicon'),
-        'foto_admin_url': _global_asset_url('foto-admin', version) if global_cfg.get('foto_administrador_general_key') else None,
+        'foto_admin_url': asset('foto_admin_url', 'foto_administrador_general_key', 'foto-admin'),
         'identity_version': version,
         'updated_at': max(str(tenant_cfg.get('updated_at') or ''), str(global_cfg.get('updated_at') or '')),
         'administrador_general': {

@@ -52,8 +52,8 @@ def main():
         assert mixed['nombre_corporacion'] == 'Fundación Siete'
         assert mixed['sigla'] == 'PG'
         assert mixed['color_primario'] == '#abcdef'
-        assert mixed['cargo_admin'] == 'Dirección General'
-        assert mixed['nombre_admin'] == 'Admin Global'
+        assert mixed['cargo_admin'] == 'Cargo Local'
+        assert mixed['nombre_admin'] == 'Admin Local Antiguo'
         assert mixed['foto_admin_url'] is None
         assert mixed['administrador_fundacion']['nombre'] == 'Admin Local Antiguo'
 
