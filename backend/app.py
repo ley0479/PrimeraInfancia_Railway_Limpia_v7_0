@@ -9717,8 +9717,23 @@ def _alpha59_obtener_usuarios_unidad(unidad):
     try:
         conn = get_db_connection()
 
-        # Primero la fuente consolidada; solo si está vacía se consultan legados.
-        for fuentes in (('master_ninos',), ('usuarios', 'beneficiarios')):
+        # Cuando existe una versión publicada, su población es definitiva.
+        # El fallback legado solo aplica a instalaciones que todavía no han
+        # publicado ninguna Base Maestra, nunca a una UDS vacía de una versión.
+        try:
+            version_activa = conn.execute(
+                'SELECT id FROM master_versiones '
+                'WHERE fundacion_id=? AND activa=1 ORDER BY id DESC LIMIT 1',
+                (tenant_id,),
+            ).fetchone()
+        except Exception:
+            version_activa = None
+        grupos_fuente = (
+            (('master_ninos',),)
+            if version_activa else
+            (('master_ninos',), ('usuarios', 'beneficiarios'))
+        )
+        for fuentes in grupos_fuente:
             usuarios = []
             for tabla in fuentes:
                 # No usar PRAGMA/sqlite_master aquí: la plataforma opera sobre

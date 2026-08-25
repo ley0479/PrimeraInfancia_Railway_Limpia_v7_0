@@ -252,25 +252,48 @@ def register_cruce_bases(app, database_path: str, upload_folder: str, output_fol
                 unidades = [u for u in unidades if u in allowed_units]
             else:
                 unidades = list(allowed_units)
-        cols = repo.columns('usuarios')
+        # La versión publicada de la Base Maestra es la fuente autoritativa.
+        # Una UDS vacía en esa versión debe permanecer vacía: volver a
+        # ``usuarios`` en ese caso reintroduce personas retiradas y duplicados.
+        version_activa = repo.fetch_one(
+            'SELECT id FROM master_versiones '
+            'WHERE fundacion_id=? AND activa=1 ORDER BY id DESC LIMIT 1',
+            [ctx['fundacion_id']],
+        )
+        fuente = 'master_ninos' if version_activa else 'usuarios'
+        cols = repo.columns(fuente)
         where = []
         params = []
-        if 'fundacion_id' in cols and ctx['rol'] != 'SUPERADMIN':
+        if fuente == 'master_ninos':
+            where.extend(['fundacion_id = ?', 'activo = 1'])
+            params.append(ctx['fundacion_id'])
+        elif 'fundacion_id' in cols and ctx['rol'] != 'SUPERADMIN':
             where.append('(fundacion_id = ? OR fundacion_id IS NULL)')
             params.append(ctx['fundacion_id'])
         if unidades:
             placeholders = ','.join(['?'] * len(unidades))
-            where.append(f'unidad IN ({placeholders})')
+            campo_unidad = 'unidad_servicio' if fuente == 'master_ninos' else 'unidad'
+            where.append(f'{campo_unidad} IN ({placeholders})')
             params.extend(unidades)
-        sql = "SELECT * FROM usuarios"
+        if fuente == 'master_ninos':
+            sql = (
+                'SELECT *, unidad_servicio AS unidad, nombre_completo AS nombre '
+                'FROM master_ninos'
+            )
+        else:
+            sql = 'SELECT * FROM usuarios'
         if where:
             sql += " WHERE " + " AND ".join(where)
-        sql += " ORDER BY unidad, nombre"
+        sql += (
+            ' ORDER BY unidad_servicio, nombre_completo'
+            if fuente == 'master_ninos' else
+            ' ORDER BY unidad, nombre'
+        )
         rows = repo.fetch_all(sql, params)
         for r in rows:
             docente = docente_por_unidad(database_path, r.get('unidad'), ctx['fundacion_id'])
-            r['docente_asignado'] = docente.get('nombre') or r.get('docente') or 'Sin docente asignado'
-            r['coordinador'] = docente.get('coordinador') or ''
+            r['docente_asignado'] = r.get('docente') or docente.get('nombre') or 'Sin docente asignado'
+            r['coordinador'] = r.get('coordinador') or docente.get('coordinador') or ''
             try:
                 meses = int(r.get('edad_meses') or 0)
                 r['edad'] = f"{meses // 12} años {meses % 12} meses" if meses else ''

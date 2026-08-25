@@ -721,35 +721,8 @@ class CentroPlaneacionRepository:
             str(templates_dir),
             str(path.parent),
         )
-        rows = []
         with self.connect() as conn:
-            beneficiary_columns = {str(row[1]) for row in conn.execute('PRAGMA table_info("beneficiarios")').fetchall()}
-            if beneficiary_columns:
-                rows = conn.execute(
-                    """
-                    SELECT b.* FROM beneficiarios b
-                     WHERE COALESCE(b.fundacion_id,1)=?
-                       AND LOWER(TRIM(COALESCE(b.unidad,'')))=LOWER(TRIM(?))
-                       AND UPPER(COALESCE(b.estado,'ACTIVO')) NOT IN ('INACTIVO','RETIRADO','FALLECIDO')
-                     ORDER BY COALESCE(NULLIF(b.primer_nombre,''), b.nombres, b.documento),
-                              COALESCE(NULLIF(b.primer_apellido,''), b.apellidos, '')
-                    """,
-                    (int(activity.get("fundacion_id") or 1), unit),
-                ).fetchall()
-            else:
-                master_columns = {str(row[1]) for row in conn.execute('PRAGMA table_info("master_ninos")').fetchall()}
-                if master_columns:
-                    rows = conn.execute(
-                        """
-                        SELECT n.* FROM master_ninos n
-                         WHERE COALESCE(n.fundacion_id,1)=?
-                           AND LOWER(TRIM(COALESCE(n.unidad_servicio,'')))=LOWER(TRIM(?))
-                           AND COALESCE(n.activo,1)=1
-                           AND UPPER(COALESCE(n.estado,'ACTIVO')) NOT IN ('INACTIVO','RETIRADO','FALLECIDO')
-                         ORDER BY COALESCE(n.nombre_completo,n.documento)
-                        """,
-                        (int(activity.get("fundacion_id") or 1), unit),
-                    ).fetchall()
+            rows, _ = self._ram_participant_rows(conn, int(activity.get("fundacion_id") or 1), unit)
         users = [generator._usuario_oficial(dict(row)) for row in rows]
         metadata = generator._metadata_oficial(month, year, unit)
         metadata.update({"mes_numero": month, "mes_nombre": metadata.get("mes_nombre") or metadata.get("mes")})
@@ -759,6 +732,43 @@ class CentroPlaneacionRepository:
             str(path),
             str(templates_dir),
         )
+
+    def _ram_participant_rows(self, conn, fundacion_id: int, unit: str):
+        """Base Maestra primero; legado solo si aún no existe versión publicada."""
+        active_version = False
+        if self._table_exists(conn, "master_versiones"):
+            active_version = bool(conn.execute(
+                "SELECT 1 FROM master_versiones WHERE fundacion_id=? AND activa=1 LIMIT 1",
+                (fundacion_id,),
+            ).fetchone())
+        if self._table_exists(conn, "master_ninos"):
+            rows = conn.execute(
+                """
+                SELECT n.* FROM master_ninos n
+                 WHERE COALESCE(n.fundacion_id,1)=?
+                   AND LOWER(TRIM(COALESCE(n.unidad_servicio,'')))=LOWER(TRIM(?))
+                   AND COALESCE(n.activo,1)=1
+                   AND UPPER(COALESCE(n.estado,'ACTIVO')) NOT IN ('INACTIVO','RETIRADO','FALLECIDO')
+                 ORDER BY COALESCE(n.nombre_completo,n.documento)
+                """,
+                (fundacion_id, unit),
+            ).fetchall()
+            if rows or active_version:
+                return rows, "master_ninos"
+        if self._table_exists(conn, "beneficiarios"):
+            rows = conn.execute(
+                """
+                SELECT b.* FROM beneficiarios b
+                 WHERE COALESCE(b.fundacion_id,1)=?
+                   AND LOWER(TRIM(COALESCE(b.unidad,'')))=LOWER(TRIM(?))
+                   AND UPPER(COALESCE(b.estado,'ACTIVO')) NOT IN ('INACTIVO','RETIRADO','FALLECIDO')
+                 ORDER BY COALESCE(NULLIF(b.primer_nombre,''), b.nombres, b.documento),
+                          COALESCE(NULLIF(b.primer_apellido,''), b.apellidos, '')
+                """,
+                (fundacion_id, unit),
+            ).fetchall()
+            return rows, "beneficiarios_compatibilidad_sin_version_maestra"
+        return [], "sin_fuente"
 
     def _write_pdf(self, path: Path, activity: dict[str, Any], doc_type: str) -> None:
         styles = getSampleStyleSheet(); story = []

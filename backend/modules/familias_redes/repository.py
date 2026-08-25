@@ -101,9 +101,21 @@ class FamiliasRedesRepository:
         if not row:
             return None
         data = dict(row)
+        documento = self._field(data, "documento", "numero_documento", "identificacion", "num_documento")
+        effective_source = source
+        if source != "master_ninos" and documento and self._table_exists(conn, "master_ninos"):
+            canonical = conn.execute(
+                """SELECT * FROM master_ninos WHERE fundacion_id=? AND activo=1
+                   AND documento=? ORDER BY id DESC LIMIT 1""",
+                (fundacion_id, str(documento).strip()),
+            ).fetchone()
+            if canonical:
+                data = dict(canonical)
+                participant_id = int(data.get("id") or participant_id)
+                effective_source = "master_ninos"
         return {
             "id": participant_id,
-            "origen": source,
+            "origen": effective_source,
             "documento": self._field(data, "documento", "numero_documento", "identificacion", "num_documento"),
             "nombre": self._field(data, "nombre_completo", "nombre", "nombres", default=f"Participante #{participant_id}"),
             "unidad": self._field(data, "unidad_servicio", "unidad", "uds", "uca"),

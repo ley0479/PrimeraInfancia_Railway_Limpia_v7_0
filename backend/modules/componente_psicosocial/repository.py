@@ -122,7 +122,22 @@ class ComponentePsicosocialRepository:
             for name in names:
                 if data.get(name) not in (None, ""): return data.get(name)
             return None
-        return {"id": participant_id, "documento": pick("documento","numero_documento","identificacion"), "nombre": pick("nombre_completo","nombre","nombres") or f"Participante #{participant_id}", "raw": data}
+        documento = pick("documento","numero_documento","identificacion")
+        origen_efectivo = source
+        # Los expedientes históricos conservan su referencia, pero su identidad
+        # visible se resuelve desde la versión maestra vigente por documento.
+        if source != "master_ninos" and documento and self._table_exists(conn, "master_ninos"):
+            canonical = conn.execute(
+                """SELECT * FROM master_ninos WHERE fundacion_id=? AND activo=1
+                   AND documento=? ORDER BY id DESC LIMIT 1""",
+                (fundacion_id, str(documento).strip()),
+            ).fetchone()
+            if canonical:
+                data = dict(canonical); participant_id = int(data.get("id") or participant_id)
+                origen_efectivo = "master_ninos"
+                documento = data.get("documento")
+        nombre = data.get("nombre_completo") or data.get("nombre") or data.get("nombres") or f"Participante #{participant_id}"
+        return {"id": participant_id, "origen": origen_efectivo, "documento": documento, "nombre": nombre, "raw": data}
 
     def list_expedientes(self, fundacion_id: int, filters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         filters = filters or {}; where=["p.fundacion_id=?"]; params: list[Any]=[fundacion_id]
