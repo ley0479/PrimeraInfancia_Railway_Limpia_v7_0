@@ -5831,8 +5831,8 @@ def relacion_mes_generar():
         'UNIDAD DE ATENCIÓN', 'DOCENTE', 'GESTANTES', 'MENORES 6 MESES', '6 A 11 MESES',
         '1 A 2 AÑOS 11 MESES', '3 A 5 AÑOS 11 MESES', 'SIN CLASIFICAR / REVISAR',
         'TOTAL USUARIOS', 'HUEVOS PARA GRUPOS DE 30', 'HUEVOS PARA 6 A 11 (15)',
-        'TOTAL HUEVOS (UNIDADES)', 'CUBETAS DE 30', 'PAQUETES COMPLETOS (7 CUBETAS)',
-        'CUBETAS SUELTAS', 'GESTANTES/LACTANTES CON DOBLE VERDURA',
+        'TOTAL HUEVOS (UNIDADES)', 'CUBETAS DE 30', 'PANALES REQUERIDOS (7 CUBETAS)',
+        'CUBETAS EXCEDENTES POR REDONDEO', 'GESTANTES/LACTANTES CON DOBLE VERDURA',
         'TOTAL VERDURAS', 'OLLA COMUNITARIA', 'BIENESTARINA'
     ]
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
@@ -5840,7 +5840,7 @@ def relacion_mes_generar():
     ws.cell(1, 1).font = Font(bold=True, size=14)
     ws.cell(1, 1).alignment = Alignment(horizontal='center')
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(headers))
-    ws.cell(2, 1).value = 'Regla: 30 huevos por usuario; 6 a 11 meses recibe 15. Una cubeta contiene 30 huevos y un paquete contiene 7 cubetas.'
+    ws.cell(2, 1).value = 'Regla: 30 huevos por usuario; 6 a 11 meses recibe 15. Una cubeta contiene 30 huevos y un panal contiene 7 cubetas. Los panales requeridos se redondean hacia arriba.'
     ws.cell(2, 1).alignment = Alignment(horizontal='left', wrap_text=True)
     for col, h in enumerate(headers, start=1):
         cell = ws.cell(3, col)
@@ -5861,8 +5861,8 @@ def relacion_mes_generar():
         valores = [
             unidad, docente, d['gestantes'], d['menores_6'], d['seis_11'], d['uno_2'], d['tres_5'],
             d['sin_clasificar'], f'=SUM(C{row}:H{row})', f'=(C{row}+D{row}+F{row}+G{row}+H{row})*30',
-            f'=E{row}*15', f'=SUM(J{row}:K{row})', f'=ROUNDUP(L{row}/30,0)', f'=QUOTIENT(M{row},7)',
-            f'=MOD(M{row},7)', d['verduras_dobles'], f'=I{row}+P{row}',
+            f'=E{row}*15', f'=SUM(J{row}:K{row})', f'=ROUNDUP(L{row}/30,0)', f'=ROUNDUP(M{row}/7,0)',
+            f'=N{row}*7-M{row}', d['verduras_dobles'], f'=I{row}+P{row}',
             f'=IF(I{row}>0,1,0)', f'=I{row}'
         ]
         for col, v in enumerate(valores, start=1):

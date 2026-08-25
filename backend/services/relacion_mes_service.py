@@ -164,8 +164,8 @@ def cantidades(item: dict[str, Any]) -> dict[str, int]:
         'huevos_15': huevos_15,
         'total_huevos': total_huevos,
         'cubetas_30': cubetas,
-        'paquetes_7': cubetas // 7,
-        'cubetas_sueltas': cubetas % 7,
+        'panales_7': int(math.ceil(cubetas / 7)) if cubetas else 0,
+        'cubetas_excedentes': ((int(math.ceil(cubetas / 7)) * 7) - cubetas) if cubetas else 0,
         # Cada usuario recibe una unidad; gestantes y lactantes reciben una
         # unidad adicional, para un total de dos.
         'verduras': total + int(item.get('verduras_dobles') or 0),

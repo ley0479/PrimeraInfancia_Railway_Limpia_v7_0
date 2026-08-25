@@ -44,8 +44,8 @@ def test_calcula_huevos_cubetas_y_paquetes_de_siete():
         'huevos_15': 30,
         'total_huevos': 180,
         'cubetas_30': 6,
-        'paquetes_7': 0,
-        'cubetas_sueltas': 6,
+        'panales_7': 1,
+        'cubetas_excedentes': 1,
         'verduras': 9,
         'olla_comunitaria': 1,
         'bienestarina': 7,
@@ -54,8 +54,8 @@ def test_calcula_huevos_cubetas_y_paquetes_de_siete():
     veinte = cantidades({'gestantes': 0, 'menores_6': 0, 'seis_11': 0, 'uno_2': 20, 'tres_5': 0})
     assert veinte['total_huevos'] == 600
     assert veinte['cubetas_30'] == 20
-    assert veinte['paquetes_7'] == 2
-    assert veinte['cubetas_sueltas'] == 6
+    assert veinte['panales_7'] == 3
+    assert veinte['cubetas_excedentes'] == 1
 
 
 if __name__ == '__main__':
