@@ -658,7 +658,7 @@
                     <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl">
                         <h2 class="text-lg font-medium mb-4 flex items-center gap-2"><i data-lucide="upload-cloud" class="text-indigo-400"></i> Cargar Base de Datos del Sistema (Cuéntame)</h2>
                         <div id="drop-zone" class="drop-zone border-2 border-dashed border-slate-800 hover:border-indigo-500/50 rounded-xl p-8 text-center transition cursor-pointer relative bg-slate-900/50">
-                            <input type="file" id="input-excel" accept=".xlsx,.xls,.xlsm,.csv,.txt,.tsv,.tab,.dat,.ods,.html,.htm,.json,.docx,.pdf" class="absolute inset-0 opacity-0 cursor-pointer">
+                            <input type="file" id="input-excel" data-help-id="base-maestra.file.upload" accept=".xlsx,.xls,.xlsm,.csv,.txt,.tsv,.tab,.dat,.ods,.html,.htm,.json,.docx,.pdf" class="absolute inset-0 opacity-0 cursor-pointer">
                             <i data-lucide="file-spreadsheet" class="mx-auto w-12 h-12 text-slate-600 mb-3"></i>
                             <p class="text-sm font-medium text-slate-300" id="texto-archivo">Arrastra o selecciona el archivo descargado (.xlsx, .xls, .csv)</p>
                         </div>
@@ -678,7 +678,7 @@
                                 </div>
                             </div>
                             <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-                                <input id="selector-unidades-buscar" oninput="renderSelectorUnidades()" type="search" placeholder="Buscar unidad de atención..." class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-500" />
+                                <input id="selector-unidades-buscar" data-help-id="base-maestra.units.search" oninput="renderSelectorUnidades()" type="search" placeholder="Buscar unidad de atención..." class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-500" />
                                 <span id="selector-unidades-contador" class="text-xs text-slate-400">0 seleccionadas</span>
                             </div>
                             <div id="selector-unidades-lista" class="mt-3 max-h-72 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/70 divide-y divide-slate-800">
@@ -1229,7 +1229,7 @@
                         <div class="grid gap-4 md:grid-cols-3">
                             <div>
                                 <label class="block text-sm font-medium text-slate-300 mb-2">Tipo de plantilla</label>
-                                <select id="template-type" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-200">
+                                <select id="template-type" data-help-id="formatos.template.type" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-200">
                                     <option value="Asistencia">Asistencia / RAM mensual</option>
                                     <option value="RAM">RAM / Registro de Asistencia Mensual</option>
                                     <option value="Bienestarina">Bienestarina</option>
@@ -1243,11 +1243,11 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-slate-300 mb-2">Archivo de plantilla</label>
-                                <input id="input-template" type="file" accept=".xlsx,.xls,.xlsm,.csv,.txt,.doc,.docx,.pdf,.png,.jpg,.jpeg,.zip,.rar" class="w-full text-slate-200" />
+                                <input id="input-template" data-help-id="formatos.template.file" type="file" accept=".xlsx,.xls,.xlsm,.csv,.txt,.doc,.docx,.pdf,.png,.jpg,.jpeg,.zip,.rar" class="w-full text-slate-200" />
                             </div>
                         </div>
                         <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                            <button onclick="subirPlantilla()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-6 py-2.5 rounded-xl text-sm transition">Guardar Plantilla</button>
+                            <button data-help-id="formatos.template.save" onclick="subirPlantilla()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-6 py-2.5 rounded-xl text-sm transition">Guardar Plantilla</button>
                             <span id="template-message" class="text-sm text-slate-300"></span>
                         </div>
                     </div>
@@ -3565,12 +3565,12 @@
                     <div class="idp-card p-6">
                         <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
                             <div><p class="idp-eyebrow">Núcleo IDP independiente del proveedor</p><h2 class="mt-2 text-2xl font-semibold text-white flex items-center gap-2"><i data-lucide="scan-text" class="w-6 h-6 text-sky-300"></i> Motor Universal de Lectura y Validación Documental</h2><p class="mt-2 max-w-4xl text-sm text-slate-400">Recibe documentos privados, evita duplicados por huella digital, clasifica, extrae datos nativos y los presenta para revisión humana. En esta fase ninguna aprobación importa información automáticamente.</p></div>
-                            <button type="button" class="idp-btn secondary" onclick="IDPDocumental.load()"><i data-lucide="refresh-cw"></i> Actualizar</button>
+                            <button type="button" data-help-id="motor-documental.refresh" class="idp-btn secondary" onclick="IDPDocumental.load()"><i data-lucide="refresh-cw"></i> Actualizar</button>
                         </div>
                         <div id="idp-message" class="hidden mt-4"></div>
                         <div class="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] items-end">
-                            <div><label class="block text-xs text-slate-400 mb-2">Documento original</label><input id="idp-file" type="file" accept=".xlsx,.xlsm,.docx,.pptx,.pdf,.png,.jpg,.jpeg,.bmp,.tif,.tiff,.heif,.heic" class="idp-input"></div>
-                            <button id="idp-upload" type="button" class="idp-btn primary"><i data-lucide="upload-cloud"></i> Cargar y analizar</button>
+                            <div><label class="block text-xs text-slate-400 mb-2">Documento original</label><input id="idp-file" data-help-id="motor-documental.file.select" type="file" accept=".xlsx,.xlsm,.docx,.pptx,.pdf,.png,.jpg,.jpeg,.bmp,.tif,.tiff,.heif,.heic" class="idp-input"></div>
+                            <button id="idp-upload" data-help-id="motor-documental.file.upload" type="button" class="idp-btn primary"><i data-lucide="upload-cloud"></i> Cargar y analizar</button>
                         </div>
                         <p class="mt-3 text-xs text-slate-500">Excel, Word y PowerPoint se leen nativamente. PDF con texto usa extracción directa; fotografías y escaneos pasan por OCR y revisión humana. Ningún campo faltante se inventa. Máximo 50 MB.</p>
                     </div>
@@ -3767,14 +3767,14 @@
     <script src="./js/print-manager.js?v=2.7.0-encabezado-institucional-1"></script>
     <script src="./js/modules/menu-lateral-institucional.js?v=2.3.0-alpha.51-entregables-sn"></script>
     <script src="./js/app.js?v=2.7.0-sync-procesar-2"></script>
-    <script src="./js/modules/calendario-inteligente.js?v=2.7.0-phase6.1"></script>
+    <script src="./js/modules/calendario-inteligente.js?v=2.7.3-liam-help-1"></script>
     <script src="./js/modules/acceso-compartido.js?v=2.4.1-tunnel-fix"></script>
     <script src="./js/modules/cruce-bases.js?v=2.1.14"></script>
     <script src="./js/modules/planeacion-pedagogica.js?v=2.7.0-proyecto-uca-1"></script>
     <script src="./js/lia-assistant/help-registry.js?v=2.7.0-1"></script>
     <script src="./js/lia-assistant/avatar-controller.js?v=2.7.0-1"></script>
     <script src="./js/lia-assistant/speech-controller.js?v=2.7.3-mic-direct-start"></script>
-    <script src="./js/liam/liam-controller.js?v=2.7.3-liam-1"></script>
+    <script src="./js/liam/liam-controller.js?v=2.7.3-liam-2"></script>
     <script src="./js/modules/asistente-capacitacion.js?v=2.7.3-mic-diagnostics"></script>
     <script src="./js/modules/gestion-pedagogica.js?v=2.1.3"></script>
     <script src="./js/modules/gestion-coordinador.js?v=2.1.6"></script>
@@ -3803,7 +3803,7 @@
     <script src="./js/modules/centro-planeacion.js?v=2.7.0"></script>
     <script src="./js/modules/componente-psicosocial.js?v=2.7.0"></script>
     <script src="./js/modules/integrity-stability.js?v=2.6.1"></script>
-    <script src="./js/modules/idp-documental.js?v=2.7.0-idp-core-1"></script>
+    <script src="./js/modules/idp-documental.js?v=2.7.3-liam-events-1"></script>
     <script src="./js/modules/centro-documental.js?v=2.7.2-doc-center-3"></script>
     <script src="./js/modules/panel-principal-institucional.js?v=2.3.0-alpha.51-entregables-sn"></script>
     <script src="./js/modules/buscador-global.js?v=2.7.3-master-publicada-1"></script>

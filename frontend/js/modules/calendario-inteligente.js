@@ -106,8 +106,8 @@
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button onclick="ciAbrirModalNuevo()" class="ci-btn ci-btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Nuevo entregable</button>
-                    <label class="ci-btn ci-btn-muted cursor-pointer"><i data-lucide="upload" class="w-4 h-4"></i> Cargar cronograma<input id="ci-cronograma-file" type="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt,.tsv,.tab,.dat,.docx,.pdf,.pptx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" class="hidden" onchange="ciCargarCronograma()"></label><button onclick="ciExportarExcel()" class="ci-btn ci-btn-muted"><i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Exportar Excel</button><button onclick="ciExportarPdf()" class="ci-btn ci-btn-muted"><i data-lucide="file-text" class="w-4 h-4"></i> Exportar PDF</button>
+                    <button data-help-id="calendario.activity.create" onclick="ciAbrirModalNuevo()" class="ci-btn ci-btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Nuevo entregable</button>
+                    <label data-help-id="calendario.schedule.upload" class="ci-btn ci-btn-muted cursor-pointer"><i data-lucide="upload" class="w-4 h-4"></i> Cargar cronograma<input id="ci-cronograma-file" type="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt,.tsv,.tab,.dat,.docx,.pdf,.pptx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" class="hidden" onchange="ciCargarCronograma()"></label><button onclick="ciExportarExcel()" class="ci-btn ci-btn-muted"><i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Exportar Excel</button><button onclick="ciExportarPdf()" class="ci-btn ci-btn-muted"><i data-lucide="file-text" class="w-4 h-4"></i> Exportar PDF</button>
                 </div>
             </div>
             <div id="ci-message" class="hidden rounded-xl px-4 py-3 text-sm"></div>
@@ -147,7 +147,7 @@
                 <div class="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <button onclick="ciLimpiarFiltros()" class="ci-btn ci-btn-muted"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> Limpiar filtros</button>
                     <div class="ci-view-toggle">
-                        <button id="ci-vista-mes" onclick="ciCambiarVista('mes')" class="ci-active">Mes</button>
+                        <button id="ci-vista-mes" data-help-id="calendario.view.month" onclick="ciCambiarVista('mes')" class="ci-active">Mes</button>
                         <button id="ci-vista-semana" onclick="ciCambiarVista('semana')">Semana</button>
                         <button id="ci-vista-anio" onclick="ciCambiarVista('anio')">Año</button>
                         <button id="ci-vista-agenda" onclick="ciCambiarVista('agenda')">Agenda</button>
@@ -166,11 +166,11 @@
                 <aside class="space-y-4">
                     <div class="ci-panel">
                         <h3 class="font-semibold text-slate-100 flex items-center gap-2"><i data-lucide="bell-ring" class="w-4 h-4 text-amber-300"></i> Pendientes y alertas</h3>
-                        <div id="ci-alertas-list" class="mt-3 space-y-2"></div>
+                        <div id="ci-alertas-list" data-help-id="calendario.alerts.list" class="mt-3 space-y-2"></div>
                     </div>
                     <div class="ci-panel">
                         <h3 class="font-semibold text-slate-100 flex items-center gap-2"><i data-lucide="list-checks" class="w-4 h-4 text-cyan-300"></i> Mis pendientes</h3>
-                        <div id="ci-mis-pendientes" class="mt-3 space-y-2"></div>
+                        <div id="ci-mis-pendientes" data-help-id="calendario.pending.list" class="mt-3 space-y-2"></div>
                     </div>
                     <div class="ci-panel">
                         <h3 class="font-semibold text-slate-100 mb-3">Leyenda de estados</h3>

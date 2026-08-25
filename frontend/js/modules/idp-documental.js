@@ -78,7 +78,7 @@
         const form=new FormData(); form.append('file',file);
         const button=$('idp-upload'); if(button)button.disabled=true;
         message('Validando, clasificando y extrayendo el documento...','info');
-        try { const data=await api('/documentos',{method:'POST',body:form}); state.selected=data.documento; input.value=''; message(data.message,'success'); await load(); renderDetail(); await loadPreview(); }
+        try { const data=await api('/documentos',{method:'POST',body:form}); state.selected=data.documento; input.value=''; message(data.message,'success'); document.dispatchEvent(new CustomEvent('liam:business-event',{detail:{name:'document-received'}})); await load(); renderDetail(); await loadPreview(); }
         catch(error){message(error.message,'error');}
         finally{if(button)button.disabled=false;}
     }
