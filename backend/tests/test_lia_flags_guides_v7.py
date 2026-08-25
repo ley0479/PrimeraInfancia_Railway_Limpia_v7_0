@@ -28,4 +28,5 @@ for key in required:
 registry = (ROOT / 'frontend/js/lia-assistant/help-registry.js').read_text(encoding='utf-8')
 assert 'LIA_HELP_REGISTRY' in registry
 assert 'document.querySelector(selector)' not in registry
+assert '.screen`' in registry and '.primary-action`' in registry
 print('LIA_FLAGS_GUIDES_V7_PASS')

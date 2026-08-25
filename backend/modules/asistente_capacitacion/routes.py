@@ -42,8 +42,20 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         allowed = set(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''), []))
         if allowed and modulo not in allowed: return jsonify({'error':'Módulo no autorizado para el rol actual.'}), 403
         guide = dict(GUIDES.get(modulo, DEFAULT_GUIDE)); guide['modulo'] = modulo
+        guide['tour_steps']=[{'help_id':f'{modulo}.screen','message':guide.get('resumen') or ''}]+[{'help_id':f'{modulo}.primary-action','message':step} for step in guide.get('pasos',[])]
         conn = connect(); row = conn.execute('SELECT * FROM ayuda_progreso_usuario WHERE fundacion_id=? AND usuario_id=? AND modulo=?',(ctx.get('fundacion_id') or 1,ctx.get('usuario_id'),modulo)).fetchone(); conn.close()
         return jsonify({'guia':guide,'rol':ctx.get('rol'),'progreso':dict(row) if row else None,'solo_orientacion':True}), 200
+
+    @bp.get('/presentation')
+    def presentation():
+        if not public_flags()['enabled']: return jsonify({'error':'LÍA está desactivada.'}),404
+        ctx=get_request_user_context();allowed=list(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''),[]))
+        modules=[]
+        for key in allowed:
+            item=GUIDES.get(key)
+            if item: modules.append({'module':key,'title':item.get('titulo'),'purpose':item.get('proposito') or item.get('resumen')})
+        profile=get_platform_profile();audit_lia(ctx,'PLATFORM_PRESENTATION_OPENED',module='dashboard',metadata={'modules':len(modules)})
+        return jsonify({'profile':profile,'modules':modules,'role':ctx.get('rol'),'total':len(modules)}),200
 
     @bp.post('/progreso')
     def progreso():
