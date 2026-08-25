@@ -35,7 +35,22 @@
     'salud-nutricion.tab.alertas':{module:'salud-nutricion',selector:'[data-help-id="salud-nutricion.tab.alertas"]'},
     'salud-nutricion.tab.entregables':{module:'salud-nutricion',selector:'[data-help-id="salud-nutricion.tab.entregables"]'},
     'salud-nutricion.integral.unit-filter':{module:'salud-nutricion',selector:'#sn-integral-unidad'},
-    'salud-nutricion.alerts.refresh':{module:'salud-nutricion',selector:'[data-help-id="salud-nutricion.alerts.refresh"]'}
+    'salud-nutricion.alerts.refresh':{module:'salud-nutricion',selector:'[data-help-id="salud-nutricion.alerts.refresh"]'},
+    'planeacion-pedagogica.period':{module:'planeacion-pedagogica',selector:'#pp-periodo-global'},
+    'planeacion-pedagogica.tab.upload':{module:'planeacion-pedagogica',selector:'#planeacion-pedagogica [data-view="cargar"]'},
+    'planeacion-pedagogica.file':{module:'planeacion-pedagogica',selector:'#pp-file'},
+    'planeacion-pedagogica.tab.evidence':{module:'planeacion-pedagogica',selector:'#planeacion-pedagogica [data-view="evidencias"]'},
+    'planeacion-pedagogica.evidence.file':{module:'planeacion-pedagogica',selector:'#pp-evidencia-file'},
+    'gestion-pedagogica.dashboard':{module:'gestion-pedagogica',selector:'#gp-tab-dashboard'},
+    'gestion-pedagogica.teams':{module:'gestion-pedagogica',selector:'#gp-tab-equipos'},
+    'gestion-pedagogica.deliverables':{module:'gestion-pedagogica',selector:'#gp-tab-entregables'},
+    'gestion-pedagogica.calendar':{module:'gestion-pedagogica',selector:'#gp-tab-calendario'},
+    'gestion-pedagogica.alerts':{module:'gestion-pedagogica',selector:'#gp-tab-alertas'},
+    'componente-psicosocial.sync':{module:'componente-psicosocial',selector:'#componente-psicosocial .ps-btn.primary'},
+    'componente-psicosocial.unit':{module:'componente-psicosocial',selector:'#ps-unit'},
+    'componente-psicosocial.view':{module:'componente-psicosocial',selector:'#ps-view'},
+    'componente-psicosocial.cases':{module:'componente-psicosocial',selector:'#ps-cases'},
+    'componente-psicosocial.detail':{module:'componente-psicosocial',selector:'#ps-detail'}
   };
   function get(id){return Object.prototype.hasOwnProperty.call(definitions,id)?definitions[id]:null}
   function resolve(id){const item=get(id);return item?document.querySelector(item.selector):null}

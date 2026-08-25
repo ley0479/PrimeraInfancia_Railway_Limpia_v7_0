@@ -14,3 +14,7 @@ Los eventos `base-file-selected`, `document-file-selected` y `document-received`
 ## Talento Humano y Salud y Nutrición
 
 Talento Humano dispone de una guía de carga, sincronización, registro manual y revisión del listado. Salud y Nutrición cubre Dashboard, expediente integral, filtro por UCA, alertas y entregables. Ambos recorridos orientan y resaltan; nunca guardan, sincronizan ni emiten diagnósticos automáticamente.
+
+## Componentes pedagógico y psicosocial
+
+Planeación Pedagógica cubre periodo, carga, revisión y evidencias. Gestión Pedagógica explica equipos, entregables, calendario y alertas. Componente Psicosocial orienta sincronización referencial, filtros, vistas y expedientes sin crear diagnósticos ni sustituir la validación profesional.

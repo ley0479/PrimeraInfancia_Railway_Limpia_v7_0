@@ -11,11 +11,11 @@ Estado de Fase 0. “Guía” indica contenido actual reutilizable; no significa
 | Formatos ICBF | Fallback | No | No | No | Alta |
 | Talento Humano | Sí | Sí | Sí | Sí | Alta |
 | Salud y Nutrición | Sí | Sí | Sí | Sí | Alta |
-| Planeación Pedagógica | Sí | No | No | Parcial | Media |
-| Gestión Pedagógica | Sí | No | No | Parcial | Media |
+| Planeación Pedagógica | Sí | Sí | Sí | Sí | Media |
+| Gestión Pedagógica | Sí | Sí | Sí | Sí | Media |
 | Gestión por Coordinador | Fallback | No | No | No | Media |
 | Familias y Redes | Sí | No | No | Parcial | Media |
-| Componente Psicosocial | Sí | No | No | Parcial | Media |
+| Componente Psicosocial | Sí | Sí | Sí | Sí | Media |
 | Expediente UCA | Sí | No | No | Parcial | Media |
 | Planeación Operativa | Sí | No | No | Parcial | Media |
 | Administración | Fallback | No | No | No | Media |

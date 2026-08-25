@@ -47,6 +47,27 @@
       {control:'salud-nutricion.integral.unit-filter',anchor:'liam.anchor.nutrition.integral',message:'Filtra por UCA para evitar mezclar unidades durante la revisión.'},
       {control:'salud-nutricion.tab.alertas',anchor:'liam.anchor.nutrition.alerts',message:'Alertas reúne situaciones que requieren verificación profesional. Una alerta no constituye por sí sola un diagnóstico.'},
       {control:'salud-nutricion.tab.entregables',anchor:'liam.anchor.nutrition.deliverables',message:'Entregables permite consultar actividades, soportes y estados del componente.'}
+    ],
+    'planeacion-pedagogica.workflow':[
+      {control:'planeacion-pedagogica.period',anchor:'liam.anchor.pedagogy.period',message:'Selecciona primero el periodo de trabajo. Este filtro organiza proyectos, planeaciones, evidencias y reportes.'},
+      {control:'planeacion-pedagogica.tab.upload',anchor:'liam.anchor.pedagogy.upload',message:'En Cargar puedes adjuntar una planeación o crearla manualmente. Los hechos y responsables deben ser verificados por el profesional.'},
+      {control:'planeacion-pedagogica.file',anchor:'liam.anchor.pedagogy.upload',message:'El archivo puede alimentar la planeación y proponer actividades en calendario; revisa unidad, docente, fecha, tema y objetivo antes de guardar.'},
+      {control:'planeacion-pedagogica.tab.evidence',anchor:'liam.anchor.pedagogy.evidence',message:'En Evidencias vinculas soportes a una planeación existente, conservando la trazabilidad.'},
+      {control:'planeacion-pedagogica.evidence.file',anchor:'liam.anchor.pedagogy.evidence',message:'Selecciona solamente una evidencia real y autorizada. LIAM no la carga ni la aprueba automáticamente.'}
+    ],
+    'gestion-pedagogica.overview':[
+      {control:'gestion-pedagogica.dashboard',anchor:'liam.anchor.management.tabs',message:'El Dashboard resume coordinadores, entregables, documentos, cumplimiento y alertas.'},
+      {control:'gestion-pedagogica.teams',anchor:'liam.anchor.management.tabs',message:'Equipos y Agentes se alimenta desde Talento Humano para evitar registros paralelos y duplicados.'},
+      {control:'gestion-pedagogica.deliverables',anchor:'liam.anchor.management.deliverables',message:'Entregables organiza tipo, responsable, fecha límite, soporte y estado de revisión.'},
+      {control:'gestion-pedagogica.calendar',anchor:'liam.anchor.management.deliverables',message:'Calendario presenta eventos pedagógicos y fechas de entrega relacionadas.'},
+      {control:'gestion-pedagogica.alerts',anchor:'liam.anchor.management.deliverables',message:'Alertas permite identificar pendientes, vencimientos y devoluciones que requieren atención.'}
+    ],
+    'componente-psicosocial.overview':[
+      {control:'componente-psicosocial.sync',anchor:'liam.anchor.psychosocial.sync',message:'Sincronizar expedientes reutiliza las fuentes autorizadas. No crea historias clínicas ni diagnósticos automáticos.'},
+      {control:'componente-psicosocial.unit',anchor:'liam.anchor.psychosocial.filter',message:'Filtra por UCA para trabajar únicamente con expedientes del ámbito autorizado.'},
+      {control:'componente-psicosocial.view',anchor:'liam.anchor.psychosocial.filter',message:'Selecciona vista de coordinación o intervención según tu rol y permisos.'},
+      {control:'componente-psicosocial.cases',anchor:'liam.anchor.psychosocial.cases',message:'Los expedientes son referenciales y se enlazan con Familias y Redes sin duplicar participantes.'},
+      {control:'componente-psicosocial.detail',anchor:'liam.anchor.psychosocial.cases',message:'El detalle reúne trazabilidad, planes y acciones. Todo cierre requiere criterio y validación profesional.'}
     ]
   };let active=null,index=0,flags={},kind='tour';
   const dashboardControlByModule={

@@ -26,7 +26,15 @@
     'liam.anchor.nutrition.tabs':{module:'salud-nutricion',control:'salud-nutricion.tab.dashboard',devices:['desktop','tablet'],side:'right'},
     'liam.anchor.nutrition.integral':{module:'salud-nutricion',control:'salud-nutricion.tab.integral',devices:['desktop','tablet'],side:'right'},
     'liam.anchor.nutrition.alerts':{module:'salud-nutricion',control:'salud-nutricion.tab.alertas',devices:['desktop','tablet'],side:'left'},
-    'liam.anchor.nutrition.deliverables':{module:'salud-nutricion',control:'salud-nutricion.tab.entregables',devices:['desktop','tablet'],side:'left'}
+    'liam.anchor.nutrition.deliverables':{module:'salud-nutricion',control:'salud-nutricion.tab.entregables',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.pedagogy.period':{module:'planeacion-pedagogica',control:'planeacion-pedagogica.period',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.pedagogy.upload':{module:'planeacion-pedagogica',control:'planeacion-pedagogica.tab.upload',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.pedagogy.evidence':{module:'planeacion-pedagogica',control:'planeacion-pedagogica.tab.evidence',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.management.tabs':{module:'gestion-pedagogica',control:'gestion-pedagogica.dashboard',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.management.deliverables':{module:'gestion-pedagogica',control:'gestion-pedagogica.deliverables',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.psychosocial.sync':{module:'componente-psicosocial',control:'componente-psicosocial.sync',devices:['desktop','tablet'],side:'left'},
+    'liam.anchor.psychosocial.filter':{module:'componente-psicosocial',control:'componente-psicosocial.unit',devices:['desktop','tablet'],side:'right'},
+    'liam.anchor.psychosocial.cases':{module:'componente-psicosocial',control:'componente-psicosocial.cases',devices:['desktop','tablet'],side:'right'}
   };
   function device(){return innerWidth<=640?'mobile':innerWidth<=1024?'tablet':'desktop'}
   function get(id){const item=Object.prototype.hasOwnProperty.call(anchors,id)?anchors[id]:null;return item&&item.devices.includes(device())?item:null}
