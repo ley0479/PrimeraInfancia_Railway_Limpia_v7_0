@@ -35,3 +35,33 @@ def public_flags() -> dict:
         'max_message_length': _int('LIA_MAX_MESSAGE_LENGTH', 2000, 100, 5000),
         'rate_limit_per_minute': _int('LIA_RATE_LIMIT_PER_MINUTE', 20, 1, 120),
     }
+
+
+def public_liam_flags() -> dict:
+    """Banderas públicas de LIAM; ninguna contiene secretos ni autoridad."""
+    enabled = _bool('ENABLE_LIAM_ASSISTANT', False)
+    performance = os.getenv('LIAM_PERFORMANCE_MODE', 'auto').strip().lower()
+    if performance not in {'auto', 'full', 'light', 'reduced'}:
+        performance = 'auto'
+    motion = os.getenv('LIAM_DEFAULT_MOTION_LEVEL', 'light').strip().lower()
+    if motion not in {'full', 'light', 'reduced'}:
+        motion = 'light'
+    return {
+        'enabled': enabled,
+        'text_enabled': enabled and _bool('LIAM_TEXT_ENABLED', True),
+        'voice_enabled': enabled and _bool('LIAM_VOICE_ENABLED', False),
+        'animation_enabled': enabled and _bool('LIAM_ANIMATION_ENABLED', True),
+        'walk_enabled': enabled and _bool('LIAM_WALK_ENABLED', False),
+        'teleport_enabled': enabled and _bool('LIAM_TELEPORT_ENABLED', True),
+        'lip_sync_enabled': enabled and _bool('LIAM_LIP_SYNC_ENABLED', False),
+        'hologram_enabled': enabled and _bool('LIAM_HOLOGRAM_ENABLED', True),
+        'context_guide_enabled': enabled and _bool('LIAM_CONTEXT_GUIDE_ENABLED', True),
+        'tours_enabled': enabled and _bool('LIAM_TOURS_ENABLED', True),
+        'platform_presentation_enabled': enabled and _bool('LIAM_PLATFORM_PRESENTATION_ENABLED', True),
+        'tablet_display_enabled': enabled and _bool('LIAM_TABLET_DISPLAY_ENABLED', True),
+        'mini_help_enabled': enabled and _bool('LIAM_MINI_HELP_ENABLED', False),
+        'ai_enabled': enabled and _bool('LIAM_AI_ENABLED', False),
+        'realtime_voice_enabled': enabled and _bool('LIAM_REALTIME_VOICE_ENABLED', False),
+        'performance_mode': performance,
+        'default_motion_level': motion,
+    }

@@ -50,6 +50,15 @@ def respond(*, question: str, module: str, role: str, allowed_modules=None) -> d
     safe = redact(message)
     return {
         'message': safe, 'speech_text': safe, 'avatar_state': 'guiding' if actions else 'idle',
+        'assistant_state': 'guiding' if actions else 'idle',
+        'avatar': {
+            'gesture': 'point_direction' if actions else 'show_tablet',
+            'expression': 'friendly',
+            'look_at': actions[0]['target'] if actions else None,
+        },
+        'movement': {'mode': 'none', 'destination': None},
+        'highlight': {'target': actions[0]['target'], 'mode': 'outline'} if actions else None,
+        'tablet': {'type': 'message', 'title': guide['titulo'], 'value': safe[:140]},
         'severity': 'info', 'confidence': confidence, 'confirmation_required': False,
         'suggestions': ['Conocer la plataforma', 'Explícame esta pantalla', 'Ver versión actual', 'Ver mis pendientes'],
         'actions': actions, 'diagnostic': None, 'request_id': uuid.uuid4().hex,

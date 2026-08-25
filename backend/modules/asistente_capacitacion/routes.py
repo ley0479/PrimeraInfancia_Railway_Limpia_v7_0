@@ -6,7 +6,7 @@ from modules.dbapi_compat import sqlite3
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS, get_request_user_context
 from .guides import DEFAULT_GUIDE, GUIDES
 from .schema import SCHEMA_SQL
-from .config import public_flags
+from .config import public_flags, public_liam_flags
 from .assistant_service import respond
 from .platform_profile import get_platform_profile
 from .tool_registry import ALLOWED_TOOLS, execute
@@ -44,7 +44,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.get('/config')
     def config_publica():
-        return jsonify({'lia': public_flags(), 'platform_profile': get_platform_profile()}), 200
+        return jsonify({'lia': public_flags(), 'liam': public_liam_flags(), 'platform_profile': get_platform_profile()}), 200
 
     @bp.get('/contexto')
     def contexto():
