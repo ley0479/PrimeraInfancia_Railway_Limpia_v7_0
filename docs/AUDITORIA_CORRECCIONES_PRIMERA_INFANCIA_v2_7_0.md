@@ -118,4 +118,29 @@ Total: **33**.
 
 **IMPLEMENTACIÓN CORREGIDA Y AUDITADA — SUITE CRÍTICA 23/23 PASS — SIN REGRESIONES FUNCIONALES DETECTADAS EN LAS PRUEBAS EJECUTADAS.**
 
-**Pendiente de cierre:** despliegue real y smoke test de Railway/PostgreSQL/credenciales.
+## 9. Cierre QAP de Base Maestra y producción (2026-08-25)
+
+Se completaron y desplegaron seis paquetes incrementales de corrección:
+
+- **QAP1:** consolidación de UDS, asignación de docentes/coordinadores y proyecciones de talento humano.
+- **QAP2:** consumidores de RAM, Planeación, Psicosocial, Familias y Redes, cruces y selectores RPP/Bienestarina.
+- **QAP3:** generadores RAM, RAN, RPP y Bienestarina alimentados por la versión maestra activa.
+- **QAP4:** alertas de edad, nutrición, cobertura y duplicados identificadas por documento y fundación.
+- **QAP5:** registro manual de peso/talla resuelto desde `master_ninos`, sin cruzar llaves históricas.
+- **QAP6:** reporte nutricional mensual desde la última `sn_valoraciones` por documento, período y tenant.
+
+Regla resultante: cuando existe una Base Maestra publicada, esa versión es autoritativa y una UDS vacía no vuelve a poblarse desde tablas antiguas. Los respaldos `usuarios`/`beneficiarios` solo operan en instalaciones sin versión publicada o como proyecciones de compatibilidad expresamente delimitadas.
+
+Validación QAP7:
+
+- Integrity Gate: archivos, módulos, rutas, roles, 9 familias de formatos y baseline funcional: **PASS**.
+- Sintaxis: **357 Python** y **45 JavaScript PASS**.
+- PostgreSQL: **1.924 consultas revisadas; 0 no soportadas; 0 contratos faltantes**.
+- Suite crítica y pruebas QAP1–QAP6: **PASS**.
+- Railway: despliegue `02306c62-8b2c-4e9f-8228-24932a1dc96b` en estado **SUCCESS**.
+- Smoke test público `/api/health`: **HTTP 200**, `database_backend=postgresql`, `database=ok`, SHA `1472e3cca5ba06fa5c7f9d235de00c6493851b96`.
+- `/api/system/version` sin credenciales: **HTTP 401 esperado** por protección de autenticación.
+
+El validador de empaquetado histórico no se utilizó como criterio de producción porque su baseline de hashes antecede estas correcciones y el workspace contiene datos runtime locales que no deben borrarse. La validación funcional, de integridad, PostgreSQL y el smoke test del artefacto desplegado sí quedaron completados.
+
+**CIERRE TÉCNICO QAP7: CORRECCIONES DESPLEGADAS, INTEGRIDAD FUNCIONAL APROBADA Y PRODUCCIÓN OPERATIVA.**
