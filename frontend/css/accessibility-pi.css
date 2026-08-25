@@ -46,8 +46,8 @@
 
 .pi-a11y-widget {
     position: fixed;
-    right: clamp(.75rem, 2vw, 1.35rem);
-    bottom: clamp(.75rem, 2vw, 1.35rem);
+    right: 6rem;
+    bottom: 1.35rem;
     z-index: 10040;
     display: flex;
     flex-direction: column;
@@ -59,12 +59,15 @@
 .pi-a11y-toggle {
     display: inline-flex;
     align-items: center;
-    gap: .55rem;
+    justify-content: center;
+    width: 3.625rem;
+    height: 3.625rem;
+    flex: 0 0 3.625rem;
     border: 1px solid rgba(56, 189, 248, .42);
-    border-radius: 999px;
+    border-radius: 50%;
     background: linear-gradient(135deg, rgba(37, 99, 235, .97), rgba(14, 165, 233, .95));
     color: white;
-    padding: .62rem .85rem;
+    padding: 0;
     box-shadow: 0 16px 44px rgba(14, 165, 233, .28);
     cursor: pointer;
     font-weight: 800;
@@ -74,15 +77,15 @@
 .pi-a11y-toggle-icon {
     display: grid;
     place-items: center;
-    width: 2rem;
-    height: 2rem;
+    width: 2.35rem;
+    height: 2.35rem;
     border-radius: 999px;
     background: #fbbf24;
     color: #0f172a;
     font-weight: 950;
     letter-spacing: -.05em;
 }
-.pi-a11y-toggle-text { font-size: .78rem; }
+.pi-a11y-toggle-text { display: none; }
 
 .pi-a11y-panel {
     width: min(360px, calc(100vw - 1.5rem));
@@ -322,8 +325,8 @@ html.pi-a11y-high-contrast *:focus-visible {
 }
 
 @media (max-width: 640px) {
-    .pi-a11y-widget { right: .65rem; bottom: .65rem; }
-    .pi-a11y-toggle-text { display: none; }
+    .pi-a11y-widget { right: 5.35rem; bottom: .875rem; }
+    .pi-a11y-toggle { width: 3.5rem; height: 3.5rem; flex-basis: 3.5rem; }
     .pi-a11y-panel { width: calc(100vw - 1.3rem); }
 }
 
