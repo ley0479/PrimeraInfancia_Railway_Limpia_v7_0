@@ -120,6 +120,14 @@ def bootstrap_core_schema(config_class) -> None:
     init_idp_schema(str(config_class.DATABASE_PATH))
     print('[MIGRATION] idp documental: PASS', flush=True)
 
+    # LÍA: preferencias, progreso, feedback y auditoría son tablas aditivas.
+    # Deben crearse en pre-deploy porque el runtime productivo bloquea DDL.
+    from modules.asistente_capacitacion.schema import SCHEMA_SQL as lia_schema_sql
+    with get_db_connection() as connection:
+        connection.cursor().executescript(lia_schema_sql)
+        connection.commit()
+    print('[MIGRATION] LIA assistant: PASS', flush=True)
+
     # Las bases anteriores a multi-tenant conservaban UNIQUE(nombre), lo que
     # impedia repetir legítimamente una UDS en otra fundacion.
     from migrations.migrate_unidades_tenant_unique_v7 import migrate as migrate_unidades_tenant_unique

@@ -23,9 +23,20 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     bp = Blueprint('asistente_capacitacion', __name__, url_prefix='/api/asistente-capacitacion')
 
     def audit_lia(ctx, event_type, *, module=None, tool=None, success=True, request_id=None, metadata=None):
-        conn=connect();conn.execute('''INSERT INTO lia_audit_events
-          (fundacion_id,usuario_id,event_type,modulo,tool_name,success,request_id,metadata_redacted,created_at)
-          VALUES(?,?,?,?,?,?,?,?,?)''',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),event_type,module,tool,1 if success else 0,request_id,json.dumps(metadata or {},ensure_ascii=False),datetime.now().isoformat(timespec='seconds')));conn.commit();conn.close()
+        conn=None
+        try:
+            conn=connect();conn.execute('''INSERT INTO lia_audit_events
+              (fundacion_id,usuario_id,event_type,modulo,tool_name,success,request_id,metadata_redacted,created_at)
+              VALUES(?,?,?,?,?,?,?,?,?)''',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),event_type,module,tool,1 if success else 0,request_id,json.dumps(metadata or {},ensure_ascii=False),datetime.now().isoformat(timespec='seconds')));conn.commit()
+        except Exception as exc:
+            if conn:
+                try: conn.rollback()
+                except Exception: pass
+            app.logger.warning('LÍA continúa sin auditoría auxiliar: %s', type(exc).__name__)
+        finally:
+            if conn:
+                try: conn.close()
+                except Exception: pass
 
     def limited(ctx):
         flags=public_flags();key=f"{ctx.get('fundacion_id')}:{ctx.get('usuario_id')}"
