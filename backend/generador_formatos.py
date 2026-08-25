@@ -525,24 +525,25 @@ class GeneradorFormatos:
 
     # ==================== NUTRICIÓN ====================
     def generar_nutricion(self, mes, año, unidad):
-        """Genera reporte de nutrición"""
+        """Genera reporte desde valoraciones identificadas por documento/tenant."""
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
         # Obtener mediciones del período
         fid = int(current_tenant_id(1) or 1)
         cursor.execute("""
-            SELECT b.nombres, b.documento, pt.peso, pt.talla, pt.estado_nutricional
-            FROM peso_talla pt
-            JOIN beneficiarios b
-              ON pt.beneficiario_id = b.id
-             AND COALESCE(b.fundacion_id, 1) = ?
-            WHERE b.unidad = ?
-              AND COALESCE(pt.fundacion_id, 1) = ?
-              AND strftime('%Y', pt.fecha_medicion) = ?
-              AND strftime('%m', pt.fecha_medicion) = ?
-            ORDER BY b.nombres
-        """, (fid, unidad, fid, str(año), f"{mes:02d}"))
+            SELECT nombre_completo AS nombres, documento,
+                   peso_kg AS peso, talla_cm AS talla,
+                   diagnostico_global AS estado_nutricional
+            FROM sn_valoraciones v
+            WHERE v.activo=1 AND COALESCE(v.fundacion_id,1)=?
+              AND v.unidad=? AND v.periodo=?
+              AND v.id=(SELECT v2.id FROM sn_valoraciones v2
+                        WHERE v2.activo=1 AND COALESCE(v2.fundacion_id,1)=COALESCE(v.fundacion_id,1)
+                          AND v2.documento=v.documento AND v2.periodo=v.periodo
+                        ORDER BY v2.fecha_valoracion DESC,v2.id DESC LIMIT 1)
+            ORDER BY nombre_completo, fecha_valoracion DESC
+        """, (fid, unidad, f"{int(año):04d}-{int(mes):02d}"))
         
         registros = [dict(row) for row in cursor.fetchall()]
         conn.close()
