@@ -146,7 +146,10 @@
         const img = qs(id);
         const fallback = qs(fallbackId);
         if (!img) return;
+        const requestId = `${Date.now()}-${Math.random()}`;
+        img.dataset.identityRequest = requestId;
         const showFallback = () => {
+            if (img.dataset.identityRequest !== requestId) return;
             img.removeAttribute('src');
             img.classList.add('hidden');
             if (fallback) fallback.classList.remove('hidden');
@@ -154,12 +157,15 @@
         if (!url) { showFallback(); return; }
         img.onerror = showFallback;
         img.onload = () => {
+            if (img.dataset.identityRequest !== requestId) return;
             img.classList.remove('hidden');
             if (fallback) fallback.classList.add('hidden');
         };
         const versioned = versionedAssetUrl(url, version);
         loadProtectedAsset(versioned)
-            .then((resolved) => { img.src = resolved; })
+            .then((resolved) => {
+                if (img.dataset.identityRequest === requestId) img.src = resolved;
+            })
             .catch(showFallback);
     }
 
@@ -646,6 +652,7 @@
     window.cargarIdentidadPublica = cargarIdentidadPublica;
     window.cargarIdentidadEfectiva = cargarIdentidadEfectiva;
     window.limpiarIdentidadInstitucional = limpiarIdentidadInstitucional;
+    window.obtenerIdentidadInstitucionalActual = () => ({ ...(configuracionActual || {}) });
     window.configInstitucionalInit = configInstitucionalInit;
     window.cargarCatalogoIdentidadVisual = cargarCatalogoIdentidadVisual;
     window.activarArchivoIdentidadVisual = activarArchivoIdentidadVisual;

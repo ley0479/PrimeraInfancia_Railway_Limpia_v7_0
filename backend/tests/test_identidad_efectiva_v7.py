@@ -31,6 +31,11 @@ def main():
                VALUES (7,7,?,?,?,?,?,?)''',
             ('Fundación Siete', '', '#abcdef', 1, now, now),
         )
+        conn.execute(
+            '''UPDATE configuracion_institucional SET nombre_admin=?, cargo_admin=?, foto_admin_path=?
+               WHERE fundacion_id=7''',
+            ('Admin Local Antiguo', 'Cargo Local', str(Path(tmp) / 'foto-local.png')),
+        )
         conn.commit()
         conn.close()
 
@@ -48,6 +53,9 @@ def main():
         assert mixed['sigla'] == 'PG'
         assert mixed['color_primario'] == '#abcdef'
         assert mixed['cargo_admin'] == 'Dirección General'
+        assert mixed['nombre_admin'] == 'Admin Global'
+        assert mixed['foto_admin_url'] is None
+        assert mixed['administrador_fundacion']['nombre'] == 'Admin Local Antiguo'
 
     source = (BACKEND / 'modules' / 'institucional_normativo.py').read_text(encoding='utf-8')
     register_body = source.split('def register_institucional_normativo', 1)[1]
