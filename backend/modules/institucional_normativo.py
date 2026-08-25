@@ -771,6 +771,9 @@ def register_institucional_normativo(app, database_path: str, base_dir: str) -> 
             'favicon_global_url': cfg['favicon_url'],
             'color_primario': cfg['color_primario'],
             'color_secundario': cfg['color_secundario'],
+            'nombre_admin': cfg['nombre_admin'],
+            'cargo_admin': cfg['cargo_admin'],
+            'foto_admin_url': cfg['foto_admin_url'],
             'identity_version': cfg['identity_version'],
             'updated_at': cfg['updated_at'],
         }})
@@ -980,6 +983,21 @@ def register_institucional_normativo(app, database_path: str, base_dir: str) -> 
         conn.execute(f'UPDATE configuracion_institucional SET {col}=?, actualizado_por=?, updated_at=? WHERE id=?', (str(path), user['username'], now, cfg['id']))
         conn.execute('UPDATE identidad_visual_archivos SET activo=0, updated_at=? WHERE fundacion_id=? AND tipo=?', (now, user['fundacion_id'], asset_type))
         conn.execute('INSERT INTO identidad_visual_archivos (fundacion_id,tipo,nombre_original,nombre_archivo,archivo_path,mime_type,tamano_bytes,activo,cargado_por,created_at,updated_at) VALUES (?,?,?,?,?,?,?,1,?,?,?)', (user['fundacion_id'],asset_type,file.filename,nombre,str(path),file.mimetype or '',path.stat().st_size,user['username'],now,now))
+        # El logo principal es también la fuente de encabezados para los
+        # generadores históricos que consultan fundaciones/corporaciones.
+        if tipo == 'principal':
+            fund_cols = {r['name'] for r in conn.execute('PRAGMA table_info(fundaciones)').fetchall()}
+            if 'logo_path' in fund_cols:
+                if 'fecha_actualizacion' in fund_cols:
+                    conn.execute('UPDATE fundaciones SET logo_path=?, fecha_actualizacion=? WHERE id=?', (str(path), now, user['fundacion_id']))
+                else:
+                    conn.execute('UPDATE fundaciones SET logo_path=? WHERE id=?', (str(path), user['fundacion_id']))
+            corp_cols = {r['name'] for r in conn.execute('PRAGMA table_info(corporaciones)').fetchall()}
+            if 'logo_path' in corp_cols:
+                if 'fecha_actualizacion' in corp_cols:
+                    conn.execute('UPDATE corporaciones SET logo_path=?, fecha_actualizacion=? WHERE fundacion_id=?', (str(path), now, user['fundacion_id']))
+                else:
+                    conn.execute('UPDATE corporaciones SET logo_path=? WHERE fundacion_id=?', (str(path), user['fundacion_id']))
         conn.commit()
         row = conn.execute('SELECT * FROM configuracion_institucional WHERE id=?', (cfg['id'],)).fetchone()
         conn.close()
@@ -1002,7 +1020,10 @@ def register_institucional_normativo(app, database_path: str, base_dir: str) -> 
         if not path.is_file() or path.stat().st_size <= 0:
             return jsonify({'error': 'El servidor recibió la foto, pero no pudo guardarla en disco.'}), 500
         conn = _connect(database_path)
-        conn.execute('UPDATE configuracion_institucional SET foto_admin_path=?, actualizado_por=?, updated_at=? WHERE id=?', (str(path), user['username'], _now(), cfg['id']))
+        now = _now()
+        conn.execute('UPDATE configuracion_institucional SET foto_admin_path=?, actualizado_por=?, updated_at=? WHERE id=?', (str(path), user['username'], now, cfg['id']))
+        conn.execute('UPDATE identidad_visual_archivos SET activo=0, updated_at=? WHERE fundacion_id=? AND tipo=?', (now, user['fundacion_id'], 'foto_admin'))
+        conn.execute('INSERT INTO identidad_visual_archivos (fundacion_id,tipo,nombre_original,nombre_archivo,archivo_path,mime_type,tamano_bytes,activo,cargado_por,created_at,updated_at) VALUES (?,?,?,?,?,?,?,1,?,?,?)', (user['fundacion_id'],'foto_admin',file.filename,nombre,str(path),file.mimetype or '',path.stat().st_size,user['username'],now,now))
         conn.commit()
         row = conn.execute('SELECT * FROM configuracion_institucional WHERE id=?', (cfg['id'],)).fetchone()
         conn.close()
@@ -1121,12 +1142,26 @@ def register_institucional_normativo(app, database_path: str, base_dir: str) -> 
     def listar_identidad_visual():
         user = _user()
         conn = _connect(database_path)
+        if str(request.args.get('scope') or '').upper() == 'GLOBAL':
+            rows = conn.execute('SELECT * FROM identidad_global_archivos ORDER BY tipo ASC, activo DESC, created_at DESC, id DESC').fetchall()
+            conn.close()
+            archivos = []
+            for row in rows:
+                item = dict(row)
+                item.update({
+                    'scope': 'GLOBAL',
+                    'nombre_archivo': os.path.basename(str(item.get('storage_key') or '')),
+                    'url': _global_asset_url(str(item.get('tipo') or ''), item.get('version')),
+                })
+                archivos.append(item)
+            return jsonify({'scope': 'GLOBAL', 'archivos': archivos}), 200
         rows = conn.execute('SELECT * FROM identidad_visual_archivos WHERE fundacion_id=? ORDER BY tipo ASC, activo DESC, created_at DESC, id DESC', (user['fundacion_id'],)).fetchall()
         conn.close()
         archivos = []
         tenant_root = _tenant_dirs()['root']
         for row in rows:
             item = dict(row)
+            item['scope'] = 'FUNDACION'
             item['url'] = _public_path(item.get('archivo_path'), base_dir, tenant_root)
             archivos.append(item)
         return jsonify({'archivos': archivos}), 200
@@ -1144,6 +1179,7 @@ def register_institucional_normativo(app, database_path: str, base_dir: str) -> 
         allowed_roots = [
             os.path.abspath(str(directories['logos_dir'])),
             os.path.abspath(str(directories['favicons_dir'])),
+            os.path.abspath(str(directories['fotos_dir'])),
             os.path.abspath(str(directories['branding_root'])),
         ]
         if not any(path.startswith(root + os.sep) for root in allowed_roots):
@@ -1162,7 +1198,7 @@ def register_institucional_normativo(app, database_path: str, base_dir: str) -> 
         if not row:
             conn.close()
             return jsonify({'error': 'Archivo de identidad visual no encontrado.'}), 404
-        mapping = {'logo_principal':'logo_principal_path','logo_horizontal':'logo_horizontal_path','logo_reportes':'logo_reportes_path','logo_formatos':'logo_formatos_path','logo_documentos':'logo_documentos_path','favicon_ico':'favicon_path','favicon_png':'favicon_png_path'}
+        mapping = {'logo_principal':'logo_principal_path','logo_horizontal':'logo_horizontal_path','logo_reportes':'logo_reportes_path','logo_formatos':'logo_formatos_path','logo_documentos':'logo_documentos_path','favicon_ico':'favicon_path','favicon_png':'favicon_png_path','foto_admin':'foto_admin_path'}
         col = mapping.get(row['tipo'])
         if not col:
             conn.close()

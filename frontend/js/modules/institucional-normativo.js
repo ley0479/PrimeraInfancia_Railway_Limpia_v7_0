@@ -205,6 +205,7 @@
 
         const brandingVersion = configuracionActual.identity_version || configuracionActual.updated_at || configuracionActual.id || 1;
         setImage('institucional-logo-sidebar', 'institucional-logo-sidebar-fallback', configuracionActual.logo_principal_url, brandingVersion);
+        setImage('institucional-logo-header', 'institucional-logo-header-fallback', configuracionActual.logo_principal_url, brandingVersion);
         setImage('institucional-logo-login', 'institucional-logo-login-fallback', configuracionActual.logo_principal_url, brandingVersion);
         setImage('ci-preview-logo', 'ci-preview-logo-fallback', configuracionActual.logo_principal_url, brandingVersion);
         setImage('institucional-foto-admin-header', 'institucional-foto-admin-fallback', configuracionActual.foto_admin_url, brandingVersion);
@@ -259,6 +260,9 @@
                 favicon_url: visual.favicon_global_url,
                 color_primario: visual.color_primario,
                 color_secundario: visual.color_secundario,
+                nombre_admin: visual.nombre_admin,
+                cargo_admin: visual.cargo_admin,
+                foto_admin_url: visual.foto_admin_url,
                 identity_version: visual.identity_version
             });
             return data;
@@ -385,6 +389,12 @@
         favicon_ico: 'Favicon ICO',
         favicon_png: 'Favicon PNG',
         logo_impresion: 'Logo para impresión 300 DPI'
+        ,foto_admin: 'Foto del administrador general'
+        ,'foto-admin': 'Foto del administrador general'
+        ,logo: 'Logo global de plataforma'
+        ,'logo-reportes': 'Logo global para reportes'
+        ,'logo-formatos': 'Logo global para documentos y formatos'
+        ,favicon: 'Favicon global'
     };
 
     function formatBytes(bytes) {
@@ -408,8 +418,8 @@
                 ${estado}
             </div>
             <div class="flex flex-wrap gap-2">
-                <button type="button" onclick="descargarArchivoInstitucional('/api/identidad-visual/${Number(asset.id)}/descargar')" class="pi-alpha41-btn-secondary"><i data-lucide="download" class="w-4 h-4"></i> Descargar</button>
-                ${Number(asset.activo) === 1 ? '' : `<button type="button" onclick="activarArchivoIdentidadVisual(${Number(asset.id)})" class="pi-alpha41-btn-secondary"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> Restaurar</button>`}
+                ${asset.scope === 'GLOBAL' ? `<a href="${escapeHtml(resolveAssetUrl(asset.url))}" target="_blank" rel="noopener" class="pi-alpha41-btn-secondary"><i data-lucide="eye" class="w-4 h-4"></i> Ver archivo</a>` : `<button type="button" onclick="descargarArchivoInstitucional('/api/identidad-visual/${Number(asset.id)}/descargar')" class="pi-alpha41-btn-secondary"><i data-lucide="download" class="w-4 h-4"></i> Descargar</button>`}
+                ${asset.scope === 'GLOBAL' || Number(asset.activo) === 1 ? '' : `<button type="button" onclick="activarArchivoIdentidadVisual(${Number(asset.id)})" class="pi-alpha41-btn-secondary"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> Restaurar</button>`}
             </div>
         </article>`;
     }
@@ -418,7 +428,8 @@
         const grid = qs('ci-assets-grid');
         if (!grid) return;
         try {
-            const data = await fetchJson('/api/identidad-visual');
+            const scope = esAmbitoGlobal() ? 'GLOBAL' : 'FUNDACION';
+            const data = await fetchJson(`/api/identidad-visual?scope=${scope}`);
             const assets = data.archivos || [];
             grid.innerHTML = assets.length ? assets.map(renderAssetCard).join('') : '<div class="md:col-span-2 rounded-xl border border-dashed border-slate-700 p-4 text-sm text-slate-500">Aún no hay archivos cargados. Sube un logo o favicon para crear el historial.</div>';
             if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -507,6 +518,7 @@
             scope.addEventListener('change', async () => {
                 actualizarAvisoAmbito();
                 await cargarConfiguracionInstitucional(true);
+                await cargarCatalogoIdentidadVisual(true);
             });
             scope.dataset.bound = '1';
             actualizarAvisoAmbito();
