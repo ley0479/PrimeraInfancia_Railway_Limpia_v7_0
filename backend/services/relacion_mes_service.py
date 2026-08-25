@@ -124,12 +124,22 @@ def consolidar_por_unidad(rows: Iterable[dict[str, Any]], anio: int | None = Non
         if estado and estado not in {'activo', 'activa'}:
             continue
         unidad = str(row.get('unidad') or row.get('unidad_servicio') or '').strip() or 'SIN UNIDAD'
-        item = resumen.setdefault(unidad, {**{grupo: 0 for grupo in GRUPOS}, '_docentes': Counter(), 'sin_clasificar': 0})
+        item = resumen.setdefault(unidad, {
+            **{grupo: 0 for grupo in GRUPOS}, '_docentes': Counter(),
+            'sin_clasificar': 0, 'verduras_dobles': 0,
+        })
         grupo = clasificar_participante(row, anio, mes)
         if grupo:
             item[grupo] += 1
         else:
             item['sin_clasificar'] += 1
+        extra = _datos_json(row.get('datos_json'))
+        poblacion = _texto(' '.join(str(value or '') for value in (
+            row.get('grupo_etario'), row.get('tipo_beneficiario'),
+            _buscar_dato(extra, ('grupo etario', 'tipo beneficiario', 'poblacion', 'lactante')),
+        )))
+        if grupo == 'gestantes' or 'lactante' in poblacion:
+            item['verduras_dobles'] += 1
         docente = str(row.get('docente') or '').strip()
         if docente:
             item['_docentes'][docente] += 1
@@ -156,7 +166,9 @@ def cantidades(item: dict[str, Any]) -> dict[str, int]:
         'cubetas_30': cubetas,
         'paquetes_7': cubetas // 7,
         'cubetas_sueltas': cubetas % 7,
-        'verduras': total,
+        # Cada usuario recibe una unidad; gestantes y lactantes reciben una
+        # unidad adicional, para un total de dos.
+        'verduras': total + int(item.get('verduras_dobles') or 0),
         'olla_comunitaria': 1 if total else 0,
         'bienestarina': total,
     }

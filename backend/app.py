@@ -1724,6 +1724,14 @@ def obtener_talentos_por_unidad(unidad):
         ensure_runtime_schema(cursor)
         consultas = [
             """
+            SELECT documento, nombre_completo AS nombre, nombres, apellidos,
+                   cargo, rol_normalizado AS tipo_equipo,
+                   unidad_servicio AS unidad, unidad_servicio,
+                   coordinador, telefono, correo, estado, activo
+            FROM master_talento_humano
+            WHERE activo = 1 AND COALESCE(fundacion_id,1) = ?
+            """,
+            """
             SELECT *
             FROM coordinadores
             WHERE COALESCE(activo, 1) = 1 AND lower(COALESCE(estado, 'activo')) <> 'inactivo'
@@ -1734,9 +1742,9 @@ def obtener_talentos_por_unidad(unidad):
             WHERE COALESCE(activo, 1) = 1 AND lower(COALESCE(estado, 'activo')) <> 'inactivo'
             """,
         ]
-        for sql in consultas:
+        for indice_consulta, sql in enumerate(consultas):
             try:
-                filas = cursor.execute(sql).fetchall()
+                filas = cursor.execute(sql, (fundacion_actual_id(),)).fetchall() if indice_consulta == 0 else cursor.execute(sql).fetchall()
             except Exception:
                 continue
             for fila in filas:
@@ -5788,33 +5796,8 @@ def cuentas_cobro_generar():
 
 
 def obtener_docente_relacion(unidad: str) -> str:
-    unidad_norm = normalize_unidad(unidad)
-    conn = database_connection()
-    cursor = conn.cursor()
-    ensure_runtime_schema(cursor)
-    fila = None
-    try:
-        fila = cursor.execute("""
-            SELECT nombre_completo AS nombre FROM master_talento_humano
-            WHERE activo = 1 AND COALESCE(fundacion_id,1) = ?
-              AND UPPER(TRIM(COALESCE(unidad_servicio,''))) = UPPER(TRIM(?))
-              AND (UPPER(COALESCE(rol_normalizado,'')) LIKE '%DOCENTE%'
-                   OR UPPER(COALESCE(rol_normalizado,'')) LIKE '%AGENTE%'
-                   OR UPPER(COALESCE(cargo,'')) LIKE '%AGENTE%'
-                   OR UPPER(COALESCE(cargo,'')) LIKE '%DOCENTE%')
-            ORDER BY nombre_completo LIMIT 1
-        """, (fundacion_actual_id(), unidad_norm)).fetchone()
-    except Exception:
-        fila = None
-    if not fila:
-        fila = cursor.execute("""
-            SELECT nombre FROM coordinadores
-            WHERE unidad = ? AND activo = 1
-              AND (UPPER(COALESCE(tipo_equipo, '')) LIKE '%DOCENTE%' OR UPPER(COALESCE(cargo, '')) LIKE '%AGENTE%' OR UPPER(COALESCE(cargo, '')) LIKE '%DOCENTE%')
-            ORDER BY nombre LIMIT 1
-        """, (unidad_norm,)).fetchone()
-    conn.close()
-    return fila['nombre'] if fila else ''
+    talento = obtener_talento_por_unidad(unidad) or {}
+    return limpiar_valor(talento.get('nombre') or talento.get('nombre_completo'))
 
 
 @app.route('/api/relacion-mes/generar', methods=['GET', 'POST'])
@@ -5849,7 +5832,8 @@ def relacion_mes_generar():
         '1 A 2 AÑOS 11 MESES', '3 A 5 AÑOS 11 MESES', 'SIN CLASIFICAR / REVISAR',
         'TOTAL USUARIOS', 'HUEVOS PARA GRUPOS DE 30', 'HUEVOS PARA 6 A 11 (15)',
         'TOTAL HUEVOS (UNIDADES)', 'CUBETAS DE 30', 'PAQUETES COMPLETOS (7 CUBETAS)',
-        'CUBETAS SUELTAS', 'VERDURAS', 'OLLA COMUNITARIA', 'BIENESTARINA'
+        'CUBETAS SUELTAS', 'GESTANTES/LACTANTES CON DOBLE VERDURA',
+        'TOTAL VERDURAS', 'OLLA COMUNITARIA', 'BIENESTARINA'
     ]
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
     ws.cell(1, 1).value = f'RELACIÓN DEL MES DE {mes_nombre_es(mes)} {anio}'
@@ -5878,7 +5862,8 @@ def relacion_mes_generar():
             unidad, docente, d['gestantes'], d['menores_6'], d['seis_11'], d['uno_2'], d['tres_5'],
             d['sin_clasificar'], f'=SUM(C{row}:H{row})', f'=(C{row}+D{row}+F{row}+G{row}+H{row})*30',
             f'=E{row}*15', f'=SUM(J{row}:K{row})', f'=ROUNDUP(L{row}/30,0)', f'=QUOTIENT(M{row},7)',
-            f'=MOD(M{row},7)', f'=I{row}', f'=IF(I{row}>0,1,0)', f'=I{row}'
+            f'=MOD(M{row},7)', d['verduras_dobles'], f'=I{row}+P{row}',
+            f'=IF(I{row}>0,1,0)', f'=I{row}'
         ]
         for col, v in enumerate(valores, start=1):
             c = ws.cell(row, col)
@@ -9742,7 +9727,16 @@ def _alpha59_obtener_usuarios_unidad(unidad):
                 # con ambos motores; las instalaciones vigentes siempre crean
                 # estas tablas mediante las migraciones de arranque.
                 try:
-                    rows = conn.execute(f'SELECT * FROM {tabla}').fetchall()
+                    if tabla == 'master_ninos':
+                        rows = conn.execute(
+                            'SELECT * FROM master_ninos WHERE activo=1 AND COALESCE(fundacion_id,1)=?',
+                            (tenant_id,),
+                        ).fetchall()
+                    else:
+                        rows = conn.execute(
+                            f'SELECT * FROM {tabla} WHERE COALESCE(fundacion_id,1)=?',
+                            (tenant_id,),
+                        ).fetchall()
                 except Exception:
                     rows = []
                 for row in rows:

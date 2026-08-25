@@ -159,7 +159,7 @@ class PaqueteMensualService:
     def docente_unidad(self, unidad: str, talento: list[dict[str, Any]]) -> str:
         unidad_norm = normalizar_texto(unidad)
         for t in talento:
-            cargo = normalizar_texto(t.get('cargo') or t.get('tipo_equipo') or '')
+            cargo = normalizar_texto(t.get('rol_normalizado') or t.get('cargo') or t.get('tipo_equipo') or '')
             unidad_t = normalizar_texto(t.get('unidad') or '')
             if unidad_norm and unidad_norm == unidad_t and ('docente' in cargo or 'agente' in cargo):
                 return t.get('nombre') or 'Sin docente'
@@ -516,22 +516,24 @@ class PaqueteMensualService:
                 unidad, docente, d['gestantes'], d['menores_6'], d['seis_11'], d['uno_2'], d['tres_5'], d['sin_clasificar'],
                 f'=SUM(C{excel_row}:H{excel_row})', f'=(C{excel_row}+D{excel_row}+F{excel_row}+G{excel_row}+H{excel_row})*30',
                 f'=E{excel_row}*15', f'=SUM(J{excel_row}:K{excel_row})', f'=ROUNDUP(L{excel_row}/30,0)',
-                f'=QUOTIENT(M{excel_row},7)', f'=MOD(M{excel_row},7)', f'=I{excel_row}',
-                f'=IF(I{excel_row}>0,1,0)', f'=I{excel_row}'
+                f'=QUOTIENT(M{excel_row},7)', f'=MOD(M{excel_row},7)', d['verduras_dobles'],
+                f'=I{excel_row}+P{excel_row}', f'=IF(I{excel_row}>0,1,0)', f'=I{excel_row}'
             ])
             pdf_rows.append([
                 unidad, docente, d['gestantes'], d['menores_6'], d['seis_11'], d['uno_2'], d['tres_5'], d['sin_clasificar'],
                 qty['total'], qty['huevos_30'], qty['huevos_15'], qty['total_huevos'], qty['cubetas_30'],
-                qty['paquetes_7'], qty['cubetas_sueltas'], qty['verduras'], qty['olla_comunitaria'], qty['bienestarina']
+                qty['paquetes_7'], qty['cubetas_sueltas'], d['verduras_dobles'], qty['verduras'],
+                qty['olla_comunitaria'], qty['bienestarina']
             ])
         if rows:
             total_row = first_excel_row + len(rows)
-            rows.append(['TOTAL GENERAL', ''] + [f'=SUM({get_column_letter(col)}{first_excel_row}:{get_column_letter(col)}{total_row - 1})' for col in range(3, 19)])
+            rows.append(['TOTAL GENERAL', ''] + [f'=SUM({get_column_letter(col)}{first_excel_row}:{get_column_letter(col)}{total_row - 1})' for col in range(3, 20)])
         headers = [
             'Unidad', 'Docente', 'Gestantes', 'Menores 6 meses', '6 a 11 meses', '1 a 2 años 11 meses',
             '3 a 5 años 11 meses', 'Sin clasificar / revisar', 'Total usuarios', 'Huevos grupos de 30',
             'Huevos 6 a 11 (15)', 'Total huevos (unidades)', 'Cubetas de 30',
-            'Paquetes completos (7 cubetas)', 'Cubetas sueltas', 'Verduras', 'Olla comunitaria', 'Bienestarina'
+            'Paquetes completos (7 cubetas)', 'Cubetas sueltas', 'Gestantes/lactantes con doble verdura',
+            'Total verduras', 'Olla comunitaria', 'Bienestarina'
         ]
         folder = ensure_dir(package_dir / '04_Relacion_Mes')
         xlsx = folder / f'RELACION_MES_{anio}_{mes:02d}.xlsx'
