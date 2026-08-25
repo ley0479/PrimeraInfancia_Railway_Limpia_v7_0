@@ -45,12 +45,15 @@ class MotorAlertas:
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
-        # Obtener beneficiarios activos
+        fid = int(current_tenant_id(1) or 1)
+        # La alerta se identifica por documento; el id de master_ninos no es FK
+        # de beneficiarios y nunca debe guardarse como si lo fuera.
         cursor.execute("""
-            SELECT id, documento, nombres, unidad, fecha_nacimiento
-            FROM beneficiarios
-            WHERE estado = ?
-        """, (EstadoUsuario.ACTIVO,))
+            SELECT documento, nombre_completo AS nombres,
+                   unidad_servicio AS unidad, fecha_nacimiento
+            FROM master_ninos
+            WHERE activo=1 AND COALESCE(fundacion_id,1)=?
+        """, (fid,))
         
         beneficiarios = cursor.fetchall()
         alertas_creadas = 0
@@ -62,8 +65,8 @@ class MotorAlertas:
             # Verificar si ya existe alerta abierta para este beneficiario
             cursor.execute("""
                 SELECT id FROM alertas
-                WHERE beneficiario_id = ? AND tipo_alerta LIKE 'EDAD_%' AND resuelta = 0
-            """, (benef['id'],))
+                WHERE tipo_alerta LIKE 'EDAD_%' AND detalles LIKE ? AND resuelta = 0
+            """, (f'%{benef["documento"]}%',))
             
             alerta_existente = cursor.fetchone()
             
@@ -80,9 +83,9 @@ class MotorAlertas:
             if nivel and not alerta_existente:
                 cursor.execute("""
                     INSERT INTO alertas
-                    (beneficiario_id, tipo_alerta, nivel, descripcion, detalles, fecha_generacion)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (benef['id'], 'EDAD_RETIRO', nivel, descripcion,
+                    (tipo_alerta, nivel, descripcion, detalles, fecha_generacion)
+                    VALUES (?, ?, ?, ?, ?)
+                """, ('EDAD_RETIRO', nivel, descripcion,
                       json.dumps({
                           'documento': benef['documento'],
                           'edad_meses': edad_meses,
@@ -109,15 +112,16 @@ class MotorAlertas:
         
         fid = int(current_tenant_id(1) or 1)
         cursor.execute("""
-            SELECT DISTINCT b.id, b.nombres, b.documento, b.unidad
-            FROM beneficiarios b
-            LEFT JOIN peso_talla pt
-              ON b.id = pt.beneficiario_id
-             AND COALESCE(pt.fundacion_id, 1) = ?
-            WHERE b.estado = ?
-              AND COALESCE(b.fundacion_id, 1) = ?
-              AND (pt.id IS NULL OR pt.fecha_medicion < ?)
-        """, (fid, EstadoUsuario.ACTIVO, fid, fecha_vencimiento))
+            SELECT b.nombre_completo AS nombres, b.documento,
+                   b.unidad_servicio AS unidad
+            FROM master_ninos b
+            LEFT JOIN master_salud_nutricion s
+              ON s.version_id=b.version_id AND s.documento=b.documento
+             AND s.activo=1 AND COALESCE(s.fundacion_id,1)=?
+            WHERE b.activo=1 AND COALESCE(b.fundacion_id,1)=?
+            GROUP BY b.documento,b.nombre_completo,b.unidad_servicio
+            HAVING MAX(s.fecha_toma) IS NULL OR MAX(s.fecha_toma) < ?
+        """, (fid, fid, fecha_vencimiento))
         
         vencidos = cursor.fetchall()
         
@@ -125,15 +129,15 @@ class MotorAlertas:
             # Verificar si ya existe alerta abierta
             cursor.execute("""
                 SELECT id FROM alertas
-                WHERE beneficiario_id = ? AND tipo_alerta = 'NUTRICION_VENCIDA' AND resuelta = 0
-            """, (benef['id'],))
+                WHERE tipo_alerta = 'NUTRICION_VENCIDA' AND detalles LIKE ? AND resuelta = 0
+            """, (f'%{benef["documento"]}%',))
             
             if not cursor.fetchone():
                 cursor.execute("""
                     INSERT INTO alertas
-                    (beneficiario_id, tipo_alerta, nivel, descripcion, detalles, fecha_generacion)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (benef['id'], 'NUTRICION_VENCIDA', AlertaNivel.AMARILLO,
+                    (tipo_alerta, nivel, descripcion, detalles, fecha_generacion)
+                    VALUES (?, ?, ?, ?, ?)
+                """, ('NUTRICION_VENCIDA', AlertaNivel.AMARILLO,
                       f"Control nutricional vencido: {benef['nombres']}",
                       json.dumps({
                           'documento': benef['documento'],
@@ -144,21 +148,14 @@ class MotorAlertas:
         
         # 2. Estados nutricionales críticos
         cursor.execute("""
-            SELECT DISTINCT b.id, b.nombres, b.documento, b.unidad, pt.estado_nutricional
-            FROM beneficiarios b
-            JOIN peso_talla pt
-              ON b.id = pt.beneficiario_id
-             AND COALESCE(pt.fundacion_id, 1) = ?
-            WHERE b.estado = ?
-              AND COALESCE(b.fundacion_id, 1) = ?
-              AND pt.estado_nutricional IN (?, ?)
-              AND pt.id = (
-                  SELECT id FROM peso_talla ptx
-                  WHERE ptx.beneficiario_id = b.id
-                    AND COALESCE(ptx.fundacion_id, 1) = ?
-                  ORDER BY ptx.fecha_medicion DESC LIMIT 1
-              )
-        """, (fid, EstadoUsuario.ACTIVO, fid, EstadoNutricion.DESNUTRICION, EstadoNutricion.RIESGO, fid))
+            SELECT b.nombre_completo AS nombres,b.documento,
+                   b.unidad_servicio AS unidad,s.estado_nutricional
+            FROM master_ninos b JOIN master_salud_nutricion s
+              ON s.version_id=b.version_id AND s.documento=b.documento
+             AND s.activo=1 AND COALESCE(s.fundacion_id,1)=?
+            WHERE b.activo=1 AND COALESCE(b.fundacion_id,1)=?
+              AND s.estado_nutricional IN (?,?)
+        """, (fid, fid, EstadoNutricion.DESNUTRICION, EstadoNutricion.RIESGO))
         
         criticos = cursor.fetchall()
         
@@ -168,15 +165,15 @@ class MotorAlertas:
             # Verificar si ya existe alerta
             cursor.execute("""
                 SELECT id FROM alertas
-                WHERE beneficiario_id = ? AND tipo_alerta = 'NUTRICION_CRITICA' AND resuelta = 0
-            """, (benef['id'],))
+                WHERE tipo_alerta = 'NUTRICION_CRITICA' AND detalles LIKE ? AND resuelta = 0
+            """, (f'%{benef["documento"]}%',))
             
             if not cursor.fetchone():
                 cursor.execute("""
                     INSERT INTO alertas
-                    (beneficiario_id, tipo_alerta, nivel, descripcion, detalles, fecha_generacion)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (benef['id'], 'NUTRICION_CRITICA', nivel,
+                    (tipo_alerta, nivel, descripcion, detalles, fecha_generacion)
+                    VALUES (?, ?, ?, ?, ?)
+                """, ('NUTRICION_CRITICA', nivel,
                       f"Estado nutricional crítico: {benef['nombres']} - {benef['estado_nutricional']}",
                       json.dumps({
                           'documento': benef['documento'],
@@ -201,11 +198,11 @@ class MotorAlertas:
         
         # Obtener conteo por unidad
         cursor.execute("""
-            SELECT unidad, COUNT(*) as total
-            FROM beneficiarios
-            WHERE estado = ?
-            GROUP BY unidad
-        """, (EstadoUsuario.ACTIVO,))
+            SELECT unidad_servicio AS unidad, COUNT(*) as total
+            FROM master_ninos
+            WHERE activo=1 AND COALESCE(fundacion_id,1)=?
+            GROUP BY unidad_servicio
+        """, (int(current_tenant_id(1) or 1),))
         
         unidades = cursor.fetchall()
         
@@ -330,13 +327,14 @@ class MotorAlertas:
         # Mismo documento en múltiples unidades
         cursor.execute("""
             SELECT documento, COUNT(*) as cantidad, 
-                   GROUP_CONCAT(unidad, ', ') as unidades,
+                   GROUP_CONCAT(unidad_servicio, ', ') as unidades,
                    GROUP_CONCAT(id, ',') as ids
-            FROM beneficiarios
-            WHERE estado = ? AND documento IS NOT NULL AND documento != ''
+            FROM master_ninos
+            WHERE activo=1 AND COALESCE(fundacion_id,1)=?
+              AND documento IS NOT NULL AND documento != ''
             GROUP BY documento
-            HAVING cantidad > 1
-        """, (EstadoUsuario.ACTIVO,))
+            HAVING COUNT(*) > 1
+        """, (int(current_tenant_id(1) or 1),))
         
         duplicados_doc = cursor.fetchall()
         
