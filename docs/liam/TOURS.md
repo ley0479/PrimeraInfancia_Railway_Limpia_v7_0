@@ -7,3 +7,6 @@ Además de la presentación del panel, LIAM dispone de recorridos cerrados para 
 
 Los eventos `base-file-selected`, `document-file-selected` y `document-received` permiten avanzar cuando la plataforma confirma la acción correspondiente. Los botones Anterior, Siguiente y Salir continúan disponibles.
 
+## Presentación institucional
+
+“Conocer la plataforma” inicia una exposición navegable. Presenta identidad confirmada, versión, cantidad de módulos permitidos por el rol, propósito de cada módulo autorizado y flujo general. No muestra módulos sin permiso ni inventa autoría o fechas ausentes.
