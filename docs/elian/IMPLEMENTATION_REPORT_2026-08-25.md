@@ -49,3 +49,11 @@ Se implementó una ampliación aditiva del asistente existente. La identidad vis
 - Los avatares son recursos PNG con animaciones de estado mediante CSS. Un archivo Rive/Live2D profesional con visemas completos no existe todavía; por eso no se declara sincronización labial avanzada ni caminata esquelética completa.
 - El reconocimiento de voz depende de la disponibilidad del navegador; el texto permanece como alternativa obligatoria.
 
+## Ajuste visual posterior solicitado
+
+- La pestaña cerrada muestra únicamente la silueta del personaje, sin tarjeta textual grande.
+- ELIAN se ubica a la derecha, junto al botón circular de Accesibilidad, sin superponerlo.
+- Hombre, mujer, variante, voz y nivel de movimiento también se configuran dentro del panel de ELIAN cuando el backend confirma permiso administrativo.
+- Al hablar se activa una capa de boca sincronizada con la reproducción; al guiar se activa un gesto de mano.
+- Una línea con flecha conecta el personaje con el control registrado y desaparece al finalizar la guía.
+- Estas capas mejoran el movimiento visible, pero no sustituyen una futura articulación esquelética Rive/Live2D.

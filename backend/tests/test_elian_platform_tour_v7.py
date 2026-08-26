@@ -39,6 +39,7 @@ html = read('frontend/index.html')
 controls = read('frontend/js/liam/liam-control-registry.js')
 anchors = read('frontend/js/liam/liam-anchor-registry.js')
 css = read('frontend/css/liam-assistant.css')
+a11y_css = read('frontend/css/accessibility-pi.css')
 for event in ('module-open-requested','module-loading','module-ready','module-guide-started','module-guide-completed','module-guide-paused','module-guide-resumed','module-guide-skipped','tour-completed','tour-failed'):
     assert event in engine
 for control in ('pause','resume','repeat','skip','previous','next','cancel'):
@@ -59,6 +60,13 @@ for anchor in ('liam.anchor.reports.period','liam.anchor.relation.period','liam.
 assert '@media(max-width:768px)' in css
 assert '@media(max-width:420px)' in css
 assert '@media(prefers-reduced-motion:reduce)' in css
+assert '.liam-mouth-motion' in css and '@keyframes elian-mouth' in css
+assert '.liam-hand-motion' in css and '@keyframes elian-hand' in css
+assert '.elian-guide-svg' in css
+assert 'Configurar personaje y voz' in controller
+assert 'elian-inline-gender' in controller and 'elian-inline-variant' in controller
+assert '.liam-shell{position:fixed;right:1rem;' in css
+assert 'right: 6rem;' in a11y_css
 assert (ROOT / 'frontend/assets/lia/elian-afro-institutional-male-v1.png').stat().st_size > 100_000
 assert (ROOT / 'frontend/assets/lia/elian-afro-institutional-female-v1.png').stat().st_size > 100_000
 for asset in (
