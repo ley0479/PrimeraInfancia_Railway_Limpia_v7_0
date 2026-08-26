@@ -174,6 +174,25 @@ class AtencionesPriorizadasService:
         cur=conn.cursor(); cur.execute("INSERT INTO rg9_evidencias(informe_id,atencion_codigo,unidad,nombre_archivo,ruta_archivo,fecha_evidencia,responsable,estado_revision,creado_en) VALUES(?,?,?,?,?,?,?,?,?)",(informe_id,codigo,payload.get("unidad"),name,str(path),payload.get("fecha_evidencia"),payload.get("responsable"),"PENDIENTE",now)); evidence_id=int(cur.lastrowid); conn.commit(); conn.close()
         return {"id":evidence_id,"atencion_codigo":codigo,"nombre_archivo":name,"estado_revision":"PENDIENTE"}
 
+    def guardar_plantilla_pptx(self, upload: Any, payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+        from werkzeug.utils import secure_filename
+        from pptx import Presentation
+        fid=int(user.get("fundacion_id") or 1); name=secure_filename(getattr(upload,"filename","") or "")
+        if Path(name).suffix.lower() != ".pptx": raise ValueError("La plantilla oficial debe ser un archivo .pptx.")
+        folder=self.base.reportes_folder/"9_atenciones"/"plantillas"/str(fid); folder.mkdir(parents=True,exist_ok=True)
+        stored=f"plantilla_9_atenciones_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.pptx"; path=folder/stored; upload.save(path)
+        if not path.is_file() or path.stat().st_size<=0: raise ValueError("La plantilla llegó vacía.")
+        try: presentation=Presentation(str(path)); slides=len(presentation.slides)
+        except Exception as exc: path.unlink(missing_ok=True); raise ValueError("El PowerPoint no es una plantilla PPTX válida.") from exc
+        digest=hashlib.sha256(path.read_bytes()).hexdigest(); conn=self.base.connect(); now=datetime.now().isoformat(timespec="seconds")
+        conn.execute("UPDATE rg9_plantillas_pptx SET estado='HISTORICA' WHERE fundacion_id=? AND estado='ACTIVA'",(fid,))
+        cur=conn.cursor(); cur.execute("INSERT INTO rg9_plantillas_pptx(fundacion_id,nombre_original,ruta_archivo,version,fecha_vigencia,estado,hash_sha256,cargado_por,creado_en) VALUES(?,?,?,?,?,'ACTIVA',?,?,?)",(fid,name,str(path),payload.get("version") or "1",payload.get("fecha_vigencia"),digest,user.get("id"),now)); template_id=int(cur.lastrowid); conn.commit(); conn.close()
+        return {"id":template_id,"nombre_original":name,"version":payload.get("version") or "1","estado":"ACTIVA","hash_sha256":digest,"diapositivas":slides}
+
+    def plantilla_pptx_activa(self, fundacion_id: int) -> dict[str, Any] | None:
+        conn=self.base.connect(); row=conn.execute("SELECT id,nombre_original,ruta_archivo,version,fecha_vigencia,estado,hash_sha256,creado_en FROM rg9_plantillas_pptx WHERE fundacion_id=? AND estado='ACTIVA' ORDER BY id DESC LIMIT 1",(fundacion_id,)).fetchone(); conn.close()
+        return dict(row) if row else None
+
     def generar_exportaciones(self, informe_id: int, fundacion_id: int) -> dict[str, str]:
         detail = self.detalle(informe_id, fundacion_id); report = detail["informe"]; results = detail["resultados"]
         folder = self._export_dir(report); base_name = f"9_ATENCIONES_{report['periodo']}_V{report['version']}"
@@ -185,7 +204,10 @@ class AtencionesPriorizadasService:
         for x in results: ws.append([names.get(x["atencion_codigo"],x["atencion_codigo"]),x["numerador"],x["denominador"],x["porcentaje"],x["estado"],x["fuente"],x.get("observacion")])
         wb.save(xlsx)
         from pptx import Presentation
-        prs = Presentation(); slide = prs.slides.add_slide(prs.slide_layouts[0]); slide.shapes.title.text = "Informe mensual\n9 Atenciones Priorizadas"; slide.placeholders[1].text = f"Periodo: {report['periodo']}\nContrato: {report.get('contrato') or 'No configurado'}"
+        template=self.plantilla_pptx_activa(fundacion_id)
+        template_path=template.get("ruta_archivo") if template else None
+        prs = Presentation(template_path) if template_path and Path(template_path).is_file() else Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[0]); slide.shapes.title.text = "Informe mensual\n9 Atenciones Priorizadas"; slide.placeholders[1].text = f"Periodo: {report['periodo']}\nContrato: {report.get('contrato') or 'No configurado'}"
         for x in results:
             slide = prs.slides.add_slide(prs.slide_layouts[1]); slide.shapes.title.text = names.get(x["atencion_codigo"],x["atencion_codigo"]); slide.placeholders[1].text = f"Resultado: {x['numerador']} / {x['denominador']} ({x['porcentaje']} %)\nEstado: {x['estado']}\nFuente: {x['fuente']}\nObservación: {x.get('observacion') or 'Sin observación'}"
         prs.save(pptx)

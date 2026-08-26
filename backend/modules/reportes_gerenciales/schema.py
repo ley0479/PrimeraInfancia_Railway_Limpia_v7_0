@@ -117,6 +117,19 @@ CREATE TABLE IF NOT EXISTS rg9_evidencias (
     creado_en TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS rg9_plantillas_pptx (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER NOT NULL,
+    nombre_original TEXT NOT NULL,
+    ruta_archivo TEXT NOT NULL,
+    version TEXT,
+    fecha_vigencia TEXT,
+    estado TEXT DEFAULT 'ACTIVA',
+    hash_sha256 TEXT NOT NULL,
+    cargado_por INTEGER,
+    creado_en TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS rg9_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     informe_id INTEGER NOT NULL,
@@ -134,4 +147,6 @@ CREATE INDEX IF NOT EXISTS idx_rg9_resultados_informe
 ON rg9_resultados(informe_id, atencion_codigo);
 CREATE INDEX IF NOT EXISTS idx_rg9_evidencias_informe
 ON rg9_evidencias(informe_id, atencion_codigo);
+CREATE INDEX IF NOT EXISTS idx_rg9_plantillas_tenant_estado
+ON rg9_plantillas_pptx(fundacion_id, estado);
 """

@@ -14,6 +14,14 @@ cierre y genera PowerPoint, PDF, Excel y ZIP.
 - Calendario/entregables: formación a familias y actividades detectadas.
 - Captura confirmada: materiales, carné, afiliación, vacunación y evidencias.
 
+## Plantilla PowerPoint oficial
+
+En `Reportes e Informes > Reportes Gerenciales > Informe de las 9 Atenciones`
+se encuentra **Plantilla PowerPoint oficial — 9 Atenciones**. Acepta `.pptx`,
+versión y fecha de vigencia. El original se conserva por fundación; al activar
+una nueva versión, la anterior queda histórica. La generación conserva las
+diapositivas de la plantilla activa y agrega el contenido mensual calculado.
+
 ## Reglas
 
 - Los cálculos son determinísticos; no los produce IA.
@@ -32,6 +40,7 @@ cierre y genera PowerPoint, PDF, Excel y ZIP.
 - `GET /api/reportes-gerenciales/9-atenciones/informes/{id}`
 - `PUT /api/reportes-gerenciales/9-atenciones/informes/{id}/atenciones/{codigo}`
 - `POST /api/reportes-gerenciales/9-atenciones/informes/{id}/atenciones/{codigo}/evidencias`
+- `GET|POST /api/reportes-gerenciales/9-atenciones/plantilla-pptx`
 - `POST /api/reportes-gerenciales/9-atenciones/informes/{id}/aprobar`
 - `POST /api/reportes-gerenciales/9-atenciones/informes/{id}/generar`
 - `GET /api/reportes-gerenciales/9-atenciones/informes/{id}/descargar/{pptx|pdf|xlsx|zip}`

@@ -1,5 +1,6 @@
 """Contrato inicial del Informe Mensual de las 9 Atenciones Priorizadas."""
 from pathlib import Path
+from io import BytesIO
 import sys
 import tempfile
 
@@ -12,6 +13,8 @@ from modules.reportes_gerenciales.atenciones_priorizadas import (  # noqa: E402
     ATENCIONES,
     AtencionesPriorizadasService,
 )
+from pptx import Presentation
+from werkzeug.datastructures import FileStorage
 
 
 def require(value, message):
@@ -87,8 +90,13 @@ with tempfile.TemporaryDirectory() as temp:
     conn.commit(); conn.close()
     approved = service.aprobar(draft["id"], {"id": 1, "fundacion_id": 1})
     require(len(approved["snapshot_hash"]) == 64, "No generó hash del snapshot")
+    template_bytes=BytesIO(); template_prs=Presentation(); template_prs.slides.add_slide(template_prs.slide_layouts[0]); template_prs.save(template_bytes); template_bytes.seek(0)
+    template=service.guardar_plantilla_pptx(FileStorage(stream=template_bytes,filename="plantilla_oficial_icbf.pptx"),{"version":"2026","fecha_vigencia":"2026-08-01"},{"id":1,"fundacion_id":1})
+    require(template["estado"]=="ACTIVA" and template["diapositivas"]==1,"No activó la plantilla PPTX")
+    require(service.plantilla_pptx_activa(2) is None,"La plantilla se cruzó con otra fundación")
     exports = service.generar_exportaciones(draft["id"], 1)
     require(set(exports) == {"pptx", "pdf", "xlsx", "zip"}, "Faltan exportaciones")
     require(all(Path(path).is_file() and Path(path).stat().st_size > 0 for path in exports.values()), "Alguna exportación está vacía")
+    require(len(Presentation(exports["pptx"]).slides)>=11,"No conservó la plantilla ni agregó el informe")
 
 print("REPORTES_9_ATENCIONES_V2_7_4_PASS")

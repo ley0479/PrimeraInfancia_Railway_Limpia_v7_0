@@ -103,6 +103,22 @@ def register_reportes_gerenciales(app, database_path: str, output_folder: str) -
         except ValueError as exc:
             return jsonify({'error':str(exc)}),422
 
+    @bp.route('/9-atenciones/plantilla-pptx', methods=['GET', 'POST'])
+    @require_roles(*ALLOWED_ROLES)
+    def plantilla_pptx_nueve_atenciones():
+        user=current_user()
+        if request.method == 'GET':
+            return jsonify({'plantilla':atenciones_service.plantilla_pptx_activa(user['fundacion_id'])})
+        if str(user.get('rol') or '').upper() not in {'SUPERADMIN','GERENTE','COORDINADOR'}:
+            return jsonify({'error':'No tienes permiso para reemplazar la plantilla oficial.'}),403
+        upload=request.files.get('file')
+        if not upload: return jsonify({'error':'Selecciona la plantilla PowerPoint .pptx.'}),400
+        try:
+            item=atenciones_service.guardar_plantilla_pptx(upload,request.form.to_dict(),user)
+            return jsonify({'message':'Plantilla PowerPoint oficial registrada y activada.','plantilla':item}),201
+        except ValueError as exc:
+            return jsonify({'error':str(exc)}),422
+
     @bp.route('/9-atenciones/informes/<int:informe_id>/aprobar', methods=['POST'])
     @require_roles('SUPERADMIN', 'GERENTE', 'COORDINADOR')
     def aprobar_nueve_atenciones(informe_id: int):
