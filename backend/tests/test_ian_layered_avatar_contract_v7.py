@@ -22,8 +22,8 @@ def main():
     lips = (ROOT / "frontend/js/liam/liam-lip-sync.js").read_text(encoding="utf-8")
     guard = (ROOT / "frontend/js/liam/ian-visibility-guard.js").read_text(encoding="utf-8")
 
-    require("mount=mountIan" in controller, "La interfaz activa no usa el montaje corregido de IAN")
-    require("if(!authToken)throw new Error('AUTH_PENDING');mount();const r=await fetch" in controller, "IAN todavía espera al endpoint antes de hacerse visible")
+    require("mountIan();const r=await fetch" in controller, "El arranque no invoca directamente el montaje corregido de IAN")
+    require("if(!authToken)throw new Error('AUTH_PENDING');mountIan();const r=await fetch" in controller, "IAN todavía espera al endpoint antes de hacerse visible")
     require("bootIan" in controller and "cache:'no-store'" in controller, "Falta el arranque resistente a caché")
     require("headers:headers()" in controller, "La configuración protegida de IAN se consulta sin autenticación")
     require("AUTH_PENDING" in controller and "setTimeout(()=>{state.booting=false;bootIan()}" in controller, "IAN no reintenta después del inicio de sesión")
@@ -32,7 +32,7 @@ def main():
         require(key in controller, f"IAN no reconoce la clave de sesión compatible: {key}")
     require("ian-launcher-avatar" in controller, "Falta la silueta única del lanzador")
     require("render('#liam-avatar-wrap'" in controller, "El panel no reutiliza el avatar del lanzador")
-    require("liam-mouth-motion" not in controller[controller.index("function mountIan"):controller.index("mount=mountIan")], "La interfaz activa todavía superpone una boca")
+    require("liam-mouth-motion" not in controller[controller.index("function mountIan"):controller.index("function applyIanVisual")], "La interfaz activa todavía superpone una boca")
     for layer in ("ian-head-layer", "ian-mouth-layer", "ian-arm-left", "ian-arm-right", "ian-eyes"):
         require(layer in renderer, f"Falta capa SVG real: {layer}")
     require("data-gender" in renderer and "data-variant" in renderer, "El SVG no admite género y variante")
@@ -44,6 +44,7 @@ def main():
     require(index.index("liam-state-machine.js") < index.index("liam-controller.js"), "El estado básico no se carga antes del controlador")
     require("ian-visibility-guard.js" in index, "La guardia de visibilidad no llega al navegador")
     require("window.IAN_BOOT?.()" in guard and "ian-visibility-fallback" in guard, "La guardia no recupera un montaje fallido")
+    require("app&&!app.classList.contains('hidden')" in guard, "La guardia depende únicamente del formato del token")
     require("removeFallback" in guard and "document.getElementById('liam-shell')" in guard, "La guardia puede duplicar el asistente")
     require("display','block','important'" in guard and "visibility','visible','important'" in guard, "La guardia no corrige ocultamiento CSS")
     require("'walking_up'" in state and "'walking_down'" in state and "'collapsed'" in state, "La máquina de estados está incompleta")

@@ -1,7 +1,7 @@
 (function(){
   'use strict';
   let attempts=0,timer=null;
-  const hasSession=()=>{const keys=['primeraInfanciaAuthToken','token','authToken','accessToken','primeraInfanciaToken'];for(const storage of [sessionStorage,localStorage])for(const key of keys){try{if(storage.getItem(key))return true}catch(_){}}return false};
+  const hasSession=()=>{const app=document.getElementById('app-shell');if(app&&!app.classList.contains('hidden'))return true;const keys=['primeraInfanciaAuthToken','token','authToken','accessToken','primeraInfanciaToken'];for(const storage of [sessionStorage,localStorage])for(const key of keys){try{if(storage.getItem(key))return true}catch(_){}}return false};
   function removeFallback(){document.getElementById('ian-visibility-fallback')?.remove()}
   function showFallback(){
     if(document.getElementById('liam-shell')||document.getElementById('ian-visibility-fallback'))return;
