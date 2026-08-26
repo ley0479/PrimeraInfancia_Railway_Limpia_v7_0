@@ -18,6 +18,8 @@ def main():
     movement = (ROOT / "frontend/js/liam/liam-movement-controller.js").read_text(encoding="utf-8")
     tour = (ROOT / "frontend/js/liam/elian-platform-tour.js").read_text(encoding="utf-8")
     orchestrator = (ROOT / "frontend/js/liam/liam-animation-orchestrator.js").read_text(encoding="utf-8")
+    speech = (ROOT / "frontend/js/lia-assistant/speech-controller.js").read_text(encoding="utf-8")
+    lips = (ROOT / "frontend/js/liam/liam-lip-sync.js").read_text(encoding="utf-8")
 
     require("mount=mountIan" in controller, "La interfaz activa no usa el montaje corregido de IAN")
     require("ian-launcher-avatar" in controller, "Falta la silueta única del lanzador")
@@ -36,6 +38,11 @@ def main():
     require("ian-tour-avatar" in movement and "pointer-events:none" in css, "El avatar del recorrido puede bloquear clics")
     require("LIAM_MOVEMENT?.moveToControl" in tour, "El recorrido automático no está conectado al movimiento")
     require("querySelector('.ian-avatar-svg')" in orchestrator, "Los estados aún buscan la fotografía antigua")
+    for event in ("start", "audio-ready", "play", "pause", "resume", "end", "error", "boundary"):
+        require(f"'{event}'" in speech, f"Falta evento de voz: {event}")
+    require("LIAM_LIP_SYNC?.pause" in speech and "LIAM_LIP_SYNC?.resume" in speech, "Pausa y reanudación no controlan la boca")
+    require("shapeFor" in lips and "ian:speech:viseme" in lips, "Falta el respaldo labial por formas internas")
+    require("mode:'timed-text-fallback'" in lips, "No se declara honestamente el modo de sincronización disponible")
     print("IAN_LAYERED_AVATAR_CONTRACT_V7_PASS")
 
 

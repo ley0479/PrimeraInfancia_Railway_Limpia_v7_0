@@ -9,7 +9,7 @@
   const headers=()=>({'Content-Type':'application/json',Authorization:`Bearer ${token()}`});
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const runtime=['ian-avatar-renderer','liam-state-machine','liam-control-registry','liam-anchor-registry','liam-safe-zone-engine','liam-animation-orchestrator','liam-tablet-controller','liam-movement-controller','liam-tour-engine','elian-platform-tour','liam-lip-sync','liam-context-collector'];
-  async function loadRuntime(){for(const name of runtime){if(document.querySelector(`script[data-liam-runtime="${name}"]`))continue;await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=`./js/liam/${name}.js?v=2.7.3-ian-motion-2`;script.dataset.liamRuntime=name;script.onload=resolve;script.onerror=()=>reject(new Error(`No se pudo cargar ${name}.`));document.head.appendChild(script)})}}
+  async function loadRuntime(){for(const name of runtime){if(document.querySelector(`script[data-liam-runtime="${name}"]`))continue;await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=`./js/liam/${name}.js?v=2.7.3-ian-voice-3`;script.dataset.liamRuntime=name;script.onload=resolve;script.onerror=()=>reject(new Error(`No se pudo cargar ${name}.`));document.head.appendChild(script)})}}
   function moduleNow(){return location.hash.replace(/^#/,'')||'dashboard'}
   function mountIan(){
     if(document.getElementById('liam-shell'))return;
