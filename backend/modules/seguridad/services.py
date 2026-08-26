@@ -1275,7 +1275,9 @@ def activate_security_guard(app, database_path: str) -> None:
         response.headers.setdefault('X-Content-Type-Options', 'nosniff')
         response.headers.setdefault('X-Frame-Options', 'DENY')
         response.headers.setdefault('Referrer-Policy', 'no-referrer')
-        response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+        # IAN necesita micrófono únicamente desde el mismo origen y tras permiso
+        # explícito del usuario. Cámara y geolocalización permanecen bloqueadas.
+        response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()')
         response.headers.setdefault('Cross-Origin-Opener-Policy', 'same-origin')
         connect_src = "'self'"
         if str(current_app.config.get('APP_ENV', '')).lower() != 'production':
