@@ -22,7 +22,7 @@ def main():
     lips = (ROOT / "frontend/js/liam/liam-lip-sync.js").read_text(encoding="utf-8")
 
     require("mount=mountIan" in controller, "La interfaz activa no usa el montaje corregido de IAN")
-    require("mount();\n      try{await loadRuntime()" in controller, "IAN todavía espera las funciones avanzadas antes de hacerse visible")
+    require("if(!authToken)throw new Error('AUTH_PENDING');mount();const r=await fetch" in controller, "IAN todavía espera al endpoint antes de hacerse visible")
     require("bootIan" in controller and "cache:'no-store'" in controller, "Falta el arranque resistente a caché")
     require("headers:headers()" in controller, "La configuración protegida de IAN se consulta sin autenticación")
     require("AUTH_PENDING" in controller and "setTimeout(()=>{state.booting=false;bootIan()}" in controller, "IAN no reintenta después del inicio de sesión")
