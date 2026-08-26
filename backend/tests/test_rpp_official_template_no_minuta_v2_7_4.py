@@ -37,6 +37,10 @@ assert "generado = _alpha59_generar_oficial_desde_template" in resilient
 assert "return generado" in resilient
 assert "Authorization': `Bearer ${token}`" in frontend
 assert "&mes=${encodeURIComponent(periodo.mes)}&anio=${encodeURIComponent(periodo.anio)}" in frontend
+assert 'data-rpp-download="1"' in frontend
+assert "window.descargarRppCategoria = descargarRppCategoria" in frontend
+assert "event.target?.closest?.('[data-rpp-download=\"1\"]')" in frontend
+assert "onclick=\"descargarRppCategoria" not in frontend
 assert ".elian-presenter { position: fixed; inset: 0; z-index: 10043; pointer-events: none; }" in presenter_css
 assert ".ian-tour-avatar{position:fixed" in avatar_css and "pointer-events:none" in avatar_css
 

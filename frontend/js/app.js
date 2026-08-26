@@ -1339,7 +1339,7 @@ function renderTablaUnidades() {
         const rppLinks = GRUPOS_EDAD_DASHBOARD.map((g) => {
             const totalGrupo = contarGrupo(grupos, g.clave);
             return `
-                <button onclick="descargarRppCategoria('${escaparHtml(unidad)}', '${escaparHtml(g.formato)}')" class="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1">
+                <button type="button" data-rpp-download="1" data-rpp-unidad="${escaparHtml(unidad)}" data-rpp-grupo="${escaparHtml(g.formato)}" class="relative z-10 text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 cursor-pointer pointer-events-auto">
                     <i data-lucide="download" class="w-3.5 h-3.5"></i> ${escaparHtml(g.etiqueta)} (${totalGrupo})
                 </button>
             `;
@@ -2181,20 +2181,42 @@ async function descargarBienestarinaAlpha62(unidad) {
     });
 }
 
-function descargarRppCategoria(unidad, grupo) {
+async function descargarRppCategoria(unidad, grupo) {
     if (!unidad || !grupo) {
         alert('Debe seleccionar una unidad y un grupo etario para descargar RPP.');
         return;
     }
     const periodo = periodoFormatosSeleccionado();
     const url = `${backendUrl}/api/rpp/descargar?unidad=${encodeURIComponent(unidad)}&grupo=${encodeURIComponent(grupo)}&mes=${encodeURIComponent(periodo.mes)}&anio=${encodeURIComponent(periodo.anio)}`;
-    descargarArchivoFormatoAlpha63({
+    if (typeof mostrarMensaje === 'function') {
+        mostrarMensaje('message-box', `Generando RPP ${grupo} para ${unidad}...`, 'success');
+    }
+    return descargarArchivoFormatoAlpha63({
         url,
         unidad,
         formato: `RPP ${grupo}`,
         nombreBase: `RPP_${String(unidad).replace(/[^A-Za-z0-9]+/g, '_')}_${grupo}.xlsx`
     });
 }
+window.descargarRppCategoria = descargarRppCategoria;
+
+// Los botones RPP se crean dinámicamente al renderizar la Base Maestra.
+// Delegar el clic evita depender de JavaScript inline, funciona con un solo
+// clic y mantiene el evento aunque la tabla sea reconstruida.
+document.addEventListener('click', (event) => {
+    const button = event.target?.closest?.('[data-rpp-download="1"]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (button.dataset.rppBusy === '1') return;
+    button.dataset.rppBusy = '1';
+    button.disabled = true;
+    descargarRppCategoria(button.dataset.rppUnidad, button.dataset.rppGrupo)
+        .finally(() => {
+            button.dataset.rppBusy = '0';
+            button.disabled = false;
+        });
+});
 
 function subirPlantilla() {
     const input = document.getElementById('input-template');
