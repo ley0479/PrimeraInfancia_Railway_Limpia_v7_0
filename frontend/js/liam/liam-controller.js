@@ -5,7 +5,13 @@
   // disponibles en el runtime legado aunque ELIAN use el recorrido ampliado.
   const state={flags:{},profile:{},module:'dashboard',open:false,guide:null,bootTimer:null,booting:false};
   const apiBase=()=>`${window.backendUrl||''}/api/asistente-capacitacion`;
-  const token=()=>window.obtenerTokenSeguro?.()||localStorage.getItem('auth_token')||localStorage.getItem('token')||'';
+  function token(){
+    const exposed=window.obtenerTokenSeguro?.();if(exposed)return exposed;
+    const keys=['primera_infancia_token','auth_token','token','authToken','accessToken','jwt','primeraInfanciaToken','primeraInfanciaAuthToken'];
+    for(const storage of [sessionStorage,localStorage]){for(const key of keys){try{const value=storage.getItem(key);if(value&&value!=='null'&&value!=='undefined')return value}catch(_){}}}
+    for(const storage of [sessionStorage,localStorage]){for(const key of ['primera_infancia_user','user','usuario','authUser','primeraInfanciaUser','primeraInfanciaAuthUser']){try{const data=JSON.parse(storage.getItem(key)||'null');if(data?.token||data?.accessToken)return data.token||data.accessToken}catch(_){}}}
+    return '';
+  }
   const headers=()=>({'Content-Type':'application/json',Authorization:`Bearer ${token()}`});
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const runtime=['liam-control-registry','liam-anchor-registry','liam-safe-zone-engine','liam-animation-orchestrator','liam-tablet-controller','liam-movement-controller','liam-tour-engine','elian-platform-tour','liam-lip-sync','liam-context-collector'];

@@ -26,6 +26,9 @@ def main():
     require("bootIan" in controller and "cache:'no-store'" in controller, "Falta el arranque resistente a caché")
     require("headers:headers()" in controller, "La configuración protegida de IAN se consulta sin autenticación")
     require("AUTH_PENDING" in controller and "setTimeout(()=>{state.booting=false;bootIan()}" in controller, "IAN no reintenta después del inicio de sesión")
+    require("[sessionStorage,localStorage]" in controller, "IAN no busca la sesión en los dos almacenamientos usados por la plataforma")
+    for key in ("authToken", "accessToken", "primeraInfanciaToken", "primeraInfanciaAuthToken"):
+        require(key in controller, f"IAN no reconoce la clave de sesión compatible: {key}")
     require("ian-launcher-avatar" in controller, "Falta la silueta única del lanzador")
     require("render('#liam-avatar-wrap'" in controller, "El panel no reutiliza el avatar del lanzador")
     require("liam-mouth-motion" not in controller[controller.index("function mountIan"):controller.index("mount=mountIan")], "La interfaz activa todavía superpone una boca")
