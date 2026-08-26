@@ -79,6 +79,7 @@ test('silueta y accesibilidad no se superponen en celular', async ({ page }) => 
   expect(separated).toBeTruthy();
   await ian.click();
   await expect(page.locator('#liam-panel')).toBeVisible();
+  await expect(a11y).toBeHidden();
   const panel = await page.locator('#liam-panel').boundingBox();
   expect(panel.x).toBeGreaterThanOrEqual(0);
   expect(panel.x + panel.width).toBeLessThanOrEqual(390);

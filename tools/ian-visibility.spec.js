@@ -32,6 +32,9 @@ test('IAN se monta, se ve y abre el panel aun si la configuración avanzada fall
   await tab.click();
   await expect(page.locator('#liam-panel')).toBeVisible();
   await expect(page.locator('#liam-avatar-wrap .ian-avatar-svg')).toBeVisible();
+  const openPanelBox = await page.locator('#liam-panel').boundingBox();
+  const openAccessibilityBox = await accessibility.boundingBox();
+  expect(openAccessibilityBox.x + openAccessibilityBox.width).toBeLessThanOrEqual(openPanelBox.x);
   await page.screenshot({ path: 'docs/ian/evidence/ian-panel-production.png', fullPage: false });
   await page.locator('#liam-close').click();
   await expect(page.locator('#liam-panel')).toBeHidden();
