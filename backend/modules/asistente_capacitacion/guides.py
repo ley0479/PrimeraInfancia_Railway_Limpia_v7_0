@@ -61,6 +61,17 @@ GUIDES['motor-documental'].update({
     'errores_frecuentes':['Failed to fetch', 'PARTICIPANTES_REQUERIDOS', 'Aprobar una lectura incompleta'],
 })
 
+GUIDES['formatos'].update({
+    'proposito':'Genera y descarga formatos institucionales autorizados conservando sus hojas oficiales.',
+    'necesitas':['Unidad válida', 'Mes y año válidos', 'Minuta RPP disponible', 'Datos fuente completos y permisos de descarga'],
+    'origen_datos':'Base Maestra, unidad seleccionada, periodo activo, minuta vigente y servicios oficiales de formatos.',
+    'validaciones':['Unidad y periodo válidos', 'Minuta y requisitos RPP disponibles', 'Permiso de la fundación activa', 'Existencia real del archivo antes de descargar'],
+    'pasos':['Selecciona una unidad y un periodo válidos.', 'Confirma que la minuta y los demás requisitos estén disponibles.', 'Presiona RPP.', 'Espera la validación y generación.', 'El sistema verifica que el archivo exista e inicia la descarga.', 'Abre el archivo y confirma que conserva las hojas oficiales.', 'Comprueba el mensaje final de la interfaz.'],
+    'resultado':'Archivo RPP generado, verificado y descargado para la unidad y periodo seleccionados, sin alterar las hojas oficiales.',
+    'uso_resultado':'Entrega y revisión institucional del RPP autorizado.',
+    'errores_frecuentes':['Unidad o periodo sin seleccionar', 'Minuta RPP no disponible', 'Datos fuente incompletos', 'Archivo todavía no generado o descarga no autorizada'],
+})
+
 for module_key, item in GUIDES.items():
     item.setdefault('proposito', item.get('resumen'))
     item.setdefault('resultado', 'La operación queda en el estado confirmado por el sistema.')

@@ -2,6 +2,16 @@
   'use strict';
   const genders=new Set(['male','female']);
   const variants=new Set(['afro_colombian_institutional','afro_colombian_technological','afro_colombian_educational']);
+  const assets=Object.freeze({
+    afro_colombian_institutional:{male:'./assets/lia/elian-afro-institutional-male-v1.png',female:'./assets/lia/elian-afro-institutional-female-v1.png'},
+    afro_colombian_technological:{male:'./assets/lia/elian-afro-technological-male-v1.png',female:'./assets/lia/elian-afro-technological-female-v1.png'},
+    afro_colombian_educational:{male:'./assets/lia/elian-afro-educational-male-v1.png',female:'./assets/lia/elian-afro-educational-female-v1.png'}
+  });
+  function trustedAsset(options,gender,variant){
+    const requested=String(options.assetPath||'').replace(/^\//,'./');
+    const allowed=new Set(['./assets/lia/lia-human-v1.png',...Object.values(assets).flatMap(Object.values)]);
+    return allowed.has(requested)?requested:assets[variant][gender];
+  }
   function markup(options={}){
     const gender=genders.has(options.gender)?options.gender:'male';
     const variant=variants.has(options.variant)?options.variant:'afro_colombian_institutional';
@@ -12,6 +22,12 @@
       <g class="ian-tablet-layer"><rect x="82" y="203" width="76" height="58" rx="7"/><path d="M91 214h58M91 226h42M91 238h49"/></g>
     </svg>`;
   }
-  function render(target,options={}){const el=typeof target==='string'?document.querySelector(target):target;if(!el)return null;el.innerHTML=markup(options);return el.querySelector('svg')}
-  window.IAN_AVATAR=Object.freeze({markup,render});
+  function render(target,options={}){
+    const el=typeof target==='string'?document.querySelector(target):target;if(!el)return null;
+    const gender=genders.has(options.gender)?options.gender:'male',variant=variants.has(options.variant)?options.variant:'afro_colombian_institutional';
+    const image=document.createElement('img');image.className=`ian-avatar-image ian-avatar-visual${options.compact?' ian-avatar-compact':''}`;image.dataset.gender=gender;image.dataset.variant=variant;image.alt=options.compact?'Silueta 2D del asistente IAN':'IAN, asistente 2D de Primera Infancia';image.src=trustedAsset(options,gender,variant);image.decoding='async';image.draggable=false;
+    image.onerror=()=>{el.innerHTML=markup({gender,variant,compact:options.compact});};
+    el.replaceChildren(image);return image;
+  }
+  window.IAN_AVATAR=Object.freeze({markup,render,assets});
 })();

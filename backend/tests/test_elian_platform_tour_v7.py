@@ -34,6 +34,8 @@ for item in ELIAN_MODULE_REGISTRY:
         assert field in item
 
 engine = read('frontend/js/liam/elian-platform-tour.js')
+profile_source = read('backend/modules/asistente_capacitacion/platform_profile.py')
+guides = read('backend/modules/asistente_capacitacion/guides.py')
 routes = read('backend/modules/asistente_capacitacion/routes.py')
 schema = read('backend/modules/asistente_capacitacion/schema.py')
 controller = read('frontend/js/liam/liam-controller.js')
@@ -49,6 +51,11 @@ for event in ('module-open-requested','module-loading','module-ready','module-gu
 for control in ('pause','resume','repeat','skip','previous','next','cancel'):
     assert f'function {control}' in engine
 assert 'window.mostrarSeccion(module.route)' in engine
+assert 'Esta plataforma fue diseñada por' in engine
+assert engine.index('Esta plataforma fue diseñada por') < engine.index('return present();')
+assert 'Leison Palacios Blandón' in profile_source and '04 de junio de 2026' in profile_source
+for rpp_step in ('Presiona RPP.', 'verifica que el archivo exista e inicia la descarga', 'conserva las hojas oficiales'):
+    assert rpp_step in guides
 assert 'elian_platform_tour_progress' in schema
 assert "@bp.get('/elian/platform-tour')" in routes
 assert "@bp.route('/elian/platform-tour/progress'" in routes

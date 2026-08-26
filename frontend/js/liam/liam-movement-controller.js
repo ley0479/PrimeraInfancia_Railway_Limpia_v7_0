@@ -3,7 +3,7 @@
   const modes=new Set(['none','walk','teleport','return_home']);let active=null;
   const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
   function remove(){active?.getAnimations?.().forEach(a=>a.cancel());active?.remove();active=null;document.getElementById('liam-avatar-wrap')?.classList.remove('ian-panel-avatar-away')}
-  function create(){remove();const source=document.querySelector('#liam-avatar-wrap .ian-avatar-svg');if(!source)return null;active=document.createElement('div');active.id='ian-tour-avatar';active.className='ian-tour-avatar';active.setAttribute('aria-hidden','true');active.appendChild(source.cloneNode(true));document.body.appendChild(active);document.getElementById('liam-avatar-wrap')?.classList.add('ian-panel-avatar-away');return active}
+  function create(){remove();const source=document.querySelector('#liam-avatar-wrap .ian-avatar-visual, #liam-avatar-wrap .ian-avatar-svg');if(!source)return null;active=document.createElement('div');active.id='ian-tour-avatar';active.className='ian-tour-avatar';active.setAttribute('aria-hidden','true');active.appendChild(source.cloneNode(true));document.body.appendChild(active);document.getElementById('liam-avatar-wrap')?.classList.add('ian-panel-avatar-away');return active}
   function state(next){window.LIAM_STATE?.set(next);if(active)active.dataset.state=next}
   async function moveToControl(helpId,options={}){
     const control=window.LIAM_CONTROLS?.resolve(helpId);if(!control)return false;control.scrollIntoView({behavior:reduced()?'auto':'smooth',block:'center'});await new Promise(resolve=>setTimeout(resolve,reduced()?0:260));

@@ -32,6 +32,9 @@ def main():
         require(key in controller, f"IAN no reconoce la clave de sesión compatible: {key}")
     require("ian-launcher-avatar" in controller, "Falta la silueta única del lanzador")
     require("render('#liam-avatar-wrap'" in controller, "El panel no reutiliza el avatar del lanzador")
+    require("lia-human-v1.png" in controller, "No se restauró la ilustración 2D institucional anterior")
+    require("ian-avatar-image" in renderer and "trustedAsset" in renderer, "La imagen 2D no es el recurso visual principal o no está validada")
+    require("avatar_asset_path" in controller, "La selección visual guardada no llega al avatar 2D")
     require("liam-mouth-motion" not in controller[controller.index("function mountIan"):controller.index("function applyIanVisual")], "La interfaz activa todavía superpone una boca")
     for layer in ("ian-head-layer", "ian-mouth-layer", "ian-arm-left", "ian-arm-right", "ian-eyes"):
         require(layer in renderer, f"Falta capa SVG real: {layer}")

@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  let tour=null,index=0,status='not_started',mode='automatic',paused=false,options={};
+  let tour=null,index=0,status='not_started',mode='automatic',paused=false,options={},identityPresented=false;
   const primaryControl={dashboard:'dashboard.cuentame.upload','base-maestra':'base-maestra.file.upload',talento:'talento.file.select','salud-nutricion':'salud-nutricion.tab.dashboard','calendario-inteligente':'calendario.pending.list','motor-documental':'motor-documental.file.upload','planeacion-pedagogica':'planeacion-pedagogica.period','gestion-pedagogica':'gestion-pedagogica.dashboard','componente-psicosocial':'componente-psicosocial.unit','familias-redes':'familias-redes.unit',formatos:'formatos.template.type','reportes-gerenciales':'reportes.period','relacion-mes':'relacion-mes.period','expediente-operativo-uca':'expediente-uca.year',administracion:'administracion.foundation.form',facturacion:'facturacion.dashboard','integrity-stability':'integrity.summary','manual-operativo':'manual.current'};
   const emit=(name,detail={})=>document.dispatchEvent(new CustomEvent(`elian:${name}`,{detail}));
   const current=()=>tour?.modules?.[index]||null;
@@ -54,7 +54,10 @@
   async function start(data,nextOptions={}){
     tour={...data,completed_modules:[...(data.progress?.completed_modules||[])],skipped_modules:[...(data.progress?.skipped_modules||[])]};options=nextOptions;mode=nextOptions.mode||data.progress?.mode||'automatic';
     const saved=data.progress?.current_module_id;index=Math.max(0,saved?data.modules.findIndex(m=>m.module_id===saved):0);if(index<0)index=0;status='in_progress';paused=false;
-    emit('tour-started',{tour_id:data.tour_id,total:data.modules.length,mode});await save('in_progress');return present();
+    const profile=data.profile||{};if(!profile.designer||!profile.created_date)throw new Error('La identidad institucional debe indicar diseñador y fecha de creación antes de iniciar el recorrido.');
+    emit('tour-started',{tour_id:data.tour_id,total:data.modules.length,mode});await save('in_progress');
+    if(!identityPresented){identityPresented=true;const introduction=`Bienvenido a ${profile.name}. Esta plataforma fue diseñada por ${profile.designer} y fue creada el ${profile.created_date}. Ahora conocerás los módulos autorizados para tu rol.`;window.LIAM_STATE?.set('greeting');await options.announceAsync(introduction);}
+    return present();
   }
   async function pause(){if(!tour)return false;paused=true;status='paused';window.LIA_SPEECH?.pause();await save('paused');emit('module-guide-paused',{module_id:current()?.module_id});render();return true}
   async function resume(){if(!tour)return false;paused=false;status='in_progress';window.LIA_SPEECH?.resume();await save('in_progress');emit('module-guide-resumed',{module_id:current()?.module_id});return present()}

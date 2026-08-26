@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 
 def get_platform_profile() -> dict:
-    designer = os.getenv('LIA_PLATFORM_DESIGNER', '').strip()
-    created = os.getenv('LIA_PLATFORM_CREATED_DATE', '').strip()
+    designer = os.getenv('LIA_PLATFORM_DESIGNER', 'Leison Palacios Blandón').strip()
+    created = os.getenv('LIA_PLATFORM_CREATED_DATE', '04 de junio de 2026').strip()
     description = os.getenv('LIA_PLATFORM_DESCRIPTION', '').strip()
     return {
         'name': os.getenv('LIA_PLATFORM_NAME', 'Plataforma Primera Infancia').strip() or 'Plataforma Primera Infancia',
@@ -13,5 +13,6 @@ def get_platform_profile() -> dict:
         'last_update_date': os.getenv('LIA_PLATFORM_LAST_UPDATE_DATE', '').strip() or None,
         'description': description or 'Plataforma de gestión integral para la operación autorizada de Primera Infancia.',
         'identity_confirmed': bool(designer and created),
+        'presentation_rule': 'designer_and_creation_date_first',
         'version': os.getenv('APP_VERSION', '2.7.2-document-center').strip() or '2.7.2-document-center',
     }
