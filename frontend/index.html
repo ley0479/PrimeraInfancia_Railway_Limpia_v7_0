@@ -1164,6 +1164,24 @@
                 </section>
 
                 <section id="reportes-gerenciales" class="hidden space-y-8">
+                    <div class="bg-slate-950 border border-cyan-500/30 p-6 rounded-2xl">
+                        <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+                            <div><p class="text-xs uppercase tracking-[0.2em] text-cyan-300">Centro de Informes Mensuales ICBF</p><h2 class="mt-2 text-xl font-semibold text-white">Informe de las 9 Atenciones Priorizadas</h2><p class="mt-2 text-sm text-slate-400">Consolida las fuentes existentes, identifica datos complementarios y congela una fotografía histórica al aprobar.</p></div>
+                            <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                <input id="rg9-periodo" type="month" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white">
+                                <input id="rg9-contrato" value="27005522025" placeholder="Contrato" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white">
+                                <input id="rg9-cobertura" type="number" value="639" min="0" placeholder="Cobertura" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white">
+                                <input id="rg9-modalidad" value="Educación Inicial Propia Diaria – Propia e Intercultural" placeholder="Modalidad" class="sm:col-span-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white">
+                                <button type="button" onclick="RG9.consolidate()" class="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500">Consolidar</button>
+                            </div>
+                        </div>
+                        <div id="rg9-message" class="mt-4 hidden rounded-xl border px-4 py-3 text-sm"></div>
+                        <div class="mt-5 flex flex-wrap items-center gap-3"><span id="rg9-progress" class="text-sm text-slate-400">Sin consolidar</span><button type="button" onclick="RG9.save()" class="rounded-lg border border-indigo-500/40 px-3 py-2 text-xs text-indigo-200">Guardar borrador</button><button type="button" onclick="RG9.generate()" class="rounded-lg border border-emerald-500/40 px-3 py-2 text-xs text-emerald-200">Generar archivos</button><button type="button" onclick="RG9.approve()" class="rounded-lg border border-amber-500/40 px-3 py-2 text-xs text-amber-200">Aprobar y congelar</button></div>
+                        <div id="rg9-cards" class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
+                        <div id="rg9-findings" class="mt-5 space-y-2"></div>
+                        <div class="mt-5 grid gap-2 md:grid-cols-5"><select id="rg9-evidence-attention" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"><option value="MATERIALES_LITERARIOS">Materiales literarios</option><option value="FORMACION_FAMILIAS">Formación a familias</option><option value="CRECIMIENTO_DESARROLLO">Crecimiento y desarrollo</option><option value="AFILIACION_SALUD">Afiliación a salud</option><option value="VACUNACION">Vacunación</option></select><input id="rg9-evidence-unit" placeholder="Unidad" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"><input id="rg9-evidence-responsible" placeholder="Responsable" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"><input id="rg9-evidence-file" type="file" accept=".pdf,.xlsx,.xls,.docx,.png,.jpg,.jpeg" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"><button type="button" onclick="RG9.uploadEvidence()" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white">Cargar evidencia</button></div>
+                        <div id="rg9-downloads" class="mt-5 flex flex-wrap gap-2"></div>
+                    </div>
                     <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl">
                         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                             <div>
@@ -3820,6 +3838,7 @@
     <script src="./js/modules/plantillas-oficiales.js?v=2.7.0-listado-docx.1"></script>
     <script src="./js/modules/paquete-mensual.js?v=2.3.0-alpha.17"></script>
     <script src="./js/modules/reportes-gerenciales.js?v=2.2.7"></script>
+    <script src="./js/modules/reportes-9-atenciones.js?v=2.7.4-1"></script>
     <script src="./js/modules/gerencia-general.js?v=2.3.0-alpha.18"></script>
     <script src="./js/modules/panel-comercial.js?v=2.2.8"></script>
     <script src="./js/modules/institucional-normativo.js?v=2.7.0-fix-identidad-global-2"></script>
