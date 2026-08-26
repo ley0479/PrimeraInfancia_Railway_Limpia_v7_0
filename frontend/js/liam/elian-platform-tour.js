@@ -52,11 +52,13 @@
     }catch(error){status='paused';paused=true;await save('paused');options.announce(`No pude continuar con ${module.title}: ${error.message} Puedes reintentar o saltar este módulo.`);emit('tour-failed',{module_id:module.module_id,message:error.message})}
   }
   async function start(data,nextOptions={}){
+    identityPresented=false;
     tour={...data,completed_modules:[...(data.progress?.completed_modules||[])],skipped_modules:[...(data.progress?.skipped_modules||[])]};options=nextOptions;mode=nextOptions.mode||data.progress?.mode||'automatic';
     const saved=data.progress?.current_module_id;index=Math.max(0,saved?data.modules.findIndex(m=>m.module_id===saved):0);if(index<0)index=0;status='in_progress';paused=false;
     const profile=data.profile||{};if(!profile.designer||!profile.created_date)throw new Error('La identidad institucional debe indicar diseñador y fecha de creación antes de iniciar el recorrido.');
     emit('tour-started',{tour_id:data.tour_id,total:data.modules.length,mode});await save('in_progress');
-    if(!identityPresented){identityPresented=true;const introduction=`Bienvenido a ${profile.name}. Esta plataforma fue diseñada por ${profile.designer} y fue creada el ${profile.created_date}. Ahora conocerás los módulos autorizados para tu rol.`;window.LIAM_STATE?.set('greeting');await options.announceAsync(introduction);}
+    if(!identityPresented){identityPresented=true;const introduction=`Bienvenido a ${profile.name}. Esta plataforma fue diseñada por ${profile.designer} y fue creada el ${profile.created_date}. Su versión actual es ${profile.version||'la versión institucional configurada'}. ${profile.description||'Su propósito es apoyar la gestión integral de Primera Infancia.'} Ahora conocerás los módulos autorizados para tu rol.`;window.LIAM_STATE?.set('greeting');await options.announceAsync(introduction);}
+    options.enterPresenter?.();
     return present();
   }
   async function pause(){if(!tour)return false;paused=true;status='paused';window.LIA_SPEECH?.pause();await save('paused');emit('module-guide-paused',{module_id:current()?.module_id});render();return true}
@@ -66,6 +68,6 @@
   async function repeat(){if(!tour)return false;window.LIA_SPEECH?.stop();paused=false;status='in_progress';return present()}
   async function skip(){const m=current();if(!m)return false;if(!tour.skipped_modules.includes(m.module_id))tour.skipped_modules.push(m.module_id);emit('module-guide-skipped',{module_id:m.module_id});return next()}
   async function cancel(){if(!tour)return false;paused=true;status='cancelled';window.LIA_SPEECH?.stop();await save('cancelled');window.LIAM_ANIMATION?.clear();window.LIAM_MOVEMENT?.remove();emit('tour-cancelled',{});return true}
-  async function finish(){status='completed';paused=false;await save('completed');render();window.LIAM_STATE?.set('success');options.announce(`Recorrido completado. Conociste ${tour.completed_modules.length} módulos y omitiste ${tour.skipped_modules.length}. Puedes repetirlo o iniciar una tarea real.`);emit('tour-completed',{completed:tour.completed_modules.length,skipped:tour.skipped_modules.length});return true}
+  async function finish(){status='completed';paused=false;await save('completed');render();window.LIAM_STATE?.set('success');await options.announceAsync(`Recorrido completado. Conociste ${tour.completed_modules.length} módulos y omitiste ${tour.skipped_modules.length}. Puedes repetirlo o iniciar una tarea real.`);emit('tour-completed',{completed:tour.completed_modules.length,skipped:tour.skipped_modules.length});return true}
   window.ELIAN_PLATFORM_TOUR=Object.freeze({start,pause,resume,next,previous,repeat,skip,cancel,state:()=>({status,mode,index,module:current()})});
 })();
