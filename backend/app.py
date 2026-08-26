@@ -9866,8 +9866,8 @@ def formatos_diagnostico_previo():
     for tipo, info in disponibles.items():
         if not info['disponible']:
             razones.append(f'No existe plantilla {tipo.upper()} aplicable al periodo.')
-    if not minuta:
-        razones.append('No existe una minuta RPP iniciada antes o durante el período solicitado.')
+    # RPP se genera desde la plantilla oficial y la Base Maestra. La Minuta
+    # Patrón es informativa para sus procesos propios, nunca un bloqueo de RPP.
 
     ready_common = unidad_conocida and bool(usuarios)
     storage_diagnostic = diagnostico_almacenamiento()
@@ -9899,7 +9899,7 @@ def formatos_diagnostico_previo():
         'preparado': {
             'bienestarina': bool(ready_common and disponibles['bienestarina']['disponible']),
             'ram': bool(ready_common and disponibles['ram']['disponible']),
-            'rpp': bool(ready_common and disponibles['rpp']['disponible'] and minuta_aplicable),
+            'rpp': bool(ready_common and disponibles['rpp']['disponible']),
         },
         'razones': razones,
         'errorPlantillas': plantillas_error or None,
@@ -10420,11 +10420,27 @@ def _alpha64_generar_rpp_resiliente(unidad, grupo, mes=None, anio=None):
         # de rendimiento observable en fundaciones sin archivos previos.
         try:
             legacy = GRUPOS_RPP_ALPHA61[grupo_cod]['legacy']
-            _alpha59_generar_oficial_desde_template('rpp', unidad, grupo=legacy, mes=mes, anio=anio)
-            nombre = _alpha61_buscar_archivo_rpp_exacto(unidad, grupo_cod)
-            if nombre:
-                _alpha64_log('RPP_GENERADO_CAMINO_OFICIAL', unidad=unidad, grupo=grupo_cod, archivo=nombre)
-                return nombre
+            generado = _alpha59_generar_oficial_desde_template(
+                'rpp', unidad, grupo=legacy, mes=mes, anio=anio
+            )
+            # El servicio ya devuelve el nombre exacto que acaba de crear. No
+            # obligarlo a pasar por una segunda búsqueda de registro/carpeta:
+            # esa búsqueda podía no encontrar el artefacto recién guardado
+            # aunque el Excel existiera y fuera válido.
+            if generado:
+                valido, motivo = _alpha63_validar_archivo_descarga(
+                    generado, unidad, 'rpp', grupo=grupo_cod
+                )
+                if valido:
+                    _alpha64_log(
+                        'RPP_GENERADO_CAMINO_OFICIAL', unidad=unidad,
+                        grupo=grupo_cod, archivo=generado,
+                    )
+                    return generado
+                _alpha64_log(
+                    'RPP_GENERADO_VALIDACION_FALLO', unidad=unidad,
+                    grupo=grupo_cod, archivo=generado, motivo=motivo,
+                )
         except Exception as exc:
             _alpha64_log('RPP_CAMINO_OFICIAL_ERROR', unidad=unidad, grupo=grupo_cod, error=str(exc), traceback=traceback.format_exc())
 

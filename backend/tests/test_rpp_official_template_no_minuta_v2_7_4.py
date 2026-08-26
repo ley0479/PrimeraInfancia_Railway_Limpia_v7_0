@@ -1,5 +1,6 @@
 """RPP se genera por categoría desde plantilla oficial, sin Minuta Patrón."""
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 
@@ -26,6 +27,14 @@ assert "source_mode='official_template'" in endpoint
 assert "RPP_REQUIRE_MINUTA_PATRON=false" in env_example
 assert "RPP_ENABLE_MINUTA_ENRICHMENT=false" in env_example
 assert "RPP_SOURCE_MODE=official_template" in env_example
+diagnostic_start = app_source.index("def formatos_diagnostico_previo")
+diagnostic = app_source[diagnostic_start:app_source.index("def _alpha59_edad_meses", diagnostic_start)]
+assert "disponibles['rpp']['disponible'] and minuta_aplicable" not in diagnostic
+assert "'rpp': bool(ready_common and disponibles['rpp']['disponible'])" in diagnostic
+resilient_start = app_source.index("def _alpha64_generar_rpp_resiliente")
+resilient = app_source[resilient_start:app_source.index("def _alpha69_periodo_descarga_ram", resilient_start)]
+assert "generado = _alpha59_generar_oficial_desde_template" in resilient
+assert "return generado" in resilient
 assert "Authorization': `Bearer ${token}`" in frontend
 assert "&mes=${encodeURIComponent(periodo.mes)}&anio=${encodeURIComponent(periodo.anio)}" in frontend
 assert ".elian-presenter { position: fixed; inset: 0; z-index: 10043; pointer-events: none; }" in presenter_css
@@ -66,5 +75,30 @@ with tempfile.TemporaryDirectory() as temp:
         assert generated["RPP OFICIAL"]["B40"].value == "=SUM(1,2)"
         assert "$A$1:$AA$42" in str(generated["RPP OFICIAL"].print_area)
         generated.close()
+
+# La plantilla oficial que se distribuye con la plataforma también debe abrir,
+# conservar su hoja exacta y producir un Excel válido sin Minuta Patrón.
+with tempfile.TemporaryDirectory() as temp:
+    base = Path(temp)
+    official = base / "templates" / "oficiales"
+    official.mkdir(parents=True)
+    source = ROOT / "backend/seed_data/templates_originales/oficiales/plantilla_rpp_oficial.xlsx"
+    shutil.copy2(source, official / "plantilla_rpp_oficial.xlsx")
+    output = base / "UNIDAD_PRUEBA_RPP_6_11_2026_08.xlsx"
+    generar_desde_plantilla_oficial(
+        "rpp",
+        {
+            "metadata": {"unidad": "UNIDAD PRUEBA", "mes": 8, "anio": 2026},
+            "usuarios": [{"NUI": "PRUEBA-1", "Nombre": "Registro prueba", "EdadMeses": 8}],
+        },
+        output,
+        base / "templates",
+    )
+    assert output.is_file() and output.stat().st_size > 0
+    generated = load_workbook(output, data_only=False)
+    assert generated.sheetnames == ["PLANTILLA O FORMADE RPP"]
+    assert "$A$1:$AA$42" in str(generated.active.print_area)
+    assert generated.active["B12"].value == "PRUEBA-1"
+    generated.close()
 
 print("RPP_OFFICIAL_TEMPLATE_NO_MINUTA_V2_7_4_PASS")
