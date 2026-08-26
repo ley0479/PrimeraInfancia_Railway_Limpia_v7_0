@@ -2081,8 +2081,9 @@ function descargar(unidad, formato) {
         return;
     }
     if (esGrupoRppDescargaAlpha61(fmtOriginal)) {
+        const periodo = periodoFormatosSeleccionado();
         descargarArchivoFormatoAlpha63({
-            url: `${backendUrl}/api/rpp/descargar?unidad=${encodeURIComponent(unidad)}&grupo=${encodeURIComponent(fmtOriginal)}`,
+            url: `${backendUrl}/api/rpp/descargar?unidad=${encodeURIComponent(unidad)}&grupo=${encodeURIComponent(fmtOriginal)}&mes=${encodeURIComponent(periodo.mes)}&anio=${encodeURIComponent(periodo.anio)}`,
             unidad,
             formato: `RPP ${fmtOriginal}`,
             nombreBase: `RPP_${String(unidad).replace(/[^A-Za-z0-9]+/g, '_')}_${fmtOriginal}.xlsx`
@@ -2101,7 +2102,17 @@ function descargar(unidad, formato) {
 
 async function descargarArchivoFormatoAlpha63({ url, unidad, formato, nombreBase }) {
     try {
-        const response = await fetch(url, { method: 'GET', credentials: 'same-origin' });
+        const token = authToken();
+        if (!token) throw new Error('La sesión no está activa. Inicia sesión nuevamente.');
+        const response = await fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-Auth-Token': token,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
         const contentType = (response.headers.get('content-type') || '').toLowerCase();
 
         if (!response.ok || contentType.includes('application/json')) {
@@ -2175,7 +2186,8 @@ function descargarRppCategoria(unidad, grupo) {
         alert('Debe seleccionar una unidad y un grupo etario para descargar RPP.');
         return;
     }
-    const url = `${backendUrl}/api/rpp/descargar?unidad=${encodeURIComponent(unidad)}&grupo=${encodeURIComponent(grupo)}`;
+    const periodo = periodoFormatosSeleccionado();
+    const url = `${backendUrl}/api/rpp/descargar?unidad=${encodeURIComponent(unidad)}&grupo=${encodeURIComponent(grupo)}&mes=${encodeURIComponent(periodo.mes)}&anio=${encodeURIComponent(periodo.anio)}`;
     descargarArchivoFormatoAlpha63({
         url,
         unidad,

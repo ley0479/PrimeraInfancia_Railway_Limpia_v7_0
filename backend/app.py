@@ -9915,11 +9915,13 @@ def formatos_diagnostico_previo():
 
 
 def _alpha59_edad_meses(user):
+    val = user.get('EdadMeses') if user.get('EdadMeses') not in (None, '') else user.get('edad_meses')
+    if val in (None, ''):
+        return None
     try:
-        val = user.get('EdadMeses') if user.get('EdadMeses') not in (None, '') else user.get('edad_meses')
-        return int(float(val or 0))
+        return int(float(val))
     except Exception:
-        return 0
+        return None
 
 
 def _alpha59_filtrar_rpp_grupo(usuarios, grupo):
@@ -9931,13 +9933,13 @@ def _alpha59_filtrar_rpp_grupo(usuarios, grupo):
         edad = _alpha59_edad_meses(user)
         es_gestante = 'gestante' in tipo or 'gestante' in gtxt
         # Rangos disjuntos: menores de 6 meses (0-5), luego 6-11.
-        if grupo == 'rpp_0_6_gestantes' and (es_gestante or 0 <= edad <= 5 or '0 a 6' in gtxt):
+        if grupo == 'rpp_0_6_gestantes' and (es_gestante or (edad is not None and 0 <= edad <= 5) or '0 a 6' in gtxt):
             filtrados.append(user)
-        elif grupo == 'rpp_6_11' and (6 <= edad <= 11 or '6 a 11' in gtxt):
+        elif grupo == 'rpp_6_11' and ((edad is not None and 6 <= edad <= 11) or '6 a 11' in gtxt):
             filtrados.append(user)
-        elif grupo == 'rpp_1_2' and (12 <= edad <= 35 or '1 a 2' in gtxt):
+        elif grupo == 'rpp_1_2' and ((edad is not None and 12 <= edad <= 35) or '1 a 2' in gtxt):
             filtrados.append(user)
-        elif grupo == 'rpp_3_5' and (36 <= edad <= 71 or '3 a 5' in gtxt):
+        elif grupo == 'rpp_3_5' and ((edad is not None and 36 <= edad <= 71) or '3 a 5' in gtxt):
             filtrados.append(user)
     return filtrados
 
@@ -9991,7 +9993,7 @@ def _alpha59_metadata_formato(unidad, usuarios, mes=None, anio=None):
     }
 
 
-def _alpha59_generar_oficial_desde_template(tipo, unidad, grupo=None):
+def _alpha59_generar_oficial_desde_template(tipo, unidad, grupo=None, mes=None, anio=None):
     try:
         usuarios = _alpha59_obtener_usuarios_unidad(unidad)
         if not usuarios:
@@ -10004,7 +10006,9 @@ def _alpha59_generar_oficial_desde_template(tipo, unidad, grupo=None):
                 log_alpha56_formato('ALPHA59_RPP_GRUPO_SIN_USUARIOS', unidad=unidad, grupo=grupo or tipo)
                 return None
             slug = _alpha59_slug(grupo or tipo).replace('RPP_', '')
-            nombre = f"{_alpha59_slug(unidad)}_RPP_{slug}.xlsx"
+            mes_int = max(1, min(12, int(mes or datetime.now().month)))
+            anio_int = max(2020, min(2100, int(anio or datetime.now().year)))
+            nombre = f"{_alpha59_slug(unidad)}_RPP_{slug}_{anio_int}_{mes_int:02d}.xlsx"
             tipo_generador = 'rpp'
         elif formato_norm == 'bienestarina':
             nombre = f"{_alpha59_slug(unidad)}_BIENESTARINA_{datetime.now().year}_{datetime.now().month:02d}.xlsx"
@@ -10016,7 +10020,7 @@ def _alpha59_generar_oficial_desde_template(tipo, unidad, grupo=None):
             from modules.plantillas_oficiales import generar_desde_plantilla_oficial
             generar_desde_plantilla_oficial(
                 tipo_generador,
-                {'metadata': _alpha59_metadata_formato(unidad, usuarios), 'usuarios': usuarios},
+                {'metadata': _alpha59_metadata_formato(unidad, usuarios, mes=mes, anio=anio), 'usuarios': usuarios},
                 salida,
                 TEMPLATES_FOLDER,
             )
@@ -10024,7 +10028,7 @@ def _alpha59_generar_oficial_desde_template(tipo, unidad, grupo=None):
             log_alpha56_formato('ALPHA59_GENERAR_OFICIAL_ERROR', formato=tipo, unidad=unidad, grupo=grupo, error=str(exc))
             return None
         if os.path.exists(salida) and os.path.getsize(salida) > 0:
-            registrar_archivo_generado_alpha57(tipo_generador, unidad, os.path.basename(salida), salida, grupo_etario=grupo)
+            registrar_archivo_generado_alpha57(tipo_generador, unidad, os.path.basename(salida), salida, mes=mes, anio=anio, grupo_etario=grupo)
             log_alpha56_formato('ALPHA59_GENERAR_OFICIAL_OK', formato=tipo_generador, unidad=unidad, grupo=grupo, archivo=os.path.basename(salida), ruta=salida)
             return os.path.basename(salida)
     except Exception as exc:
@@ -10401,13 +10405,13 @@ def _alpha64_generar_bienestarina_resiliente(unidad):
         return None
 
 
-def _alpha64_generar_rpp_resiliente(unidad, grupo):
+def _alpha64_generar_rpp_resiliente(unidad, grupo, mes=None, anio=None):
     """Intenta obtener/generar RPP exacto por UDS + grupo, sin fallback cruzado."""
     grupo_cod = _alpha61_normalizar_grupo_rpp(grupo)
     if not grupo_cod:
         return None
     try:
-        existente = _alpha61_buscar_archivo_rpp_exacto(unidad, grupo_cod)
+        existente = None if mes and anio else _alpha61_buscar_archivo_rpp_exacto(unidad, grupo_cod)
         if existente:
             return existente
 
@@ -10416,7 +10420,7 @@ def _alpha64_generar_rpp_resiliente(unidad, grupo):
         # de rendimiento observable en fundaciones sin archivos previos.
         try:
             legacy = GRUPOS_RPP_ALPHA61[grupo_cod]['legacy']
-            _alpha59_generar_oficial_desde_template('rpp', unidad, grupo=legacy)
+            _alpha59_generar_oficial_desde_template('rpp', unidad, grupo=legacy, mes=mes, anio=anio)
             nombre = _alpha61_buscar_archivo_rpp_exacto(unidad, grupo_cod)
             if nombre:
                 _alpha64_log('RPP_GENERADO_CAMINO_OFICIAL', unidad=unidad, grupo=grupo_cod, archivo=nombre)
@@ -11325,14 +11329,54 @@ def descargar_rpp_por_categoria():
     archivo = request.args.get('archivo') or request.args.get('filename') or ''
     grupo_raw = request.args.get('grupo') or request.args.get('grupo_etario_rpp') or request.args.get('formato')
     try:
+        try:
+            mes = max(1, min(12, int(request.args.get('mes') or request.args.get('month') or datetime.now().month)))
+            anio = max(2020, min(2100, int(request.args.get('anio') or request.args.get('año') or request.args.get('year') or datetime.now().year)))
+        except (TypeError, ValueError):
+            return jsonify({'ok': False, 'formato': 'rpp', 'error': 'Mes o año inválido.'}), 400
         grupo = _alpha61_normalizar_grupo_rpp(grupo_raw)
         if not unidad:
             return jsonify({'ok': False, 'formato': 'rpp', 'error': 'Debes indicar la unidad de atención.'}), 400
         if not grupo:
             return jsonify({'ok': False, 'formato': 'rpp', 'error': 'Grupo etario RPP inválido.', 'grupo_recibido': grupo_raw, 'grupos_validos': sorted(GRUPOS_RPP_ALPHA61.keys())}), 400
 
+        usuarios_grupo = _alpha59_filtrar_rpp_grupo(
+            _alpha59_obtener_usuarios_unidad(unidad),
+            GRUPOS_RPP_ALPHA61[grupo]['legacy'],
+        )
+        if not usuarios_grupo:
+            return jsonify({
+                'ok': False, 'formato': 'rpp', 'error': 'No hay participantes válidos para este grupo y UDS.',
+                'mensaje': 'Revisa fecha de nacimiento, grupo etario y asignación de la unidad en la Base Maestra.',
+                'unidad': unidad, 'grupo_normalizado': grupo, 'periodo': {'mes': mes, 'anio': anio},
+            }), 422
+
+        plantillas_periodo = iter_plantillas_oficiales_para_generacion(TEMPLATES_FOLDER, mes=mes, anio=anio)
+        plantilla_rpp = next((item for item in plantillas_periodo if item.get('tipo') == 'rpp' and item.get('ruta') and os.path.exists(item.get('ruta'))), None)
+        if not plantilla_rpp:
+            return jsonify({
+                'ok': False, 'formato': 'rpp', 'error': 'No existe una plantilla oficial RPP vigente para el periodo.',
+                'mensaje': 'Registra o activa la plantilla desde Administración > Plantillas oficiales.',
+                'periodo': {'mes': mes, 'anio': anio}, 'requierePlantillaOficial': True,
+            }), 422
+
+        from services.rpp_minutas_service import obtener_minuta_vigente
+        usuario = usuario_actual() or {}
+        fid = int(fundacion_actual_id() or 1)
+        corporacion_id = int(usuario.get('corporacion_id') or fid)
+        minuta = obtener_minuta_vigente(
+            DATABASE_PATH, mes=mes, anio=anio,
+            fundacion_id=fid, corporacion_id=corporacion_id,
+        )
+        if not minuta:
+            return jsonify({
+                'ok': False, 'formato': 'rpp', 'error': 'No existe una minuta RPP vigente aplicable al periodo.',
+                'mensaje': 'Carga la minuta, revísala y márcala como vigente antes de generar el RPP.',
+                'periodo': {'mes': mes, 'anio': anio}, 'requiereMinutaVigente': True,
+            }), 422
+
         tag_esperado = GRUPOS_RPP_ALPHA61[grupo]['archivo_tag']
-        _alpha64_log('RPP_ENDPOINT_INICIO', unidad=unidad, grupo_raw=grupo_raw, grupo=grupo, archivo_parametro=archivo, tag_esperado=tag_esperado)
+        _alpha64_log('RPP_ENDPOINT_INICIO', unidad=unidad, grupo_raw=grupo_raw, grupo=grupo, archivo_parametro=archivo, tag_esperado=tag_esperado, mes=mes, anio=anio, plantilla=plantilla_rpp.get('nombre'), minuta_version=minuta.get('version'))
 
         # Archivo explícito: aceptar solo si coincide UDS + grupo exacto.
         if archivo:
@@ -11345,9 +11389,7 @@ def descargar_rpp_por_categoria():
             else:
                 _alpha64_log('RPP_ARCHIVO_EXPLICITO_RECHAZADO_ALPHA64', unidad=unidad, grupo=grupo, archivo=archivo, ruta=ruta, existe=bool(ruta and os.path.exists(ruta)))
 
-        nombre_archivo = _alpha61_buscar_archivo_rpp_exacto(unidad, grupo)
-        if not nombre_archivo:
-            nombre_archivo = _alpha64_generar_rpp_resiliente(unidad, grupo)
+        nombre_archivo = _alpha64_generar_rpp_resiliente(unidad, grupo, mes=mes, anio=anio)
 
         if nombre_archivo:
             resp, motivo = _alpha64_send_output(nombre_archivo, unidad, 'rpp', grupo=grupo)
@@ -11365,6 +11407,7 @@ def descargar_rpp_por_categoria():
             'grupo_recibido': grupo_raw,
             'grupo_normalizado': grupo,
             'tag_esperado': tag_esperado,
+            'periodo': {'mes': mes, 'anio': anio},
             # TenantPath protege el aislamiento por fundación, pero no es un
             # tipo JSON. Convertirlo a texto evita transformar un 404 funcional
             # (RPP aún no generado) en un 409 por serialización.

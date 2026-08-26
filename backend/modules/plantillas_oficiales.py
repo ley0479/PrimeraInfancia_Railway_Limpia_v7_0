@@ -479,24 +479,27 @@ def _tipo_doc(user: dict[str, Any]) -> str:
     return raw or "RC"
 
 
-def _edad_meses(user: dict[str, Any]) -> int:
+def _edad_meses(user: dict[str, Any]) -> int | None:
+    value = _cell_value(user, "EdadMeses", "edad_meses", default=None)
+    if value in (None, ""):
+        return None
     try:
-        return int(float(_cell_value(user, "EdadMeses", "edad_meses", default=0) or 0))
+        return int(float(value))
     except Exception:
-        return 0
+        return None
 
 
 def _grupo_edad_marker(user: dict[str, Any]) -> str:
     tipo = normalizar_texto(_cell_value(user, "TipoBeneficiario", "tipo_beneficiario", default=""))
     grupo = normalizar_texto(_cell_value(user, "GrupoEdad", "grupo_edad", default=""))
     edad = _edad_meses(user)
-    if "gestante" in tipo or "gestante" in grupo or "0 a 6" in grupo or "0 a 5" in grupo or edad <= 5:
+    if "gestante" in tipo or "gestante" in grupo or "0 a 6" in grupo or "0 a 5" in grupo or (edad is not None and edad <= 5):
         return "D"
-    if "6 a 11" in grupo or 6 <= edad <= 11:
+    if "6 a 11" in grupo or (edad is not None and 6 <= edad <= 11):
         return "E"
-    if "1 a 2" in grupo or 12 <= edad <= 35:
+    if "1 a 2" in grupo or (edad is not None and 12 <= edad <= 35):
         return "F"
-    if "3 a 5" in grupo or 36 <= edad <= 71:
+    if "3 a 5" in grupo or (edad is not None and 36 <= edad <= 71):
         return "G"
     return ""
 
@@ -653,13 +656,12 @@ def generar_desde_plantilla_oficial(
     metadata = dict(datos.get("metadata") or {})
     report_year = int(metadata.get("anio") or metadata.get("año") or datetime.now().year)
     report_month = int(metadata.get("mes_numero") or metadata.get("mes") or datetime.now().month)
-    info = get_plantilla_oficial(
-        templates_folder,
-        tipo or "",
-        mes=report_month if tipo == "ram" else None,
-        anio=report_year if tipo == "ram" else None,
+    candidates = iter_plantillas_oficiales_para_generacion(
+        templates_folder, mes=report_month, anio=report_year
     )
-    if not info or not info.get("existe"):
+    selected = next((item for item in candidates if item.get("tipo") == tipo), None)
+    info = ({**DEFAULT_MANIFEST.get(tipo or "", {}), **selected} if selected else None)
+    if not info or not info.get("ruta") or not Path(str(info.get("ruta"))).is_file():
         raise FileNotFoundError(
             "No se encontró la plantilla oficial de este formato. "
             "Cargue la plantilla desde Administración > Plantillas oficiales."
