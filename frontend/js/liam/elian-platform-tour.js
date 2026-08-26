@@ -44,7 +44,7 @@
     try{
       await waitReady(module);emit('module-guide-started',{module_id:module.module_id,index,total:tour.modules.length});
       window.LIAM_STATE?.set('guiding');
-      const text=messageFor(module),control=primaryControl[module.module_id];if(control)window.LIAM_ANIMATION?.highlight(control,`Herramienta principal de ${module.title}`);await options.announceAsync(text);window.LIAM_ANIMATION?.clear();
+      const text=messageFor(module),control=primaryControl[module.module_id];if(control)await window.LIAM_MOVEMENT?.moveToControl(control,{mode:'walk',walk_enabled:true,message:`Herramienta principal de ${module.title}`});await options.announceAsync(text);window.LIAM_ANIMATION?.clear();window.LIAM_MOVEMENT?.remove();
       emit('module-guide-completed',{module_id:module.module_id,index});
       if(!tour.completed_modules.includes(module.module_id))tour.completed_modules.push(module.module_id);
       await save('in_progress');
@@ -62,7 +62,7 @@
   async function previous(){if(!tour)return false;window.LIA_SPEECH?.stop();index=Math.max(0,index-1);paused=false;status='in_progress';await save('in_progress');return present()}
   async function repeat(){if(!tour)return false;window.LIA_SPEECH?.stop();paused=false;status='in_progress';return present()}
   async function skip(){const m=current();if(!m)return false;if(!tour.skipped_modules.includes(m.module_id))tour.skipped_modules.push(m.module_id);emit('module-guide-skipped',{module_id:m.module_id});return next()}
-  async function cancel(){if(!tour)return false;paused=true;status='cancelled';window.LIA_SPEECH?.stop();await save('cancelled');window.LIAM_ANIMATION?.clear();emit('tour-cancelled',{});return true}
+  async function cancel(){if(!tour)return false;paused=true;status='cancelled';window.LIA_SPEECH?.stop();await save('cancelled');window.LIAM_ANIMATION?.clear();window.LIAM_MOVEMENT?.remove();emit('tour-cancelled',{});return true}
   async function finish(){status='completed';paused=false;await save('completed');render();window.LIAM_STATE?.set('success');options.announce(`Recorrido completado. Conociste ${tour.completed_modules.length} módulos y omitiste ${tour.skipped_modules.length}. Puedes repetirlo o iniciar una tarea real.`);emit('tour-completed',{completed:tour.completed_modules.length,skipped:tour.skipped_modules.length});return true}
   window.ELIAN_PLATFORM_TOUR=Object.freeze({start,pause,resume,next,previous,repeat,skip,cancel,state:()=>({status,mode,index,module:current()})});
 })();

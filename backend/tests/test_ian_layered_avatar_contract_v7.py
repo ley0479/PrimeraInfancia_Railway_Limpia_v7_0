@@ -15,6 +15,9 @@ def main():
     css = (ROOT / "frontend/css/ian-avatar.css").read_text(encoding="utf-8")
     index = (ROOT / "frontend/index.html").read_text(encoding="utf-8")
     state = (ROOT / "frontend/js/liam/liam-state-machine.js").read_text(encoding="utf-8")
+    movement = (ROOT / "frontend/js/liam/liam-movement-controller.js").read_text(encoding="utf-8")
+    tour = (ROOT / "frontend/js/liam/elian-platform-tour.js").read_text(encoding="utf-8")
+    orchestrator = (ROOT / "frontend/js/liam/liam-animation-orchestrator.js").read_text(encoding="utf-8")
 
     require("mount=mountIan" in controller, "La interfaz activa no usa el montaje corregido de IAN")
     require("ian-launcher-avatar" in controller, "Falta la silueta única del lanzador")
@@ -28,6 +31,11 @@ def main():
     require("ian-wave" in css and "ian-point-left" in css and "ian-point-right" in css, "Los brazos no tienen gestos reales")
     require("ian-avatar.css" in index, "La hoja correctiva no llega al navegador")
     require("'walking_up'" in state and "'walking_down'" in state and "'collapsed'" in state, "La máquina de estados está incompleta")
+    require("avatar.animate" in movement and "getBoundingClientRect" in movement, "La caminata no mueve un elemento visible hacia el control")
+    require("LIAM_SAFE_ZONES?.placement" in movement, "El movimiento no valida una zona segura")
+    require("ian-tour-avatar" in movement and "pointer-events:none" in css, "El avatar del recorrido puede bloquear clics")
+    require("LIAM_MOVEMENT?.moveToControl" in tour, "El recorrido automático no está conectado al movimiento")
+    require("querySelector('.ian-avatar-svg')" in orchestrator, "Los estados aún buscan la fotografía antigua")
     print("IAN_LAYERED_AVATAR_CONTRACT_V7_PASS")
 
 
