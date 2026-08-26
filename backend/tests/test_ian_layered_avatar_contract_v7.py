@@ -24,6 +24,8 @@ def main():
     require("mount=mountIan" in controller, "La interfaz activa no usa el montaje corregido de IAN")
     require("mount();\n      try{await loadRuntime()" in controller, "IAN todavía espera las funciones avanzadas antes de hacerse visible")
     require("bootIan" in controller and "cache:'no-store'" in controller, "Falta el arranque resistente a caché")
+    require("headers:headers()" in controller, "La configuración protegida de IAN se consulta sin autenticación")
+    require("AUTH_PENDING" in controller and "setTimeout(()=>{state.booting=false;bootIan()}" in controller, "IAN no reintenta después del inicio de sesión")
     require("ian-launcher-avatar" in controller, "Falta la silueta única del lanzador")
     require("render('#liam-avatar-wrap'" in controller, "El panel no reutiliza el avatar del lanzador")
     require("liam-mouth-motion" not in controller[controller.index("function mountIan"):controller.index("mount=mountIan")], "La interfaz activa todavía superpone una boca")
