@@ -22,8 +22,10 @@ def main():
     lips = (ROOT / "frontend/js/liam/liam-lip-sync.js").read_text(encoding="utf-8")
 
     require("mount=mountIan" in controller, "La interfaz activa no usa el montaje corregido de IAN")
+    require("mount();\n      try{await loadRuntime()" in controller, "IAN todavía espera las funciones avanzadas antes de hacerse visible")
+    require("bootIan" in controller and "cache:'no-store'" in controller, "Falta el arranque resistente a caché")
     require("ian-launcher-avatar" in controller, "Falta la silueta única del lanzador")
-    require("IAN_AVATAR.render('#liam-avatar-wrap'" in controller, "El panel no reutiliza el avatar del lanzador")
+    require("render('#liam-avatar-wrap'" in controller, "El panel no reutiliza el avatar del lanzador")
     require("liam-mouth-motion" not in controller[controller.index("function mountIan"):controller.index("mount=mountIan")], "La interfaz activa todavía superpone una boca")
     for layer in ("ian-head-layer", "ian-mouth-layer", "ian-arm-left", "ian-arm-right", "ian-eyes"):
         require(layer in renderer, f"Falta capa SVG real: {layer}")
@@ -32,6 +34,8 @@ def main():
     require(".ian-mouth-open" in css and "[data-state=speaking]" in css, "La boca interna no responde al estado de voz")
     require("ian-wave" in css and "ian-point-left" in css and "ian-point-right" in css, "Los brazos no tienen gestos reales")
     require("ian-avatar.css" in index, "La hoja correctiva no llega al navegador")
+    require(index.index("ian-avatar-renderer.js") < index.index("liam-controller.js"), "El SVG no se carga antes del controlador")
+    require(index.index("liam-state-machine.js") < index.index("liam-controller.js"), "El estado básico no se carga antes del controlador")
     require("'walking_up'" in state and "'walking_down'" in state and "'collapsed'" in state, "La máquina de estados está incompleta")
     require("avatar.animate" in movement and "getBoundingClientRect" in movement, "La caminata no mueve un elemento visible hacia el control")
     require("LIAM_SAFE_ZONES?.placement" in movement, "El movimiento no valida una zona segura")
