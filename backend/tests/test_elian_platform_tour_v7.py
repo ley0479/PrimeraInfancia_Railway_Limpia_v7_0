@@ -38,6 +38,7 @@ admin_ui = read('frontend/js/liam/elian-admin-config.js')
 html = read('frontend/index.html')
 controls = read('frontend/js/liam/liam-control-registry.js')
 anchors = read('frontend/js/liam/liam-anchor-registry.js')
+css = read('frontend/css/liam-assistant.css')
 for event in ('module-open-requested','module-loading','module-ready','module-guide-started','module-guide-completed','module-guide-paused','module-guide-resumed','module-guide-skipped','tour-completed','tour-failed'):
     assert event in engine
 for control in ('pause','resume','repeat','skip','previous','next','cancel'):
@@ -55,8 +56,16 @@ for control in ('reportes.period','relacion-mes.period','facturacion.dashboard',
     assert control in controls
 for anchor in ('liam.anchor.reports.period','liam.anchor.relation.period','liam.anchor.billing.dashboard','liam.anchor.integrity.summary','liam.anchor.manual.current'):
     assert anchor in anchors
+assert '@media(max-width:768px)' in css
+assert '@media(max-width:420px)' in css
+assert '@media(prefers-reduced-motion:reduce)' in css
 assert (ROOT / 'frontend/assets/lia/elian-afro-institutional-male-v1.png').stat().st_size > 100_000
 assert (ROOT / 'frontend/assets/lia/elian-afro-institutional-female-v1.png').stat().st_size > 100_000
+for asset in (
+    'elian-afro-technological-male-v1.png', 'elian-afro-technological-female-v1.png',
+    'elian-afro-educational-male-v1.png', 'elian-afro-educational-female-v1.png',
+):
+    assert (ROOT / 'frontend/assets/lia' / asset).stat().st_size > 100_000
 for forbidden in ('eval(', 'new Function', 'document.write('):
     assert forbidden not in engine
 

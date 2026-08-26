@@ -29,5 +29,5 @@ Todos tienen explicación estructurada de propósito, usuarios autorizados, entr
 
 - Afrocolombiano institucional masculino: disponible.
 - Afrocolombiana institucional femenina: disponible.
-- Variante tecnológica masculina y femenina: usa respaldo institucional; arte definitivo pendiente.
-- Variante educativa masculina y femenina: usa respaldo institucional; arte definitivo pendiente.
+- Variante tecnológica masculina y femenina: disponible.
+- Variante educativa masculina y femenina: disponible.

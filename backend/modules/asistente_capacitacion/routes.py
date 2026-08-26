@@ -116,8 +116,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0)
         variants={
             'afro_colombian_institutional':{'label':'Afrocolombiano institucional','assets':{'male':'./assets/lia/elian-afro-institutional-male-v1.png','female':'./assets/lia/elian-afro-institutional-female-v1.png'},'ready_genders':['male','female']},
-            'afro_colombian_technological':{'label':'Afrocolombiano tecnológico','assets':{'male':'./assets/lia/elian-afro-institutional-male-v1.png','female':'./assets/lia/elian-afro-institutional-female-v1.png'},'ready_genders':[]},
-            'afro_colombian_educational':{'label':'Afrocolombiano educativo','assets':{'male':'./assets/lia/elian-afro-institutional-male-v1.png','female':'./assets/lia/elian-afro-institutional-female-v1.png'},'ready_genders':[]},
+            'afro_colombian_technological':{'label':'Afrocolombiano tecnológico','assets':{'male':'./assets/lia/elian-afro-technological-male-v1.png','female':'./assets/lia/elian-afro-technological-female-v1.png'},'ready_genders':['male','female']},
+            'afro_colombian_educational':{'label':'Afrocolombiano educativo','assets':{'male':'./assets/lia/elian-afro-educational-male-v1.png','female':'./assets/lia/elian-afro-educational-female-v1.png'},'ready_genders':['male','female']},
         }
         defaults={'assistant_name':'ELIAN','avatar_gender':'male','avatar_variant':'afro_colombian_institutional','skin_tone':'dark','hair_style':'short_coily','clothing_style':'institutional_vest','primary_color':'#123A63','secondary_color':'#16C6D8','voice_gender':'male','voice_speed':.95,'headset_enabled':1,'tablet_enabled':1,'hologram_enabled':1,'animation_enabled':1,'walk_enabled':0,'lip_sync_enabled':0,'motion_level':'light','avatar_asset_path':variants['afro_colombian_institutional']['assets']['male']}
         conn=connect();row=conn.execute('SELECT * FROM elian_visual_configuration WHERE fundacion_id=?',(fid,)).fetchone()

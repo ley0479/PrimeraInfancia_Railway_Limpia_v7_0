@@ -23,6 +23,10 @@ with tempfile.TemporaryDirectory() as folder:
         users = {
             'admin-a': {'id': 10, 'fundacion_id': 1, 'rol': 'SUPERADMIN', 'username': 'admin-a'},
             'teacher-b': {'id': 20, 'fundacion_id': 2, 'rol': 'DOCENTE', 'username': 'teacher-b'},
+            'manager-a': {'id': 11, 'fundacion_id': 1, 'rol': 'GERENTE', 'username': 'manager-a'},
+            'coordinator-a': {'id': 12, 'fundacion_id': 1, 'rol': 'COORDINADOR', 'username': 'coordinator-a'},
+            'nutrition-a': {'id': 13, 'fundacion_id': 1, 'rol': 'NUTRICIONISTA', 'username': 'nutrition-a'},
+            'psychosocial-a': {'id': 14, 'fundacion_id': 1, 'rol': 'PSICOSOCIAL', 'username': 'psychosocial-a'},
         }
         g.current_user = users[identity]
 
@@ -34,6 +38,19 @@ with tempfile.TemporaryDirectory() as folder:
     payload = tour.get_json()
     assert payload['modules'][0]['module_id'] == 'dashboard'
     assert any(item['module_id'] == 'componente-psicosocial' for item in payload['modules'])
+
+    expected = {
+        'manager-a': {'dashboard','administracion','facturacion'},
+        'coordinator-a': {'dashboard','talento','componente-psicosocial'},
+        'teacher-b': {'dashboard','planeacion-pedagogica','formatos'},
+        'nutrition-a': {'dashboard','base-maestra','salud-nutricion'},
+        'psychosocial-a': {'dashboard','familias-redes','componente-psicosocial'},
+    }
+    for identity, required in expected.items():
+        response = client.get('/api/asistente-capacitacion/elian/platform-tour', headers={'X-Test-Identity':identity})
+        assert response.status_code == 200
+        visible = {item['module_id'] for item in response.get_json()['modules']}
+        assert required <= visible
 
     update = client.put('/api/asistente-capacitacion/elian/platform-tour/progress', json={
         'status':'paused', 'mode':'interactive', 'current_module_id':'base-maestra',
@@ -51,5 +68,15 @@ with tempfile.TemporaryDirectory() as folder:
         'avatar_variant':'afro_colombian_institutional', 'motion_level':'light',
     }, headers={'X-Test-Identity':'admin-a'})
     assert configured.status_code == 200 and configured.get_json()['asset_ready'] is True
+    for variant in ('afro_colombian_institutional','afro_colombian_technological','afro_colombian_educational'):
+        for gender in ('male','female'):
+            selected = client.put('/api/asistente-capacitacion/elian/visual-config', json={
+                'assistant_name':'ELIAN', 'avatar_gender':gender,
+                'avatar_variant':variant, 'motion_level':'light',
+            }, headers={'X-Test-Identity':'admin-a'})
+            assert selected.status_code == 200
+            body = selected.get_json()
+            assert body['asset_ready'] is True
+            assert gender in body['configuration']['avatar_asset_path']
 
 print('ELIAN_HTTP_MULTITENANT_V7_PASS')
