@@ -44,7 +44,6 @@ test('apariencia, gestos, labios y movimiento de IAN funcionan con el SVG por ca
     const wrap = document.getElementById('liam-avatar-wrap');
     return { accepted, machine: window.LIAM_STATE.get(), states: window.LIAM_STATE.states, runtimeWarning: document.getElementById('liam-tab').dataset.runtimeWarning || '', animationApi: Boolean(window.LIAM_ANIMATION), movementApi: Boolean(window.LIAM_MOVEMENT), state: wrap.dataset.state, animation: getComputedStyle(wrap.querySelector('.ian-arm-right')).animationName };
   });
-  console.log('IAN greeting diagnostic', greeting);
   expect(greeting.state).toBe('greeting');
   expect(greeting.animation).toContain('ian-wave');
   await page.evaluate(() => { window.LIAM_STATE.set('speaking'); window.LIAM_LIP_SYNC.start('Hola, te acompaño.'); });

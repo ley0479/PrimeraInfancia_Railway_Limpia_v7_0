@@ -19,7 +19,9 @@ test('IAN se monta, se ve y abre el panel aun si la configuración avanzada fall
     const rect = node.getBoundingClientRect();
     return { display: style.display, visibility: style.visibility, opacity: style.opacity, width: rect.width, height: rect.height, parentDisplay: parentStyle.display, parentWidth: node.parentElement.getBoundingClientRect().width, parentHeight: node.parentElement.getBoundingClientRect().height };
   });
-  console.log('IAN launcher metrics', launcherMetrics);
+  expect(launcherMetrics.width).toBeGreaterThan(0);
+  expect(launcherMetrics.height).toBeGreaterThan(0);
+  expect(launcherMetrics.parentDisplay).not.toBe('none');
   await expect(tab.locator('.ian-avatar-svg')).toBeVisible({ timeout: 15000 });
   const box = await tab.boundingBox();
   expect(box && box.width >= 44 && box.height >= 44).toBeTruthy();
