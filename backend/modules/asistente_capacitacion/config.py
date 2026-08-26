@@ -70,12 +70,18 @@ def public_liam_flags() -> dict:
 def public_elian_flags() -> dict:
     """Identidad nueva con fallback compatible a la activación actual de LIAM."""
     legacy = public_liam_flags()
-    explicitly_enabled = os.getenv('ENABLE_ELIAN_ASSISTANT')
-    enabled = legacy['enabled'] if explicitly_enabled is None else _bool('ENABLE_ELIAN_ASSISTANT', False)
+    ian_enabled = os.getenv('ENABLE_IAN_ASSISTANT')
+    elian_enabled = os.getenv('ENABLE_ELIAN_ASSISTANT')
+    if ian_enabled is not None:
+        enabled = _bool('ENABLE_IAN_ASSISTANT', False)
+    elif elian_enabled is not None:
+        enabled = _bool('ENABLE_ELIAN_ASSISTANT', False)
+    else:
+        enabled = legacy['enabled']
     return {
         **legacy,
         'enabled': enabled,
-        'assistant_name': (os.getenv('ELIAN_ASSISTANT_NAME') or 'ELIAN').strip()[:40] or 'ELIAN',
+        'assistant_name': (os.getenv('IAN_ASSISTANT_NAME') or os.getenv('ELIAN_ASSISTANT_NAME') or 'IAN').strip()[:40] or 'IAN',
         'platform_tour_enabled': enabled and _bool('ELIAN_PLATFORM_TOUR_ENABLED', True),
         'avatar_gender': (os.getenv('ELIAN_AVATAR_GENDER') or 'male').strip().lower(),
         'avatar_variant': (os.getenv('ELIAN_AVATAR_VARIANT') or 'afro_colombian_institutional').strip().lower(),

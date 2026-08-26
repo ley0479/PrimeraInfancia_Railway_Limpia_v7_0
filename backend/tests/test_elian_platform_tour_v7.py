@@ -14,11 +14,14 @@ def read(relative):
     return (ROOT / relative).read_text(encoding='utf-8')
 
 
+config_source = read('backend/modules/asistente_capacitacion/config.py')
 os.environ['ENABLE_LIAM_ASSISTANT'] = 'true'
+os.environ.pop('ENABLE_IAN_ASSISTANT', None)
 os.environ.pop('ENABLE_ELIAN_ASSISTANT', None)
 flags = public_elian_flags()
 assert flags['enabled'] is True
-assert flags['assistant_name'] == 'ELIAN'
+assert flags['assistant_name'] == 'IAN'
+assert 'ENABLE_IAN_ASSISTANT' in config_source
 assert flags['avatar_variant'] == 'afro_colombian_institutional'
 
 ids = [item['module_id'] for item in ELIAN_MODULE_REGISTRY]
@@ -39,6 +42,7 @@ html = read('frontend/index.html')
 controls = read('frontend/js/liam/liam-control-registry.js')
 anchors = read('frontend/js/liam/liam-anchor-registry.js')
 css = read('frontend/css/liam-assistant.css')
+ian_css = read('frontend/css/ian-avatar.css')
 a11y_css = read('frontend/css/accessibility-pi.css')
 for event in ('module-open-requested','module-loading','module-ready','module-guide-started','module-guide-completed','module-guide-paused','module-guide-resumed','module-guide-skipped','tour-completed','tour-failed'):
     assert event in engine
@@ -60,8 +64,8 @@ for anchor in ('liam.anchor.reports.period','liam.anchor.relation.period','liam.
 assert '@media(max-width:768px)' in css
 assert '@media(max-width:420px)' in css
 assert '@media(prefers-reduced-motion:reduce)' in css
-assert '.liam-mouth-motion' in css and '@keyframes elian-mouth' in css
-assert '.liam-hand-motion' in css and '@keyframes elian-hand' in css
+assert '.ian-mouth-open' in ian_css and 'ian:speech:viseme' in read('frontend/js/liam/liam-lip-sync.js')
+assert '.ian-arm-right' in ian_css and '@keyframes ian-wave' in ian_css
 assert '.elian-guide-svg' in css
 assert 'Configurar personaje y voz' in controller
 assert 'elian-inline-gender' in controller and 'elian-inline-variant' in controller
