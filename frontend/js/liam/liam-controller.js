@@ -57,5 +57,6 @@
     }catch(error){if(error.message!=='AUTH_PENDING')console.warn('No fue posible consultar la activación de IAN:',error.message);clearTimeout(state.bootTimer);state.bootTimer=setTimeout(()=>{state.booting=false;bootIan()},1800)}finally{if(document.getElementById('liam-shell'))state.booting=false}
   }
   window.LIAM=Object.freeze({open,close,ask,presentation,showWhere,refreshContext,announce});
+  window.IAN_BOOT=bootIan;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bootIan);else bootIan();
 })();

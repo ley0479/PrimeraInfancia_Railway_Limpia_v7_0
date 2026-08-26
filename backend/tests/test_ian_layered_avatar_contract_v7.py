@@ -20,6 +20,7 @@ def main():
     orchestrator = (ROOT / "frontend/js/liam/liam-animation-orchestrator.js").read_text(encoding="utf-8")
     speech = (ROOT / "frontend/js/lia-assistant/speech-controller.js").read_text(encoding="utf-8")
     lips = (ROOT / "frontend/js/liam/liam-lip-sync.js").read_text(encoding="utf-8")
+    guard = (ROOT / "frontend/js/liam/ian-visibility-guard.js").read_text(encoding="utf-8")
 
     require("mount=mountIan" in controller, "La interfaz activa no usa el montaje corregido de IAN")
     require("if(!authToken)throw new Error('AUTH_PENDING');mount();const r=await fetch" in controller, "IAN todavía espera al endpoint antes de hacerse visible")
@@ -41,6 +42,10 @@ def main():
     require("ian-avatar.css" in index, "La hoja correctiva no llega al navegador")
     require(index.index("ian-avatar-renderer.js") < index.index("liam-controller.js"), "El SVG no se carga antes del controlador")
     require(index.index("liam-state-machine.js") < index.index("liam-controller.js"), "El estado básico no se carga antes del controlador")
+    require("ian-visibility-guard.js" in index, "La guardia de visibilidad no llega al navegador")
+    require("window.IAN_BOOT?.()" in guard and "ian-visibility-fallback" in guard, "La guardia no recupera un montaje fallido")
+    require("removeFallback" in guard and "document.getElementById('liam-shell')" in guard, "La guardia puede duplicar el asistente")
+    require("display','block','important'" in guard and "visibility','visible','important'" in guard, "La guardia no corrige ocultamiento CSS")
     require("'walking_up'" in state and "'walking_down'" in state and "'collapsed'" in state, "La máquina de estados está incompleta")
     require("avatar.animate" in movement and "getBoundingClientRect" in movement, "La caminata no mueve un elemento visible hacia el control")
     require("LIAM_SAFE_ZONES?.placement" in movement, "El movimiento no valida una zona segura")
