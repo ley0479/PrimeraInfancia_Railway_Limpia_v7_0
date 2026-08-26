@@ -37,11 +37,13 @@ def main():
     endpoint = app_source[endpoint_start:app_source.index("@app.route('/api/descargar-archivo", endpoint_start)]
     for contract in (
         "iter_plantillas_oficiales_para_generacion",
-        "obtener_minuta_vigente",
         "_alpha59_obtener_usuarios_unidad",
         "_alpha64_generar_rpp_resiliente(unidad, grupo, mes=mes, anio=anio)",
     ):
         require(contract in endpoint, f"Falta validación RPP: {contract}")
+    require("obtener_minuta_vigente" not in endpoint, "RPP continúa bloqueado por Minuta Patrón")
+    require("RPP_SOURCE_MODE" in endpoint and "official_template" in endpoint,
+            "RPP no declara la plantilla oficial como fuente")
 
     require(_grupo_edad_marker({"GrupoEdad": "", "EdadMeses": None}) == "",
             "Una edad ausente todavía se clasifica como cero meses")

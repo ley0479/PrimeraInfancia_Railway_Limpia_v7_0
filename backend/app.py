@@ -11325,6 +11325,7 @@ def descargar_bienestarina_alpha57():
 @app.route('/api/rpp/descargar', methods=['GET'])
 def descargar_rpp_por_categoria():
     """ALPHA64: descarga RPP por UDS + grupo exacto, sin error 500 opaco."""
+    request_id = request.headers.get('X-Request-ID') or f"rpp-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
     unidad = request.args.get('unidad') or request.args.get('unidad_id') or request.args.get('nombre_unidad')
     archivo = request.args.get('archivo') or request.args.get('filename') or ''
     grupo_raw = request.args.get('grupo') or request.args.get('grupo_etario_rpp') or request.args.get('formato')
@@ -11333,12 +11334,12 @@ def descargar_rpp_por_categoria():
             mes = max(1, min(12, int(request.args.get('mes') or request.args.get('month') or datetime.now().month)))
             anio = max(2020, min(2100, int(request.args.get('anio') or request.args.get('año') or request.args.get('year') or datetime.now().year)))
         except (TypeError, ValueError):
-            return jsonify({'ok': False, 'formato': 'rpp', 'error': 'Mes o año inválido.'}), 400
+            return jsonify({'ok': False, 'formato': 'rpp', 'code': 'RPP_PERIOD_INVALID', 'stage': 'input_validation', 'error': 'Mes o año inválido.', 'request_id': request_id}), 400
         grupo = _alpha61_normalizar_grupo_rpp(grupo_raw)
         if not unidad:
-            return jsonify({'ok': False, 'formato': 'rpp', 'error': 'Debes indicar la unidad de atención.'}), 400
+            return jsonify({'ok': False, 'formato': 'rpp', 'code': 'RPP_UNIT_NOT_FOUND', 'stage': 'input_validation', 'error': 'Debes indicar la unidad de atención.', 'request_id': request_id}), 400
         if not grupo:
-            return jsonify({'ok': False, 'formato': 'rpp', 'error': 'Grupo etario RPP inválido.', 'grupo_recibido': grupo_raw, 'grupos_validos': sorted(GRUPOS_RPP_ALPHA61.keys())}), 400
+            return jsonify({'ok': False, 'formato': 'rpp', 'code': 'RPP_CATEGORY_INVALID', 'stage': 'input_validation', 'error': 'Grupo etario RPP inválido.', 'grupo_recibido': grupo_raw, 'grupos_validos': sorted(GRUPOS_RPP_ALPHA61.keys()), 'request_id': request_id}), 400
 
         usuarios_grupo = _alpha59_filtrar_rpp_grupo(
             _alpha59_obtener_usuarios_unidad(unidad),
@@ -11348,7 +11349,8 @@ def descargar_rpp_por_categoria():
             return jsonify({
                 'ok': False, 'formato': 'rpp', 'error': 'No hay participantes válidos para este grupo y UDS.',
                 'mensaje': 'Revisa fecha de nacimiento, grupo etario y asignación de la unidad en la Base Maestra.',
-                'unidad': unidad, 'grupo_normalizado': grupo, 'periodo': {'mes': mes, 'anio': anio},
+                'code': 'RPP_NO_PARTICIPANTS', 'stage': 'participant_query',
+                'unidad': unidad, 'grupo_normalizado': grupo, 'periodo': {'mes': mes, 'anio': anio}, 'request_id': request_id,
             }), 422
 
         plantillas_periodo = iter_plantillas_oficiales_para_generacion(TEMPLATES_FOLDER, mes=mes, anio=anio)
@@ -11357,26 +11359,26 @@ def descargar_rpp_por_categoria():
             return jsonify({
                 'ok': False, 'formato': 'rpp', 'error': 'No existe una plantilla oficial RPP vigente para el periodo.',
                 'mensaje': 'Registra o activa la plantilla desde Administración > Plantillas oficiales.',
-                'periodo': {'mes': mes, 'anio': anio}, 'requierePlantillaOficial': True,
-            }), 422
-
-        from services.rpp_minutas_service import obtener_minuta_vigente
-        usuario = usuario_actual() or {}
-        fid = int(fundacion_actual_id() or 1)
-        corporacion_id = int(usuario.get('corporacion_id') or fid)
-        minuta = obtener_minuta_vigente(
-            DATABASE_PATH, mes=mes, anio=anio,
-            fundacion_id=fid, corporacion_id=corporacion_id,
-        )
-        if not minuta:
-            return jsonify({
-                'ok': False, 'formato': 'rpp', 'error': 'No existe una minuta RPP vigente aplicable al periodo.',
-                'mensaje': 'Carga la minuta, revísala y márcala como vigente antes de generar el RPP.',
-                'periodo': {'mes': mes, 'anio': anio}, 'requiereMinutaVigente': True,
+                'code': 'RPP_TEMPLATE_NOT_FOUND', 'stage': 'template_loading',
+                'periodo': {'mes': mes, 'anio': anio}, 'requierePlantillaOficial': True, 'request_id': request_id,
             }), 422
 
         tag_esperado = GRUPOS_RPP_ALPHA61[grupo]['archivo_tag']
-        _alpha64_log('RPP_ENDPOINT_INICIO', unidad=unidad, grupo_raw=grupo_raw, grupo=grupo, archivo_parametro=archivo, tag_esperado=tag_esperado, mes=mes, anio=anio, plantilla=plantilla_rpp.get('nombre'), minuta_version=minuta.get('version'))
+        # RPP se genera exclusivamente desde la plantilla oficial y la Base
+        # Maestra. La Minuta Patrón conserva sus funciones propias, pero no es
+        # requisito, enriquecimiento ni condición de descarga para este formato.
+        rpp_source_mode = str(os.environ.get('RPP_SOURCE_MODE') or 'official_template').strip().lower()
+        require_minuta = str(os.environ.get('RPP_REQUIRE_MINUTA_PATRON') or 'false').strip().lower() in {'1', 'true', 'yes', 'on'}
+        enable_minuta_enrichment = str(os.environ.get('RPP_ENABLE_MINUTA_ENRICHMENT') or 'false').strip().lower() in {'1', 'true', 'yes', 'on'}
+        if rpp_source_mode != 'official_template':
+            _alpha64_log('RPP_SOURCE_MODE_ROLLBACK_IGNORADO', modo=rpp_source_mode)
+        _alpha64_log(
+            'RPP_ENDPOINT_INICIO', unidad=unidad, grupo_raw=grupo_raw, grupo=grupo,
+            archivo_parametro=archivo, tag_esperado=tag_esperado, mes=mes, anio=anio,
+            plantilla=plantilla_rpp.get('nombre'), source_mode='official_template',
+            require_minuta_patron=False, minuta_enrichment=False,
+            configuracion_minuta_ignorada=bool(require_minuta or enable_minuta_enrichment),
+        )
 
         # Archivo explícito: aceptar solo si coincide UDS + grupo exacto.
         if archivo:
@@ -11408,6 +11410,7 @@ def descargar_rpp_por_categoria():
             'grupo_normalizado': grupo,
             'tag_esperado': tag_esperado,
             'periodo': {'mes': mes, 'anio': anio},
+            'code': 'RPP_FILE_NOT_CREATED', 'stage': 'file_validation', 'request_id': request_id,
             # TenantPath protege el aislamiento por fundación, pero no es un
             # tipo JSON. Convertirlo a texto evita transformar un 404 funcional
             # (RPP aún no generado) en un 409 por serialización.
@@ -11425,7 +11428,7 @@ def descargar_rpp_por_categoria():
             'mensaje': 'La plataforma no se cerró. Revise backend/logs/alpha64_descargas_rpp_bienestarina.log para ver el detalle.',
             'unidad': unidad,
             'grupo_recibido': grupo_raw,
-            'detalle': str(exc),
+            'code': 'RPP_GENERATION_FAILED', 'stage': 'generation', 'request_id': request_id,
         }), 409
 
 
