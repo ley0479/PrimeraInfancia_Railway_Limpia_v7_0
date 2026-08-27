@@ -2175,7 +2175,19 @@ async function descargarBienestarinaAlpha62(unidad) {
         alert('Debe seleccionar una UDS antes de descargar Bienestarina.');
         return;
     }
-    const url = `${backendUrl}/api/bienestarina/descargar?unidad=${encodeURIComponent(unidad)}`;
+    const periodo = periodoFormatosSeleccionado();
+    const fechaEntrega = document.getElementById('fecha-entrega-bienestarina')?.value || '';
+    const lote = document.getElementById('lote-bienestarina')?.value || '';
+    const cantidad = document.getElementById('cantidad-bienestarina')?.value || '';
+    const params = new URLSearchParams({
+        unidad: String(unidad),
+        mes: String(periodo.mes),
+        anio: String(periodo.anio),
+        fecha_entrega: fechaEntrega,
+        lote,
+        cantidad
+    });
+    const url = `${backendUrl}/api/bienestarina/descargar?${params.toString()}`;
     return descargarArchivoFormatoAlpha63({
         url,
         unidad,
