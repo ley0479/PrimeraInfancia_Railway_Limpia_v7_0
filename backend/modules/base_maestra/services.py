@@ -1680,8 +1680,53 @@ def publicar_base_maestra(database_path: str, version_id: int, ctx: dict[str, An
             (fundacion_id, version_id, 'TALENTO_HUMANO_Y_ASIGNACIONES', propagacion['estado'], total,
              json.dumps(propagacion.get('detalle') or {}, ensure_ascii=False, default=str), error, now),
         )
+        # Los demás módulos no requieren copias: consumen directamente las
+        # tablas maestras. Registrar su disponibilidad hace verificable que una
+        # publicación alimenta toda la plataforma bajo la misma versión.
+        conteos = {
+            'PARTICIPANTES_Y_UNIDADES': int(conn.execute(
+                "SELECT COUNT(*) FROM master_ninos WHERE fundacion_id=? AND version_id=? AND activo=1",
+                (fundacion_id, version_id),
+            ).fetchone()[0]),
+            'SALUD_Y_NUTRICION': int(conn.execute(
+                "SELECT COUNT(*) FROM master_salud_nutricion WHERE fundacion_id=? AND version_id=? AND activo=1",
+                (fundacion_id, version_id),
+            ).fetchone()[0]),
+            'PSICOSOCIAL_Y_FAMILIAS': int(conn.execute(
+                "SELECT COUNT(*) FROM master_ninos WHERE fundacion_id=? AND version_id=? AND activo=1",
+                (fundacion_id, version_id),
+            ).fetchone()[0]),
+            'PLANEACION_FORMATOS_Y_REPORTES': int(conn.execute(
+                "SELECT COUNT(*) FROM master_ninos WHERE fundacion_id=? AND version_id=? AND activo=1",
+                (fundacion_id, version_id),
+            ).fetchone()[0]),
+        }
+        for modulo, total_directo in conteos.items():
+            detalle = {
+                'modo': 'LECTURA_DIRECTA_OBLIGATORIA',
+                'version_id': version_id,
+                'fuente': 'BASE_MAESTRA_PUBLICADA',
+            }
+            conn.execute(
+                """
+                INSERT INTO master_projection_status
+                (fundacion_id,version_id,modulo,estado,total_registros,detalle_json,error,fecha_actualizacion)
+                VALUES (?,?,?,?,?,?,NULL,?)
+                ON CONFLICT(fundacion_id,version_id,modulo) DO UPDATE SET
+                    estado=excluded.estado,total_registros=excluded.total_registros,
+                    detalle_json=excluded.detalle_json,error=NULL,
+                    fecha_actualizacion=excluded.fecha_actualizacion
+                """,
+                (fundacion_id, version_id, modulo, 'COMPLETADA', total_directo,
+                 json.dumps(detalle, ensure_ascii=False), now),
+            )
         conn.commit()
     result['propagacion'] = propagacion
+    result['alimentacion_modulos'] = [
+        {'modulo': modulo, 'estado': 'COMPLETADA', 'total_registros': total_directo,
+         'modo': 'LECTURA_DIRECTA_OBLIGATORIA'}
+        for modulo, total_directo in conteos.items()
+    ] + [propagacion]
     result['message'] = (
         'Base Maestra publicada y propagada correctamente. La versión anterior quedó archivada.'
         if propagacion['estado'] == 'COMPLETADA'

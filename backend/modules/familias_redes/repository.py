@@ -11,6 +11,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from services.master_data_provider import MasterDataProvider
+
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from reportlab.lib import colors
@@ -90,29 +92,12 @@ class FamiliasRedesRepository:
         return default
 
     def _participant_source(self, conn: sqlite3.Connection, fundacion_id: int, source: str, participant_id: int) -> dict[str, Any] | None:
-        if source not in {"master_ninos", "beneficiarios", "usuarios"} or not self._table_exists(conn, source):
+        data, effective_source = MasterDataProvider.resolve_historical_participant(
+            conn, fundacion_id, source, participant_id
+        )
+        if not data:
             return None
-        cols = self._columns(conn, source)
-        where = ["id=?"]
-        params: list[Any] = [participant_id]
-        if "fundacion_id" in cols:
-            where.append("fundacion_id=?"); params.append(fundacion_id)
-        row = conn.execute(f'SELECT * FROM "{source}" WHERE ' + " AND ".join(where), params).fetchone()
-        if not row:
-            return None
-        data = dict(row)
-        documento = self._field(data, "documento", "numero_documento", "identificacion", "num_documento")
-        effective_source = source
-        if source != "master_ninos" and documento and self._table_exists(conn, "master_ninos"):
-            canonical = conn.execute(
-                """SELECT * FROM master_ninos WHERE fundacion_id=? AND activo=1
-                   AND documento=? ORDER BY id DESC LIMIT 1""",
-                (fundacion_id, str(documento).strip()),
-            ).fetchone()
-            if canonical:
-                data = dict(canonical)
-                participant_id = int(data.get("id") or participant_id)
-                effective_source = "master_ninos"
+        participant_id = int(data.get("id") or participant_id)
         return {
             "id": participant_id,
             "origen": effective_source,

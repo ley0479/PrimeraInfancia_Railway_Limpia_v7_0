@@ -13,6 +13,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from services.master_data_provider import MasterDataProvider
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
@@ -111,31 +113,17 @@ class ComponentePsicosocialRepository:
         return {"creados": created, "actualizados": updated, "mensaje": "Sincronización referencial completada."}
 
     def _participant(self, conn, source: str, participant_id: int, fundacion_id: int) -> dict[str, Any] | None:
-        if source not in {"master_ninos", "beneficiarios", "usuarios"} or not self._table_exists(conn, source):
+        data, origen_efectivo = MasterDataProvider.resolve_historical_participant(
+            conn, fundacion_id, source, participant_id
+        )
+        if not data:
             return None
-        cols = self._columns(conn, source); where = ["id=?"]; params: list[Any] = [participant_id]
-        if "fundacion_id" in cols: where.append("fundacion_id=?"); params.append(fundacion_id)
-        row = conn.execute(f'SELECT * FROM "{source}" WHERE ' + " AND ".join(where), params).fetchone()
-        if not row: return None
-        data = dict(row)
         def pick(*names):
             for name in names:
                 if data.get(name) not in (None, ""): return data.get(name)
             return None
         documento = pick("documento","numero_documento","identificacion")
-        origen_efectivo = source
-        # Los expedientes históricos conservan su referencia, pero su identidad
-        # visible se resuelve desde la versión maestra vigente por documento.
-        if source != "master_ninos" and documento and self._table_exists(conn, "master_ninos"):
-            canonical = conn.execute(
-                """SELECT * FROM master_ninos WHERE fundacion_id=? AND activo=1
-                   AND documento=? ORDER BY id DESC LIMIT 1""",
-                (fundacion_id, str(documento).strip()),
-            ).fetchone()
-            if canonical:
-                data = dict(canonical); participant_id = int(data.get("id") or participant_id)
-                origen_efectivo = "master_ninos"
-                documento = data.get("documento")
+        participant_id = int(data.get("id") or participant_id)
         nombre = data.get("nombre_completo") or data.get("nombre") or data.get("nombres") or f"Participante #{participant_id}"
         return {"id": participant_id, "origen": origen_efectivo, "documento": documento, "nombre": nombre, "raw": data}
 
