@@ -173,7 +173,18 @@ class TalentoHumanoService:
 
     def list_talento(self) -> list[dict[str, Any]]:
         ctx = self.context()
-        return self.repo.list_talento(ctx.get('fundacion_id'), ctx.get('rol') == 'SUPERADMIN')
+        fundacion_id = int(ctx.get('fundacion_id') or 1)
+        # La Base Maestra publicada es la fuente canónica para toda la
+        # plataforma. La tabla operativa permanece como respaldo cuando aún no
+        # existe una publicación, pero nunca debe ocultar una proyección maestra
+        # completa o mezclar fundaciones para un SUPERADMIN.
+        maestros = self.repo.list_master_talento(fundacion_id)
+        if maestros:
+            for row in maestros:
+                row['fuente_canonica'] = 'BASE_MAESTRA_PUBLICADA'
+                row['solo_lectura'] = True
+            return maestros
+        return self.repo.list_talento(fundacion_id, False)
 
     def integral_dashboard(self) -> dict[str, Any]:
         ctx=self.context(); return self.repo.integral_dashboard(int(ctx.get('fundacion_id') or 1))

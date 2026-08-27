@@ -3406,7 +3406,7 @@ def contar_peso_talla_vencido(cursor):
               SELECT 1 FROM master_salud_nutricion s
               WHERE s.version_id = b.version_id AND s.documento = b.documento
                 AND s.activo = 1 AND COALESCE(s.fundacion_id, 1) = ?
-                AND date(s.fecha_toma) >= date(?)
+                AND date(NULLIF(TRIM(s.fecha_toma), '')) >= date(?)
           )
     """, (fid, fid, limite))
     return cursor.fetchone()['total']

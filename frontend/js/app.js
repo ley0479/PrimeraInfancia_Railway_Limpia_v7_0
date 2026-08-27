@@ -2689,11 +2689,12 @@ function renderTalento() {
                 <td class="px-4 py-3">${escaparHtml(coordinadorVisible || '')}<div class="text-[11px] text-slate-500">${escaparHtml(estado)}</div></td>
                 <td class="px-4 py-3">${escaparHtml(item.contrato || '')}</td>
                 <td class="px-4 py-3">
+                    ${item.solo_lectura ? '<span class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300">Base Maestra</span>' : `
                     <div class="flex flex-wrap gap-2">
                         <button onclick="editarTalento(${Number(item.id)})" class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-300 hover:bg-cyan-500/20">Editar</button>
                         <button onclick="eliminarTalento(${Number(item.id)}, false)" class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-500/20">Eliminar</button>
                         <button onclick="eliminarTalento(${Number(item.id)}, true)" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-xs text-rose-300 hover:bg-rose-500/20">Borrar</button>
-                    </div>
+                    </div>`}
                 </td>
             </tr>
         `;
