@@ -83,12 +83,17 @@ def clasificar_participante(row: dict[str, Any], anio: int | None = None, mes: i
     if 'gestante' in texto and not combinado_gestantes:
         return 'gestantes'
 
-    edad = _entero(row.get('edad_meses'))
-    if edad is None:
-        edad = _entero(_buscar_dato(extra, ('edad meses', 'meses cumplidos', 'edad en meses')))
-    if edad is None and anio and mes:
+    # La fecha de nacimiento es la fuente canónica cuando se genera un periodo.
+    # Algunas importaciones históricas dejaron en ``edad_meses`` la edad en años
+    # (1, 2, 3, 4 o 5), lo que vaciaba precisamente los rangos 1–2 y 3–5.
+    edad = None
+    if anio and mes:
         fecha = row.get('fecha_nacimiento') or _buscar_dato(extra, ('fecha nacimiento', 'fecha de nacimiento'))
         edad = edad_meses_en_periodo(fecha, anio, mes)
+    if edad is None:
+        edad = _entero(row.get('edad_meses'))
+    if edad is None:
+        edad = _entero(_buscar_dato(extra, ('edad meses', 'meses cumplidos', 'edad en meses')))
 
     if edad is not None:
         if edad < 6:
