@@ -1860,10 +1860,12 @@ function manejarErrorAuthProcesamiento(xhr, resultado) {
 
 function enviarFormularioProcesamientoCuentame(formData, textoCargando) {
     const token = authToken();
-    // El flujo interactivo siempre solicita el contrato síncrono. HTTP 202 queda
-    // reservado para una operación masiva que lo pida expresamente.
-    formData.set('sync', '1');
-    formData.set('modo_ejecucion', 'sincrono');
+    // La consolidación de Cuéntame puede tardar varios minutos. Se solicita el
+    // trabajo en segundo plano para que Railway responda de inmediato con 202 y
+    // la interfaz siga el progreso sin dejar una conexión HTTP expuesta a 502.
+    formData.delete('sync');
+    formData.set('async', '1');
+    formData.set('modo_ejecucion', 'segundo_plano');
     const tablaCuerpo = document.getElementById('tabla-cuerpo');
     if (tablaCuerpo) {
         tablaCuerpo.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-indigo-400 animate-pulse">Preparando los datos y generando únicamente los formatos y unidades seleccionados...</td></tr>`;

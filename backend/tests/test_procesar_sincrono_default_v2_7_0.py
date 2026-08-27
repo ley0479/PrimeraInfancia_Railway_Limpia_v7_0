@@ -62,8 +62,11 @@ def test_endpoint_and_frontend_contract_are_wired() -> None:
     assert "if not async_explicito:" in backend
     assert "resultado['modo'] = 'sincrono'" in backend
     assert "'modo': 'segundo_plano_explicito'" in backend
-    assert "formData.set('sync', '1')" in frontend
-    assert "formData.set('modo_ejecucion', 'sincrono')" in frontend
+    # El endpoint conserva compatibilidad síncrona para clientes antiguos, pero
+    # la interfaz web usa jobs para evitar el timeout 502 del proxy en Railway.
+    assert "formData.delete('sync')" in frontend
+    assert "formData.set('async', '1')" in frontend
+    assert "formData.set('modo_ejecucion', 'segundo_plano')" in frontend
     assert "xhr.status === 202 && resultado.job_id" in frontend
 
 
