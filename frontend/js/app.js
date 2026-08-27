@@ -91,6 +91,7 @@ let estadoDiagnostico = {
 window.estadoDiagnostico = estadoDiagnostico;
 let plantillasRegistradas = [];
 let talentoRegistrado = [];
+let talentoEstructuraMaestra = null;
 let estadoSeleccionCuentame = {
     archivoToken: '',
     archivoNombre: '',
@@ -2475,6 +2476,13 @@ function fetchTalento() {
             contenedor.innerHTML = '<tr><td colspan="10" class="px-6 py-8 text-center text-rose-400">No se pudo cargar talento humano.</td></tr>';
         });
     fetchTalentoIntegral();
+    fetch(`${backendUrl}/api/base-maestra/resumen`)
+        .then(manejarRespuestaJson)
+        .then((data) => {
+            talentoEstructuraMaestra = data?.estructura_talento || null;
+            renderEquipoCoordinadores();
+        })
+        .catch((error) => console.error('No se pudo cargar la estructura maestra de Talento Humano', error));
 }
 
 let thIntegralBound=false;
@@ -2614,6 +2622,24 @@ function renderEquipoCoordinadores() {
     const contenedor = document.getElementById('equipo-coordinadores');
     if (!contenedor) return;
 
+    const estructura = talentoEstructuraMaestra || {};
+    const equiposMaestros = Array.isArray(estructura.equipos) ? estructura.equipos : [];
+    if (equiposMaestros.length) {
+        contenedor.innerHTML = equiposMaestros.map((equipo, indice) => {
+            const cargos = Object.entries(equipo.cargos || {}).sort((a, b) => a[0].localeCompare(b[0], 'es'));
+            const botones = `<button type="button" onclick="talentoFiltrarEquipo(${indice}, '')" class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-200">Ver todos: ${escaparHtml(equipo.total_personas || 0)}</button>` + cargos.map(([cargo, total]) => `<button type="button" onclick="talentoFiltrarEquipo(${indice}, decodeURIComponent('${encodeURIComponent(cargo)}'))" class="rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-1 text-xs text-violet-200 hover:bg-violet-500/20">${escaparHtml(cargo)}: ${escaparHtml(total)}</button>`).join('');
+            const filas = (equipo.integrantes || []).map(persona => `<tr data-th-rol="${escaparHtml(persona.rol_normalizado || '')}"><td class="px-3 py-2 text-slate-200">${escaparHtml(persona.nombre || '')}</td><td class="px-3 py-2">${escaparHtml(persona.cargo || persona.rol_normalizado || '')}</td><td class="px-3 py-2">${escaparHtml(persona.unidad_servicio || '—')}</td><td class="px-3 py-2">${escaparHtml(persona.telefono || persona.correo || '—')}</td></tr>`).join('');
+            return `<details data-th-equipo="${indice}" data-th-filtro="" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                <summary class="cursor-pointer list-none"><div class="flex flex-wrap items-center justify-between gap-3"><div><p class="font-semibold text-slate-100">${escaparHtml(equipo.coordinador)}</p><p class="mt-1 text-xs text-slate-500">${escaparHtml(equipo.total_personas || 0)} integrantes</p></div><div class="flex flex-wrap gap-1">${botones}</div></div></summary>
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2"><span data-th-resultado class="text-xs font-semibold text-emerald-300">Mostrando todo el equipo: ${escaparHtml(equipo.total_personas || 0)} personas</span><button type="button" onclick="talentoImprimirEquipo(${indice})" class="rounded-xl border border-amber-500/40 px-3 py-2 text-xs text-amber-300 hover:bg-amber-500/10">Imprimir selección</button></div>
+                <div class="mt-4 overflow-auto"><table class="w-full min-w-[680px] text-xs"><thead class="bg-slate-950 text-slate-300"><tr><th class="px-3 py-2 text-left">Nombre</th><th class="px-3 py-2 text-left">Cargo</th><th class="px-3 py-2 text-left">Unidad</th><th class="px-3 py-2 text-left">Contacto</th></tr></thead><tbody>${filas}</tbody></table></div>
+            </details>`;
+        }).join('');
+        const estado = document.getElementById('talento-equipos-estado');
+        if (estado) estado.textContent = `Carga #${estructura.carga_id || '—'} · ${estructura.total_coordinadores || 0} coordinadores · ${estructura.total_personas || 0} personas únicas · ${estructura.asignados_por_unidad || 0} integrantes vinculados por unidad · ${estructura.duplicados_omitidos || 0} duplicados omitidos · ${(estructura.unidades_ambiguas || []).length} unidades requieren revisión`;
+        return;
+    }
+
     const activos = (talentoRegistrado || []).filter((item) => String(item.estado || (item.activo ? 'activo' : 'inactivo')).toLowerCase() === 'activo');
     const coordinadorPorUnidad = talentoCoordinadorPorUnidad(activos);
     const grupos = {};
@@ -2660,6 +2686,45 @@ function renderEquipoCoordinadores() {
             </div>
         `;
     }).join('');
+}
+
+function talentoFiltrarEquipo(indice, rol) {
+    const panel = document.querySelector(`[data-th-equipo="${Number(indice)}"]`);
+    if (!panel) return;
+    panel.open = true;
+    panel.dataset.thFiltro = rol || '';
+    let visibles = 0;
+    panel.querySelectorAll('[data-th-rol]').forEach((fila) => {
+        const mostrar = !rol || fila.dataset.thRol === rol;
+        fila.classList.toggle('hidden', !mostrar);
+        if (mostrar) visibles += 1;
+    });
+    const resultado = panel.querySelector('[data-th-resultado]');
+    if (resultado) resultado.textContent = rol ? `${rol}: ${visibles} personas` : `Mostrando todo el equipo: ${visibles} personas`;
+}
+
+function talentoVentanaImpresion(titulo, subtitulo, personas) {
+    const ventana = window.open('', '_blank', 'width=1000,height=750');
+    if (!ventana) return mostrarMensaje('talento-message', 'El navegador bloqueó la ventana de impresión.', 'error');
+    const filas = personas.map(persona => `<tr><td>${escaparHtml(persona.nombre || '')}</td><td>${escaparHtml(persona.cargo || persona.rol_normalizado || '')}</td><td>${escaparHtml(persona.unidad_servicio || persona.unidad || '—')}</td><td>${escaparHtml(persona.telefono || persona.correo || '—')}</td></tr>`).join('');
+    ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escaparHtml(titulo)}</title><style>body{font-family:Arial,sans-serif;margin:28px;color:#111}h1{font-size:20px;margin-bottom:4px}p{margin:4px 0 18px;color:#444}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #bbb;padding:7px;text-align:left}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>${escaparHtml(titulo)}</h1><p>${escaparHtml(subtitulo)} · ${personas.length} personas</p><table><thead><tr><th>Nombre</th><th>Cargo</th><th>Unidad</th><th>Contacto</th></tr></thead><tbody>${filas}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);
+    ventana.document.close();
+}
+
+function talentoImprimirEquipo(indice) {
+    const equipo = talentoEstructuraMaestra?.equipos?.[Number(indice)];
+    const panel = document.querySelector(`[data-th-equipo="${Number(indice)}"]`);
+    if (!equipo || !panel) return;
+    const rol = panel.dataset.thFiltro || '';
+    const personas = (equipo.integrantes || []).filter(persona => !rol || persona.rol_normalizado === rol);
+    talentoVentanaImpresion(`Equipo de ${equipo.coordinador}`, rol ? `Cargo seleccionado: ${rol}` : 'Equipo completo', personas);
+}
+
+function talentoImprimirTodos() {
+    const equipos = talentoEstructuraMaestra?.equipos || [];
+    const personas = equipos.flatMap(equipo => (equipo.integrantes || []).map(persona => ({ ...persona, coordinador_impresion: equipo.coordinador })));
+    if (!personas.length) return mostrarMensaje('talento-message', 'No hay equipos disponibles para imprimir.', 'error');
+    talentoVentanaImpresion('Coordinadores y equipos de Talento Humano', `${equipos.length} coordinadores`, personas);
 }
 
 function renderTalento() {

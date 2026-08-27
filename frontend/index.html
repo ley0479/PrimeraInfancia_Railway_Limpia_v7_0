@@ -2685,11 +2685,13 @@
 
                     
                     <div class="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden">
-                        <div class="p-6 border-b border-slate-800">
-                            <h2 class="text-lg font-medium">Equipos interdisciplinarios por coordinador</h2>
-                            <p class="mt-1 text-sm text-slate-400">Resumen automático de agentes educativos, psicosociales, enfermería, nutrición, pedagogía y apoyo asociados a cada coordinador.</p>
+                        <div class="p-6 border-b border-slate-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div><h2 class="text-lg font-medium">Coordinadores y equipos de Talento Humano</h2>
+                            <p class="mt-1 text-sm text-slate-400">Despliega cada coordinador para visualizar sus docentes, psicosociales, nutricionistas y demás integrantes.</p>
+                            <p id="talento-equipos-estado" class="mt-2 text-xs text-cyan-300">Consultando la Base Maestra publicada…</p></div>
+                            <button type="button" onclick="talentoImprimirTodos()" class="rounded-xl border border-amber-500/40 px-3 py-2 text-xs text-amber-300 hover:bg-amber-500/10">Imprimir todos los equipos</button>
                         </div>
-                        <div id="equipo-coordinadores" class="p-6 grid gap-4 lg:grid-cols-2 text-sm text-slate-300">
+                        <div id="equipo-coordinadores" class="p-6 grid gap-4 text-sm text-slate-300">
                             <p class="text-slate-500">No hay equipos registrados todavía.</p>
                         </div>
                     </div>
