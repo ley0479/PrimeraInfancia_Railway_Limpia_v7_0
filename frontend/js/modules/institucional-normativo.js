@@ -378,6 +378,7 @@
             aplicarIdentidadInstitucional(data.configuracion);
             input.value = '';
             await cargarConfiguracionInstitucional(true);
+            await cargarIdentidadEfectiva(true);
             await cargarCatalogoIdentidadVisual(true);
             mostrar('ci-message', data.message || 'Archivo cargado correctamente.', 'success');
         } catch (error) {
@@ -456,6 +457,7 @@
         try {
             const data = await fetchJson(`/api/identidad-visual/${Number(id)}/activar`, { method: 'POST' });
             aplicarIdentidadInstitucional(data.configuracion || {});
+            await cargarIdentidadEfectiva(true);
             mostrar('ci-message', data.message || 'Archivo restaurado.', 'success');
             await cargarCatalogoIdentidadVisual(true);
         } catch (error) {
@@ -502,7 +504,10 @@
             }
             if (apply) apply.dataset.loteId = data.lote_id || '';
             actions?.classList.remove('hidden');
-            mostrar('ci-message', `${data.message || 'Recursos generados.'}${data.warning ? ' ' + data.warning : ''}`, data.warning ? 'warning' : 'success');
+            const applied = await fetchJson(`/api/identidad-visual/lote/${encodeURIComponent(data.lote_id)}/aplicar`, { method: 'POST' });
+            aplicarIdentidadInstitucional(applied.configuracion || {});
+            await cargarIdentidadEfectiva(true);
+            mostrar('ci-message', `${data.message || 'Recursos generados.'} Recursos activados en toda la plataforma.${data.warning ? ' ' + data.warning : ''}`, data.warning ? 'warning' : 'success');
             await cargarCatalogoIdentidadVisual(true);
             if (typeof lucide !== 'undefined') lucide.createIcons();
         } catch (error) { mostrar('ci-message', error.message || 'No fue posible generar los recursos.', 'error'); }
@@ -514,6 +519,7 @@
         try {
             const data = await fetchJson(`/api/identidad-visual/lote/${encodeURIComponent(id)}/aplicar`, { method: 'POST' });
             aplicarIdentidadInstitucional(data.configuracion || {});
+            await cargarIdentidadEfectiva(true);
             mostrar('ci-message', data.message || 'Recursos aplicados.', 'success');
             await cargarCatalogoIdentidadVisual(true);
         } catch (error) { mostrar('ci-message', error.message || 'No fue posible aplicar los recursos.', 'error'); }
