@@ -49,6 +49,11 @@ class TalentoHumanoRepository(CoreCompatRepository):
     """
 
     def init_schema(self) -> None:
+        # La sincronización llama varios upserts por persona. Ejecutar todas las
+        # comprobaciones DDL en cada fila hacía que una publicación real tardara
+        # cerca de un minuto y podía agotar el tiempo de la petición.
+        if getattr(self, '_talento_schema_initialized', False):
+            return
         self.execute_script(TALENTO_SCHEMA_SQL)
         self.execute_script(GP_SCHEMA_SQL)
 
@@ -82,6 +87,7 @@ class TalentoHumanoRepository(CoreCompatRepository):
                 # En PostgreSQL algunos índices se gestionan desde Alembic. El
                 # fallo no debe bloquear el arranque local.
                 pass
+        self._talento_schema_initialized = True
 
     def _fundacion_filter(self, fundacion_id: int | None, superadmin: bool, alias: str = '') -> tuple[str, list[Any]]:
         prefix = f"{alias}." if alias else ''

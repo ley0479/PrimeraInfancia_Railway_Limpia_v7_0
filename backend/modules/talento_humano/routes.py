@@ -20,9 +20,10 @@ def fuente_maestra():
 
 
 @bp.post('/sincronizar')
+@require_roles('SUPERADMIN','GERENTE','COORDINADOR','AUXILIAR_ADMINISTRATIVO')
 def sincronizar():
     service = TalentoHumanoService()
-    resultado = service.sincronizar_global(origen='talento_core_endpoint')
+    resultado = service.sincronizar_base_maestra_publicada(origen='talento_core_endpoint')
     return jsonify({'resultado': resultado, 'integracion': service.resumen_integracion()})
 
 

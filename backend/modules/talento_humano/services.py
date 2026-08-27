@@ -338,9 +338,13 @@ class TalentoHumanoService:
                     resultado['docentes_actualizados'] += 1
                 for unidad in unidades_de_row(row):
                     resultado['unidades_actualizadas'] += self.repo.update_unidad_docente(unidad, row, coord_nombre, fundacion_id)
-                    op = self.repo.update_docente_in_operacion(unidad, row.get('nombre') or '', fundacion_id)
-                    resultado['beneficiarios_actualizados'] += op.get('beneficiarios', 0)
-                    resultado['usuarios_actualizados'] += op.get('usuarios', 0)
+                    # Al publicar la Base Maestra no se reescriben las tablas
+                    # históricas beneficiarios/usuarios: los consumidores deben
+                    # leer master_ninos y la relación docente-unidad maestra.
+                    if fuente_normalizada != 'base_maestra':
+                        op = self.repo.update_docente_in_operacion(unidad, row.get('nombre') or '', fundacion_id)
+                        resultado['beneficiarios_actualizados'] += op.get('beneficiarios', 0)
+                        resultado['usuarios_actualizados'] += op.get('usuarios', 0)
                     if coord_id and self.repo.upsert_unidad_asignada(coord_id, unidad, fundacion_id, ctx):
                         resultado['unidades_asignadas_creadas'] += 1
             else:
@@ -374,6 +378,43 @@ class TalentoHumanoService:
         except Exception:
             pass
         return resultado
+
+    def sincronizar_base_maestra_publicada(self, origen: str = 'reintento_desde_talento') -> dict[str, Any]:
+        """Reintenta la proyección sin volver a publicar ni tocar datos operativos."""
+        ctx = self.context()
+        fundacion_id = int(ctx.get('fundacion_id') or 1)
+        version = self.repo.fetch_one(
+            "SELECT id FROM master_versiones WHERE fundacion_id=? AND activa=1 ORDER BY id DESC LIMIT 1",
+            [fundacion_id],
+        )
+        if not version:
+            raise ValueError('No existe una Base Maestra publicada para sincronizar.')
+        version_id = int(version['id'])
+        now = __import__('datetime').datetime.now().isoformat(timespec='seconds')
+        try:
+            resultado = self.sincronizar_global(origen=origen, fuente='base_maestra')
+            total = int(resultado.get('talento_base') or 0)
+            self.repo.execute(
+                """INSERT INTO master_projection_status
+                   (fundacion_id,version_id,modulo,estado,total_registros,detalle_json,error,fecha_actualizacion)
+                   VALUES (?,?,'TALENTO_HUMANO_Y_ASIGNACIONES','COMPLETADA',?,?,NULL,?)
+                   ON CONFLICT(fundacion_id,version_id,modulo) DO UPDATE SET
+                     estado='COMPLETADA',total_registros=excluded.total_registros,
+                     detalle_json=excluded.detalle_json,error=NULL,fecha_actualizacion=excluded.fecha_actualizacion""",
+                [fundacion_id, version_id, total, safe_json(resultado), now],
+            )
+            return resultado
+        except Exception as exc:
+            self.repo.execute(
+                """INSERT INTO master_projection_status
+                   (fundacion_id,version_id,modulo,estado,total_registros,detalle_json,error,fecha_actualizacion)
+                   VALUES (?,?,'TALENTO_HUMANO_Y_ASIGNACIONES','ERROR',0,'{}',?,?)
+                   ON CONFLICT(fundacion_id,version_id,modulo) DO UPDATE SET
+                     estado='ERROR',total_registros=0,error=excluded.error,
+                     fecha_actualizacion=excluded.fecha_actualizacion""",
+                [fundacion_id, version_id, str(exc), now],
+            )
+            raise
 
     def resumen_integracion(self) -> dict[str, Any]:
         ctx = self.context()

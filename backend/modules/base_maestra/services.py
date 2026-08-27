@@ -1666,6 +1666,14 @@ def publicar_base_maestra(database_path: str, version_id: int, ctx: dict[str, An
         propagacion = {'estado': 'ERROR', 'modulo': 'TALENTO_HUMANO_Y_ASIGNACIONES', 'total_registros': 0, 'error': str(exc)}
         total = 0
         error = str(exc)
+        try:
+            from flask import current_app
+            current_app.logger.exception(
+                'BASE_MAESTRA_PROPAGACION_TALENTO_ERROR version_id=%s fundacion_id=%s',
+                version_id, fundacion_id,
+            )
+        except Exception:
+            pass
     with repo.connect() as conn:
         conn.execute(
             """
