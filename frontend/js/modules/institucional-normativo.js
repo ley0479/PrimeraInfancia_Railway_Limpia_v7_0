@@ -221,6 +221,7 @@
         setImage('institucional-logo-header', 'institucional-logo-header-fallback', configuracionActual.logo_principal_url, brandingVersion);
         setImage('institucional-logo-login', 'institucional-logo-login-fallback', configuracionActual.logo_principal_url, brandingVersion);
         setImage('ci-preview-logo', 'ci-preview-logo-fallback', configuracionActual.logo_principal_url, brandingVersion);
+        setImage('ci-preview-foto-admin', 'ci-preview-foto-admin-fallback', configuracionActual.foto_admin_url, brandingVersion);
         setImage('institucional-foto-admin-header', 'institucional-foto-admin-fallback', configuracionActual.foto_admin_url, brandingVersion);
         setFavicon(configuracionActual.favicon_url || configuracionActual.logo_principal_url, brandingVersion);
 
