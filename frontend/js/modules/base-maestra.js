@@ -295,6 +295,16 @@
         const box = el('bm-resumen-publicacion');
         if (box) {
             if (version) {
+                const alimentacion = data?.alimentacion_modulos || [];
+                const estados = alimentacion.length
+                    ? alimentacion.map(item => {
+                        const ok = item.estado === 'COMPLETADA';
+                        const color = ok ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100' : 'border-rose-500/30 bg-rose-500/10 text-rose-100';
+                        const nombre = String(item.modulo || '').replaceAll('_', ' ');
+                        const detalle = item.error ? ` · ${esc(item.error)}` : '';
+                        return `<div class="rounded-xl border ${color} p-3"><div class="font-semibold">${esc(nombre)}</div><div class="mt-1 text-xs">${esc(item.estado)} · ${esc(item.total_registros || 0)} registros${detalle}</div></div>`;
+                    }).join('')
+                    : '<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-100"><strong>Propagación pendiente de registrar</strong><div class="mt-1 text-xs">Vuelve a publicar una versión validada para aplicar y verificar la alimentación uniforme.</div></div>';
                 box.innerHTML = `
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div>
@@ -302,7 +312,8 @@
                             <div class="text-xs text-slate-400 mt-1">Publicada: ${esc(version.fecha_publicacion || 'pendiente')} · Usuario: ${esc(version.usuario || 'sistema')}</div>
                         </div>
                         <div class="text-xs text-slate-400">Errores críticos: ${esc(resumen.errores_criticos || 0)} · Advertencias: ${esc(resumen.advertencias || 0)}</div>
-                    </div>`;
+                    </div>
+                    <div class="mt-4"><div class="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-200">Alimentación uniforme de módulos</div><div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">${estados}</div></div>`;
             } else {
                 box.textContent = 'Sin versión activa publicada todavía. Puedes consolidar un borrador y publicarlo cuando la validación esté correcta.';
             }
@@ -480,7 +491,8 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ version_id: versionId })
             });
-            mensaje(data.message || 'Base Maestra publicada correctamente.', 'success');
+            const fallidas = (data.alimentacion_modulos || []).filter(item => item.estado !== 'COMPLETADA');
+            mensaje(data.message || 'Base Maestra publicada correctamente.', fallidas.length ? 'warning' : 'success');
             await baseMaestraCargarResumen();
         } catch (error) {
             mensaje(error.message || 'No se pudo publicar.', 'error');

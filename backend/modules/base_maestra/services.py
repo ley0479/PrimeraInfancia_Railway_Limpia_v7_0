@@ -1892,7 +1892,22 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
         'tablas': ['master_ninos', 'master_talento_humano', 'master_salud_nutricion', 'master_unidades'],
         'cargas_temporales_son_oficiales': False,
     }
-    return {'version_activa': version, 'fuente_oficial': fuente_oficial, 'resumen': resumen, 'resumen_fuentes': resumen_fuentes, 'resumen_unidades_fuentes': resumen_unidades_fuentes, 'estructura_talento': estructura_talento, 'cargas': cargas, 'total_cargas_historicas': len(cargas_todas), 'borradores': borradores}
+    alimentacion_modulos = []
+    if version:
+        alimentacion_modulos = repo.fetch_all(
+            """SELECT modulo,estado,total_registros,detalle_json,error,fecha_actualizacion
+               FROM master_projection_status
+               WHERE fundacion_id=? AND version_id=?
+               ORDER BY modulo""",
+            (fundacion_id, int(version['id'])),
+        )
+        for item in alimentacion_modulos:
+            try:
+                item['detalle'] = json.loads(item.get('detalle_json') or '{}')
+            except Exception:
+                item['detalle'] = {}
+            item.pop('detalle_json', None)
+    return {'version_activa': version, 'fuente_oficial': fuente_oficial, 'alimentacion_modulos': alimentacion_modulos, 'resumen': resumen, 'resumen_fuentes': resumen_fuentes, 'resumen_unidades_fuentes': resumen_unidades_fuentes, 'estructura_talento': estructura_talento, 'cargas': cargas, 'total_cargas_historicas': len(cargas_todas), 'borradores': borradores}
 
 
 def listar_unidades(database_path: str, ctx: dict[str, Any] | None = None) -> dict[str, Any]:
