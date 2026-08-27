@@ -90,6 +90,17 @@
         return qs('ci-scope')?.value === 'GLOBAL';
     }
 
+    const IDENTITY_SCOPE_KEY = 'primeraInfanciaIdentityScope';
+
+    function restaurarAmbitoSeleccionado() {
+        const scope = qs('ci-scope');
+        if (!scope) return;
+        try {
+            const saved = sessionStorage.getItem(IDENTITY_SCOPE_KEY);
+            if (saved === 'GLOBAL' || saved === 'FUNDACION') scope.value = saved;
+        } catch (_) {}
+    }
+
     function actualizarAvisoAmbito() {
         setText('ci-scope-target', esAmbitoGlobal()
             ? 'Esta modificación se aplicará a TODA LA PLATAFORMA y será heredada por fundaciones sin personalización.'
@@ -343,6 +354,8 @@
                 body: JSON.stringify(payload)
             });
             aplicarIdentidadInstitucional(data.configuracion || {});
+            await cargarConfiguracionInstitucional(true);
+            await cargarIdentidadEfectiva(true);
             mostrar('ci-message', data.message || 'Configuración guardada.', 'success');
         } catch (error) {
             mostrar('ci-message', error.message || 'No se pudo guardar la configuración.', 'error');
@@ -528,6 +541,7 @@
 
     function bindConfigForms() {
         bindGeneratorPreview();
+        restaurarAmbitoSeleccionado();
         const generator = qs('ci-generator-form');
         if (generator && !generator.dataset.bound) { generator.addEventListener('submit', generarRecursosIdentidad); generator.dataset.bound = '1'; }
         const applyGenerated = qs('ci-generator-apply');
@@ -536,6 +550,7 @@
         const scope = qs('ci-scope');
         if (scope && !scope.dataset.bound) {
             scope.addEventListener('change', async () => {
+                try { sessionStorage.setItem(IDENTITY_SCOPE_KEY, scope.value); } catch (_) {}
                 actualizarAvisoAmbito();
                 await cargarConfiguracionInstitucional(true);
                 await cargarCatalogoIdentidadVisual(true);

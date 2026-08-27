@@ -155,38 +155,19 @@ def _copy_to_active_storage(source_path: str, branding_root: Path, tipo: str, to
 
 
 def _repair_missing_branding_references(database_path: str, fundacion_id: int) -> None:
-    """Limpia referencias antiguas o absolutas que apuntan a archivos ausentes.
+    """Conserva la identidad persistida aunque el archivo no esté disponible.
 
-    No borra registros: únicamente desactiva recursos inexistentes y deja en NULL
-    las rutas de configuración rotas para que la interfaz use su fallback.
+    Una comprobación de lectura nunca debe desactivar recursos ni poner sus rutas
+    en ``NULL``. En Railway un volumen puede tardar en montarse o una instancia
+    puede responder antes de ver el archivo; convertir esa condición transitoria
+    en una escritura destruía la selección del administrador al recargar.
+
+    La disponibilidad se resuelve al serializar/servir el archivo y las
+    sustituciones se realizan únicamente mediante las acciones explícitas de
+    subir, aplicar o restaurar.
     """
-    conn = _connect(database_path)
-    now = _now()
-    try:
-        rows = conn.execute(
-            'SELECT id, archivo_path, activo FROM identidad_visual_archivos WHERE fundacion_id=?',
-            (int(fundacion_id),),
-        ).fetchall()
-        for row in rows:
-            if row['archivo_path'] and not os.path.isfile(str(row['archivo_path'])) and int(row['activo'] or 0) == 1:
-                conn.execute('UPDATE identidad_visual_archivos SET activo=0, updated_at=? WHERE id=?', (now, row['id']))
-        columns = (
-            'logo_principal_path', 'logo_horizontal_path', 'logo_reportes_path',
-            'logo_formatos_path', 'logo_documentos_path', 'favicon_path',
-            'favicon_png_path', 'foto_admin_path', 'firma_path'
-        )
-        configs = conn.execute(
-            'SELECT * FROM configuracion_institucional WHERE fundacion_id=?',
-            (int(fundacion_id),),
-        ).fetchall()
-        for cfg in configs:
-            broken = [col for col in columns if col in cfg.keys() and cfg[col] and not os.path.isfile(str(cfg[col]))]
-            if broken:
-                assignments = ', '.join(f'{col}=NULL' for col in broken)
-                conn.execute(f'UPDATE configuracion_institucional SET {assignments}, updated_at=? WHERE id=?', (now, cfg['id']))
-        conn.commit()
-    finally:
-        conn.close()
+    del database_path, fundacion_id
+    return None
 
 
 def _row_to_dict(
@@ -757,7 +738,8 @@ def register_institucional_normativo(app, database_path: str, base_dir: str) -> 
         }:
             return None
         directories = _tenant_dirs()
-        _repair_missing_branding_references(database_path, _user()['fundacion_id'])
+        # Solo prepara las carpetas. Las solicitudes GET nunca modifican la
+        # identidad persistida ni desactivan archivos por una ausencia temporal.
         g.institutional_tenant_dirs = directories
 
     @bp.route('/api/configuracion-publica', methods=['GET'])

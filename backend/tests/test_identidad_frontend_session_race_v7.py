@@ -18,7 +18,7 @@ def test_identidad_publica_no_sobrescribe_una_sesion_autenticada():
 def test_javascript_institucional_tiene_version_nueva_de_cache():
     html = INDEX_HTML.read_text(encoding="utf-8")
 
-    assert "institucional-normativo.js?v=2.7.0-fix-identidad-global-2" in html
+    assert "institucional-normativo.js?v=2.7.4-identidad-persistente-1" in html
 
 
 def test_carga_de_imagen_ignora_respuestas_anteriores():
