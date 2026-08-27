@@ -9915,11 +9915,38 @@ def formatos_diagnostico_previo():
 
 
 def _alpha59_edad_meses(user):
+    """Obtiene una edad mensual fiable desde la Base Maestra/Cuéntame.
+
+    Algunas cargas históricas guardaron en ``edad_meses`` la edad expresada en
+    años (1, 2, 3, 4 o 5). Eso hacía que esos participantes parecieran bebés y
+    dejaba vacíos exclusivamente los RPP de 1–2 y 3–5 años. La fecha de
+    nacimiento es la fuente preferente; los campos numéricos quedan como
+    respaldo para registros que realmente no traen fecha.
+    """
+    fecha = (
+        user.get('FechaNacimiento') or user.get('fecha_nacimiento') or
+        user.get('fechaNacimiento') or user.get('fecha_de_nacimiento_del_beneficiario')
+    )
+    if fecha not in (None, ''):
+        try:
+            parsed = parse_fecha_cuentame(fecha)
+            if parsed:
+                return int(calcular_edad_meses(parsed))
+        except Exception:
+            pass
+
     val = user.get('EdadMeses') if user.get('EdadMeses') not in (None, '') else user.get('edad_meses')
-    if val in (None, ''):
-        return None
+    if val not in (None, ''):
+        try:
+            return int(float(val))
+        except Exception:
+            pass
+
+    # Último respaldo: la columna Edad puede venir como "2 años", "3 años y
+    # 4 meses" o un valor equivalente reconocido por el importador existente.
+    edad_general = user.get('Edad') if user.get('Edad') not in (None, '') else user.get('edad')
     try:
-        return int(float(val))
+        return inferir_edad_meses_desde_valor(edad_general) if edad_general not in (None, '') else None
     except Exception:
         return None
 
@@ -9933,13 +9960,13 @@ def _alpha59_filtrar_rpp_grupo(usuarios, grupo):
         edad = _alpha59_edad_meses(user)
         es_gestante = 'gestante' in tipo or 'gestante' in gtxt
         # Rangos disjuntos: menores de 6 meses (0-5), luego 6-11.
-        if grupo == 'rpp_0_6_gestantes' and (es_gestante or (edad is not None and 0 <= edad <= 5) or '0 a 6' in gtxt):
+        if grupo == 'rpp_0_6_gestantes' and (es_gestante or (edad is not None and 0 <= edad <= 5) or '0 a 6' in gtxt or '0 6 meses' in gtxt):
             filtrados.append(user)
-        elif grupo == 'rpp_6_11' and ((edad is not None and 6 <= edad <= 11) or '6 a 11' in gtxt):
+        elif grupo == 'rpp_6_11' and ((edad is not None and 6 <= edad <= 11) or '6 a 11' in gtxt or '6 11 meses' in gtxt):
             filtrados.append(user)
-        elif grupo == 'rpp_1_2' and ((edad is not None and 12 <= edad <= 35) or '1 a 2' in gtxt):
+        elif grupo == 'rpp_1_2' and ((edad is not None and 12 <= edad <= 35) or '1 a 2' in gtxt or '1 2 anos' in gtxt):
             filtrados.append(user)
-        elif grupo == 'rpp_3_5' and ((edad is not None and 36 <= edad <= 71) or '3 a 5' in gtxt):
+        elif grupo == 'rpp_3_5' and ((edad is not None and 36 <= edad <= 71) or '3 a 5' in gtxt or '3 5 anos' in gtxt):
             filtrados.append(user)
     return filtrados
 
