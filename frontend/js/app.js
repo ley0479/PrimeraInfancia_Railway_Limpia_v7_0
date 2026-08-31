@@ -2500,6 +2500,10 @@ function fetchTalento() {
 }
 
 let thIntegralBound=false;
+function puedeVerTalentoIntegral(){
+    const rol=String((usuarioActual||authUser()||{}).rol||'').toUpperCase();
+    return ['SUPERADMIN','GERENTE','COORDINADOR','AUXILIAR_ADMINISTRATIVO'].includes(rol);
+}
 async function actualizarTalentoIntegral(){
     const button=document.getElementById('th-integral-actualizar');
     const status=document.getElementById('th-integral-estado');
@@ -2528,6 +2532,10 @@ async function actualizarTalentoIntegral(){
 }
 async function fetchTalentoIntegral(){
     const box=document.getElementById('th-integral-resumen'); if(!box)return;
+    if(!puedeVerTalentoIntegral()){
+        box.innerHTML='';
+        return {resumen:{},personas:[],documentos:[],mapa_capacidades:[]};
+    }
     try{
         const response=await fetch(`${backendUrl}/api/talento-core/integral/dashboard`); const data=await manejarRespuestaJson(response); const r=data.resumen||{};
         box.innerHTML=[['Colaboradores',r.colaboradores_activos],['Documentos',r.documentos],['Vencidos',r.documentos_vencidos],['Formaciones',r.formaciones_programadas],['Evaluaciones borrador',r.evaluaciones_borrador]].map(([l,v])=>`<div class="rounded-xl border border-slate-800 p-3"><p class="text-xs text-slate-500">${escaparHtml(l)}</p><p class="text-2xl font-bold">${escaparHtml(v||0)}</p></div>`).join('');

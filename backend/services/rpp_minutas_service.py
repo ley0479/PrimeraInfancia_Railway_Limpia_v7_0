@@ -691,7 +691,7 @@ def obtener_minuta_vigente(
     fundacion_id: int = 1,
     corporacion_id: int = 1,
     *,
-    permitir_fallback: bool = False,
+    permitir_fallback: bool = True,
 ) -> dict | None:
     """Obtiene la minuta vigente aplicable al periodo solicitado.
 
@@ -699,34 +699,45 @@ def obtener_minuta_vigente(
     oficial posterior. Para periodos históricos se elige siempre la última minuta
     cuyo inicio sea anterior o igual al periodo consultado; nunca una futura.
 
-    ``permitir_fallback`` se conserva por compatibilidad con llamadas antiguas,
-    pero ya no habilita la reutilización de minutas futuras.
+    Cuando una fundación no tiene una minuta propia, ``permitir_fallback`` hace
+    que herede la minuta oficial central (fundación/corporación 1). Esto comparte
+    únicamente la regla institucional; población y archivos continúan aislados
+    por tenant. Nunca se reutiliza una minuta futura para un periodo histórico.
     """
     init_schema(database_path)
     conn = connect(database_path)
-    params = [fundacion_id, corporacion_id]
-    where = ['v.estado=\'vigente\'', 'v.fundacion_id=?', 'v.corporacion_id=?']
-    if mes is not None and anio is not None:
-        mes_consulta = max(1, min(12, int(mes)))
-        anio_consulta = int(anio)
-        where.append('(v.anio < ? OR (v.anio = ? AND v.mes <= ?))')
-        params.extend([anio_consulta, anio_consulta, mes_consulta])
-    elif anio is not None:
-        where.append('v.anio <= ?')
-        params.append(int(anio))
-    elif mes is not None:
-        where.append('v.mes <= ?')
-        params.append(max(1, min(12, int(mes))))
-    row = conn.execute(
-        f'''SELECT v.* FROM rpp_minutas_versiones v
-            WHERE {' AND '.join(where)}
-            ORDER BY v.anio DESC, v.mes DESC, v.created_at DESC LIMIT 1''',
-        params,
-    ).fetchone()
+    def buscar_version(fid: int, cid: int):
+        params = [int(fid), int(cid)]
+        where = ['v.estado=\'vigente\'', 'v.fundacion_id=?', 'v.corporacion_id=?']
+        if mes is not None and anio is not None:
+            mes_consulta = max(1, min(12, int(mes)))
+            anio_consulta = int(anio)
+            where.append('(v.anio < ? OR (v.anio = ? AND v.mes <= ?))')
+            params.extend([anio_consulta, anio_consulta, mes_consulta])
+        elif anio is not None:
+            where.append('v.anio <= ?')
+            params.append(int(anio))
+        elif mes is not None:
+            where.append('v.mes <= ?')
+            params.append(max(1, min(12, int(mes))))
+        return conn.execute(
+            f'''SELECT v.* FROM rpp_minutas_versiones v
+                WHERE {' AND '.join(where)}
+                ORDER BY v.anio DESC, v.mes DESC, v.created_at DESC LIMIT 1''',
+            params,
+        ).fetchone()
+
+    row = buscar_version(fundacion_id, corporacion_id)
+    heredada_global = False
+    if not row and permitir_fallback and (int(fundacion_id), int(corporacion_id)) != (1, 1):
+        row = buscar_version(1, 1)
+        heredada_global = bool(row)
     if not row:
         conn.close()
         return None
     version = dict(row)
+    version['heredada_global'] = heredada_global
+    version['fundacion_solicitante_id'] = int(fundacion_id)
     grupos_rows = conn.execute('SELECT * FROM rpp_minutas_grupos WHERE minuta_version_id=? AND activo=1 ORDER BY orden,id', (version['id'],)).fetchall()
     grupos = []
     for gr in grupos_rows:

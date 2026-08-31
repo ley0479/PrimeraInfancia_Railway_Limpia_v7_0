@@ -6351,7 +6351,15 @@ def inyectar_datos_en_plantillas(unidad_nombre, lista_usuarios, options=None):
             return []
 
     try:
-        minuta_rpp_vigente = obtener_minuta_vigente(DATABASE_PATH, mes=mes, anio=año) if obtener_minuta_vigente else None
+        usuario_minuta = usuario_actual() or {}
+        minuta_rpp_vigente = obtener_minuta_vigente(
+            DATABASE_PATH,
+            mes=mes,
+            anio=año,
+            fundacion_id=fundacion_actual_id(),
+            corporacion_id=int(usuario_minuta.get('corporacion_id') or 1),
+            permitir_fallback=True,
+        ) if obtener_minuta_vigente else None
     except Exception as exc:
         print(f'No se pudo consultar minuta RPP vigente: {exc}')
         minuta_rpp_vigente = None
@@ -9843,7 +9851,15 @@ def formatos_diagnostico_previo():
 
     try:
         from services.rpp_minutas_service import obtener_minuta_vigente
-        minuta = obtener_minuta_vigente(DATABASE_PATH, mes=mes, anio=anio)
+        usuario_minuta = usuario_actual() or {}
+        minuta = obtener_minuta_vigente(
+            DATABASE_PATH,
+            mes=mes,
+            anio=anio,
+            fundacion_id=fundacion_actual_id(),
+            corporacion_id=int(usuario_minuta.get('corporacion_id') or 1),
+            permitir_fallback=True,
+        )
     except Exception as exc:
         minuta = None
         minuta_error = str(exc)
