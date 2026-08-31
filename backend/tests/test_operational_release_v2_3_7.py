@@ -54,7 +54,6 @@ def run():
         second = seed_minuta_sanitizada_desde_json(str(db), seed_file)
         minute = obtener_minuta_vigente(str(db), mes=5, anio=2026)
         minute_june = obtener_minuta_vigente(str(db), mes=6, anio=2026)
-        minute_tenant = obtener_minuta_vigente(str(db), mes=6, anio=2026, fundacion_id=25, corporacion_id=1)
         assert_true(
             minute_june is not None and minute_june.get('id') == minute.get('id'),
             "La minuta de mayo debe continuar vigente en junio si no existe otra posterior",
@@ -63,9 +62,14 @@ def run():
             obtener_minuta_vigente(str(db), mes=4, anio=2026) is None,
             "Una minuta futura nunca debe reutilizarse para un periodo anterior",
         )
+        conn = sqlite3.connect(db)
+        conn.execute("UPDATE rpp_minutas_versiones SET fundacion_id=8, corporacion_id=3")
+        conn.commit()
+        conn.close()
+        minute_tenant = obtener_minuta_vigente(str(db), mes=6, anio=2026, fundacion_id=25, corporacion_id=1)
         assert_true(
             minute_tenant is not None and minute_tenant.get('id') == minute.get('id') and minute_tenant.get('heredada_global') is True,
-            "Una fundación nueva debe heredar la minuta oficial central sin compartir sus datos",
+            "Una fundación nueva debe heredar la minuta institucional aunque no esté registrada como 1/1",
         )
         conn = sqlite3.connect(db)
         equivalence_count = conn.execute("SELECT COUNT(*) FROM rpp_minutas_equivalencias WHERE activo=1").fetchone()[0]

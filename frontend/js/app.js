@@ -2473,6 +2473,7 @@ function subirTalento() {
 function fetchTalento() {
     const contenedor = document.getElementById('talento-list');
     if (!contenedor) return;
+    if (!puedeVerTalentoIntegral()) return;
 
     fetch(`${backendUrl}/api/talento`)
         .then(manejarRespuestaJson)

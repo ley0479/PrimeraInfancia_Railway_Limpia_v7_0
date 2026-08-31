@@ -700,7 +700,7 @@ def obtener_minuta_vigente(
     cuyo inicio sea anterior o igual al periodo consultado; nunca una futura.
 
     Cuando una fundación no tiene una minuta propia, ``permitir_fallback`` hace
-    que herede la minuta oficial central (fundación/corporación 1). Esto comparte
+    que herede la minuta oficial vigente del catálogo institucional. Esto comparte
     únicamente la regla institucional; población y archivos continúan aislados
     por tenant. Nunca se reutiliza una minuta futura para un periodo histórico.
     """
@@ -727,10 +727,31 @@ def obtener_minuta_vigente(
             params,
         ).fetchone()
 
+    def buscar_version_institucional():
+        params = []
+        where = ['v.estado=\'vigente\'']
+        if mes is not None and anio is not None:
+            mes_consulta = max(1, min(12, int(mes)))
+            anio_consulta = int(anio)
+            where.append('(v.anio < ? OR (v.anio = ? AND v.mes <= ?))')
+            params.extend([anio_consulta, anio_consulta, mes_consulta])
+        elif anio is not None:
+            where.append('v.anio <= ?')
+            params.append(int(anio))
+        elif mes is not None:
+            where.append('v.mes <= ?')
+            params.append(max(1, min(12, int(mes))))
+        return conn.execute(
+            f'''SELECT v.* FROM rpp_minutas_versiones v
+                WHERE {' AND '.join(where)}
+                ORDER BY v.anio DESC, v.mes DESC, v.updated_at DESC, v.created_at DESC LIMIT 1''',
+            params,
+        ).fetchone()
+
     row = buscar_version(fundacion_id, corporacion_id)
     heredada_global = False
-    if not row and permitir_fallback and (int(fundacion_id), int(corporacion_id)) != (1, 1):
-        row = buscar_version(1, 1)
+    if not row and permitir_fallback:
+        row = buscar_version_institucional()
         heredada_global = bool(row)
     if not row:
         conn.close()
