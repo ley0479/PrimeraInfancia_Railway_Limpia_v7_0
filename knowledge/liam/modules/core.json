@@ -1,0 +1,94 @@
+{
+  "kind": "modules",
+  "items": [
+    {
+      "module_id": "dashboard", "screen_id": "dashboard.control-center", "title": "Panel Principal", "technical_name": "dashboard",
+      "objective": "Presentar el estado general, alertas y accesos rápidos del periodo activo.",
+      "roles": ["SUPERADMIN", "GERENTE", "COORDINADOR", "DOCENTE", "NUTRICIONISTA", "PSICOSOCIAL", "AUXILIAR_ADMINISTRATIVO"],
+      "location": "Menú → Panel Principal", "prerequisites": ["Sesión iniciada", "Fundación activa"],
+      "inputs": ["Rol", "Fundación", "Periodo"], "tools": ["Indicadores", "Alertas", "Accesos rápidos"],
+      "process": ["Consulta información autorizada", "Resume estados y pendientes"],
+      "result": "Centro de control según el rol", "result_location": "Panel Principal",
+      "validations": ["Sesión", "Tenant", "Permisos"], "common_errors": ["DASHBOARD_LOAD_FAILED", "USER_FORBIDDEN"],
+      "solution": "Actualizar la pantalla; si continúa, copiar el código de referencia y reportarlo.", "next_step": "Abrir el módulo asociado a la alerta.",
+      "app_version": "2.7.4", "guide_version": "2.7.4-manual-maestro-1", "last_verified_at": "2026-08-31", "status": "verified"
+    },
+    {
+      "module_id": "base-maestra", "screen_id": "base-maestra.main", "title": "Base Maestra", "technical_name": "base-maestra",
+      "objective": "Cargar, validar, procesar y publicar las fuentes institucionales que alimentan los demás módulos.",
+      "roles": ["SUPERADMIN", "GERENTE", "COORDINADOR", "NUTRICIONISTA", "AUXILIAR_ADMINISTRATIVO"],
+      "location": "Menú → Base Maestra", "prerequisites": ["Fundación y periodo correctos", "Archivo institucional autorizado"],
+      "inputs": ["Cuéntame", "Talento Humano", "Salud y Nutrición"], "tools": ["Cargar fuente", "Diagnóstico", "Procesar", "Publicar"],
+      "process": ["Valida tipo y columnas", "Detecta UDS y registros", "Procesa", "Publica una versión consultable"],
+      "result": "Base Maestra publicada y disponible para formatos y tableros", "result_location": "Estado de Base Maestra y selectores de UDS",
+      "validations": ["Archivo no vacío", "Columnas reconocidas", "Tenant", "Periodo"], "common_errors": ["FILE_EMPTY", "UNIT_COLUMN_NOT_MAPPED", "BASE_NOT_PUBLISHED"],
+      "solution": "Revisar el diagnóstico, corregir la fuente y publicar la versión válida.", "next_step": "Confirmar UDS y participantes detectados.",
+      "app_version": "2.7.4", "guide_version": "2.7.4-manual-maestro-1", "last_verified_at": "2026-08-31", "status": "verified",
+      "controls": [
+        {
+          "help_id": "base-maestra.cuentame.upload", "title": "Cargar Base Cuéntame", "selector": "#bmp-file-cuentame",
+          "purpose": "Seleccionar la fuente Cuéntame de la fundación y periodo activos.",
+          "required_inputs": ["Fundación activa", "Periodo", "Archivo Cuéntame"],
+          "process": ["Recibe el archivo", "Valida estructura", "Detecta unidades", "Prepara el diagnóstico"],
+          "outputs": ["Registro de carga", "Diagnóstico", "UDS detectadas"],
+          "common_errors": ["FILE_EMPTY", "UNIT_COLUMN_NOT_MAPPED"], "next_step": "Procesar y publicar la Base Maestra."
+        }
+      ]
+    },
+    {
+      "module_id": "calendario-inteligente", "screen_id": "calendario-inteligente.main", "title": "Calendario y entregables", "technical_name": "calendario-inteligente",
+      "objective": "Consultar actividades, vencimientos, evidencias, devoluciones y aprobaciones.",
+      "roles": ["SUPERADMIN", "GERENTE", "COORDINADOR", "DOCENTE", "NUTRICIONISTA", "PSICOSOCIAL", "AUXILIAR_ADMINISTRATIVO"],
+      "location": "Menú → Calendario inteligente", "prerequisites": ["Sesión", "UDS asignada cuando aplique"],
+      "inputs": ["Periodo", "UDS", "Estado"], "tools": ["Vista mensual", "Filtros", "Actividades", "Evidencias"],
+      "process": ["Filtra actividades autorizadas", "Muestra estado y fecha límite"], "result": "Agenda y estado de entregables", "result_location": "Calendario",
+      "validations": ["Permisos", "Asignación de UDS"], "common_errors": ["UNIT_NOT_ASSIGNED"], "solution": "Verificar la UDS asignada y los filtros.", "next_step": "Abrir la actividad y completar la evidencia requerida.",
+      "app_version": "2.7.4", "guide_version": "2.7.4-manual-maestro-1", "last_verified_at": "2026-08-31", "status": "verified"
+    },
+    {
+      "module_id": "formatos", "screen_id": "formatos.main", "title": "Formatos", "technical_name": "formatos",
+      "objective": "Generar y descargar formatos institucionales con datos de la Base Maestra y plantillas oficiales.",
+      "roles": ["SUPERADMIN", "GERENTE", "COORDINADOR", "DOCENTE", "AUXILIAR_ADMINISTRATIVO"],
+      "location": "Menú → Formatos", "prerequisites": ["Base Maestra publicada", "UDS autorizada", "Periodo", "Plantilla oficial vigente"],
+      "inputs": ["UDS", "Mes", "Año", "Grupo o formato"], "tools": ["RPP", "Bienestarina", "RAM", "RAN", "RRAN", "Listados"],
+      "process": ["Valida sesión, tenant, UDS y periodo", "Consulta participantes", "Diligencia la plantilla oficial", "Valida el archivo antes de descargar"],
+      "result": "Archivo institucional de la UDS y grupo exactos", "result_location": "Descargas del dispositivo",
+      "validations": ["UDS exacta", "Grupo etario", "Participantes", "Plantilla", "Archivo no vacío"],
+      "common_errors": ["RPP_NO_PARTICIPANTS", "RPP_TEMPLATE_NOT_FOUND", "RPP_FILE_NOT_CREATED", "RPP_GENERATION_FAILED", "BASE_NOT_PUBLISHED", "UNIT_NOT_ASSIGNED"],
+      "solution": "Verificar Base Maestra publicada, UDS asignada, periodo, grupo con participantes y plantilla vigente; conservar el código de referencia si falla.",
+      "next_step": "Abrir el archivo descargado y confirmar UDS, periodo y grupo.",
+      "app_version": "2.7.4", "guide_version": "2.7.4-manual-maestro-1", "last_verified_at": "2026-08-31", "status": "verified",
+      "controls": [
+        {
+          "help_id": "formatos.rpp.download", "title": "Descargar RPP", "selector": "[data-rpp-download=\"1\"]",
+          "purpose": "Generar o descargar el RPP de la UDS y grupo etario seleccionados.",
+          "required_inputs": ["Base Maestra publicada", "UDS asignada", "Periodo válido", "Grupo con participantes", "Plantilla RPP vigente"],
+          "process": ["Envía sesión y periodo", "Valida UDS y grupo", "Consulta participantes por fecha de nacimiento", "Diligencia la plantilla oficial", "Valida y descarga"],
+          "outputs": ["Archivo XLSX RPP exacto", "Código estructurado si no puede generarse"],
+          "common_errors": ["RPP_NO_PARTICIPANTS", "RPP_TEMPLATE_NOT_FOUND", "RPP_FILE_NOT_CREATED", "RPP_GENERATION_FAILED"],
+          "next_step": "Comprobar el archivo o consultar a LIAM con el código mostrado."
+        }
+      ]
+    },
+    {
+      "module_id": "motor-plantillas", "screen_id": "motor-plantillas.main", "title": "Motor Documental", "technical_name": "motor-plantillas",
+      "objective": "Versionar, mapear y validar plantillas y documentos institucionales.",
+      "roles": ["SUPERADMIN", "GERENTE", "AUXILIAR_ADMINISTRATIVO"], "location": "Menú → Motor de Plantillas",
+      "prerequisites": ["Permiso administrativo", "Archivo autorizado"], "inputs": ["Plantilla", "Versión", "Vigencia"],
+      "tools": ["Cargar", "Mapear", "Validar", "Publicar", "Restaurar"], "process": ["Registra versión", "Analiza estructura", "Valida", "Publica"],
+      "result": "Plantilla versionada", "result_location": "Catálogo de plantillas", "validations": ["Tipo", "Versión", "Estructura"],
+      "common_errors": ["TEMPLATE_INVALID"], "solution": "Usar el archivo oficial exacto y revisar el diagnóstico.", "next_step": "Probar generación con datos controlados.",
+      "app_version": "2.7.4", "guide_version": "2.7.4-manual-maestro-1", "last_verified_at": "2026-08-31", "status": "verified"
+    },
+    {
+      "module_id": "administracion", "screen_id": "administracion.main", "title": "Administración", "technical_name": "administracion",
+      "objective": "Administrar fundaciones, usuarios, roles, asignaciones y configuración autorizada.",
+      "roles": ["SUPERADMIN", "GERENTE"], "location": "Menú → Administración", "prerequisites": ["Permiso administrativo"],
+      "inputs": ["Fundación", "Usuario", "Rol", "UDS"], "tools": ["Fundaciones", "Usuarios", "Roles", "Asignaciones", "Auditoría"],
+      "process": ["Valida permisos", "Guarda en el tenant correspondiente", "Registra auditoría"], "result": "Configuración administrativa aplicada",
+      "result_location": "Administración", "validations": ["Rol", "Tenant", "Datos obligatorios"], "common_errors": ["USER_FORBIDDEN", "TENANT_MISMATCH"],
+      "solution": "Confirmar fundación activa, rol y asignaciones.", "next_step": "Probar el acceso con el usuario creado.",
+      "app_version": "2.7.4", "guide_version": "2.7.4-manual-maestro-1", "last_verified_at": "2026-08-31", "status": "verified"
+    }
+  ]
+}

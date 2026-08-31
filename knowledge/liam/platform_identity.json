@@ -1,0 +1,15 @@
+{
+  "kind": "identity",
+  "title": "Plataforma Primera Infancia",
+  "purpose": "Gestionar información, actividades, evidencias, formatos y seguimiento institucional de la atención integral a la primera infancia.",
+  "scope": "Fundaciones, unidades de servicio y usuarios autorizados, con separación de información por fundación.",
+  "security": [
+    "Cada persona debe usar su propia cuenta.",
+    "La información visible depende del rol, la fundación y las UDS asignadas.",
+    "LIAM orienta y consulta estados autorizados; no debe revelar información de otra fundación ni ejecutar cambios sin confirmación."
+  ],
+  "app_version": "2.7.4",
+  "guide_version": "2.7.4-manual-maestro-1",
+  "last_verified_at": "2026-08-31",
+  "status": "verified"
+}

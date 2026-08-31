@@ -5,7 +5,7 @@ from .guides import DEFAULT_GUIDE, GUIDES
 from .privacy_service import redact
 from .platform_profile import get_platform_profile
 
-def respond(*, question: str, module: str, role: str, allowed_modules=None) -> dict:
+def respond(*, question: str, module: str, role: str, allowed_modules=None, knowledge=None) -> dict:
     guide = dict(GUIDES.get(module, DEFAULT_GUIDE))
     q = question.casefold()
     actions = []
@@ -13,6 +13,9 @@ def respond(*, question: str, module: str, role: str, allowed_modules=None) -> d
     profile = get_platform_profile()
     allowed_modules = list(allowed_modules or [])
     module_names = [GUIDES[key]['titulo'] for key in allowed_modules if key in GUIDES]
+    knowledge = knowledge or {}
+    active_control = knowledge.get('active_control')
+    matched_error = next((item for item in knowledge.get('errors', []) if item.get('code', '').casefold() in q), None)
     if any(word in q for word in ('qué es esta plataforma', 'que es esta plataforma', 'para qué sirve', 'para que sirve')):
         message = (f'{profile["description"]} Sirve para centralizar la Base Maestra, el talento humano, '
                    'salud y nutrición, la gestión pedagógica y psicosocial, el calendario, las evidencias, '
@@ -34,14 +37,24 @@ def respond(*, question: str, module: str, role: str, allowed_modules=None) -> d
         else:
             message = f'{profile["description"]} La autoría y la fecha de creación todavía no han sido confirmadas en la configuración institucional; no debo inventarlas.'
             confidence = 'insufficient'
+    elif matched_error:
+        message = (f'{matched_error["code"]}: {matched_error["explanation"]} '
+                   f'Qué debes hacer: {matched_error["action"]} '
+                   f'Comprueba: {", ".join(matched_error.get("checks", []))}.')
     elif any(word in q for word in ('dónde', 'donde', 'clic', 'botón', 'boton')):
-        message = f'Te mostraré el acceso registrado de {guide["titulo"]}. LÍA no pulsará ni guardará nada por ti.'
-        actions = [{'type':'scroll_to','target':f'{module}.open'}, {'type':'highlight','target':f'{module}.open'}]
+        target = active_control.get('help_id') if active_control else f'{module}.open'
+        title = active_control.get('title') if active_control else guide['titulo']
+        message = f'Te mostraré el acceso registrado de {title}. LÍA no pulsará ni guardará nada por ti.'
+        actions = [{'type':'scroll_to','target':target}, {'type':'highlight','target':target}]
     elif any(word in q for word in ('error', 'falló', 'fallo', 'no carga', 'no descarga', 'validación')):
         message = ('Podemos revisarlo con calma. Todavía no hay información suficiente para confirmar la causa. '
                    'Primero revisa el código y mensaje exactos, el estado del proceso y los requisitos visibles. '
                    'Si compartes el error estructurado sin datos personales, podré orientarte con mayor precisión.')
         confidence = 'insufficient'
+    elif active_control and any(word in q for word in ('cómo', 'como', 'paso', 'qué hago', 'que hago', 'pantalla', 'rpp')):
+        message = (f'{active_control["title"]}: {active_control["purpose"]}\n' +
+                   '\n'.join(f'{i}. {step}' for i, step in enumerate(active_control.get('process', []), 1)) +
+                   f'\nSiguiente paso: {active_control.get("next_step", "Confirma el resultado.")}')
     elif any(word in q for word in ('cómo', 'como', 'paso', 'qué hago', 'que hago', 'pantalla')):
         message = f'{guide.get("proposito", guide["resumen"])}\n' + '\n'.join(f'{i}. {step}' for i, step in enumerate(guide.get('pasos', []), 1))
     else:

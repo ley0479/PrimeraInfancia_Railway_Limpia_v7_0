@@ -1340,7 +1340,7 @@ function renderTablaUnidades() {
         const rppLinks = GRUPOS_EDAD_DASHBOARD.map((g) => {
             const totalGrupo = contarGrupo(grupos, g.clave);
             return `
-                <button type="button" data-rpp-download="1" data-rpp-unidad="${escaparHtml(unidad)}" data-rpp-grupo="${escaparHtml(g.formato)}" class="relative z-10 text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 cursor-pointer pointer-events-auto">
+                <button type="button" data-rpp-download="1" data-rpp-unidad="${escaparHtml(unidad)}" data-rpp-grupo="${escaparHtml(g.formato)}" data-help-id="formatos.rpp.download" data-help-module="formatos" data-help-screen="formatos.rpp" class="relative z-10 text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 cursor-pointer pointer-events-auto">
                     <i data-lucide="download" class="w-3.5 h-3.5"></i> ${escaparHtml(g.etiqueta)} (${totalGrupo})
                 </button>
             `;

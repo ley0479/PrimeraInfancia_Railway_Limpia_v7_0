@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from flask import Blueprint, jsonify, request, g
+from flask import Blueprint, jsonify, request, g, Response
 from modules.dbapi_compat import sqlite3
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS, get_request_user_context
 from .guides import DEFAULT_GUIDE, GUIDES
@@ -13,6 +13,7 @@ from .platform_profile import get_platform_profile
 from .tool_registry import ALLOWED_TOOLS, execute
 from .rate_limit import allow
 from .provider_adapter import provider_status
+from .knowledge_base import manual_for_role, build_manual_pdf
 import json, uuid
 
 
@@ -56,8 +57,9 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if allowed and modulo not in allowed: return jsonify({'error':'Módulo no autorizado para el rol actual.'}), 403
         guide = dict(GUIDES.get(modulo, DEFAULT_GUIDE)); guide['modulo'] = modulo
         guide['tour_steps']=[{'help_id':f'{modulo}.screen','message':guide.get('resumen') or ''}]+[{'help_id':f'{modulo}.primary-action','message':step} for step in guide.get('pasos',[])]
+        knowledge = manual_for_role(str(ctx.get('rol') or ''), module_id=modulo, screen_id=str(request.args.get('screen_id') or ''), help_id=str(request.args.get('help_id') or ''))
         conn = connect(); row = conn.execute('SELECT * FROM ayuda_progreso_usuario WHERE fundacion_id=? AND usuario_id=? AND modulo=?',(ctx.get('fundacion_id') or 1,ctx.get('usuario_id'),modulo)).fetchone(); conn.close()
-        return jsonify({'guia':guide,'rol':ctx.get('rol'),'progreso':dict(row) if row else None,'solo_orientacion':True}), 200
+        return jsonify({'guia':guide,'conocimiento':knowledge,'rol':ctx.get('rol'),'progreso':dict(row) if row else None,'solo_orientacion':True}), 200
 
     @bp.get('/presentation')
     def presentation():
@@ -70,6 +72,30 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         profile=get_platform_profile();audit_lia(ctx,'PLATFORM_PRESENTATION_OPENED',module='dashboard',metadata={'modules':len(modules)})
         workflow=['Confirmar sesión, fundación y periodo.','Actualizar las fuentes autorizadas en Base Maestra.','Revisar unidades, participantes y equipo humano.','Consultar calendario, actividades y entregables.','Trabajar en el módulo correspondiente según el rol.','Cargar evidencias o generar borradores.','Confirmar el resultado y atender revisiones o devoluciones.']
         return jsonify({'profile':profile,'modules':modules,'role':ctx.get('rol'),'total':len(modules),'workflow':workflow}),200
+
+    @bp.get('/manual')
+    def manual_maestro():
+        ctx = get_request_user_context()
+        manual = manual_for_role(
+            str(ctx.get('rol') or ''),
+            module_id=str(request.args.get('module_id') or '').strip(),
+            screen_id=str(request.args.get('screen_id') or '').strip(),
+            help_id=str(request.args.get('help_id') or '').strip(),
+        )
+        audit_lia(ctx, 'MASTER_MANUAL_OPENED', module=request.args.get('module_id') or 'manual-operativo', metadata={'help_id': request.args.get('help_id') or ''})
+        return jsonify(manual), 200
+
+    @bp.get('/manual.pdf')
+    def manual_maestro_pdf():
+        ctx = get_request_user_context()
+        manual = manual_for_role(str(ctx.get('rol') or ''))
+        payload = build_manual_pdf(manual)
+        audit_lia(ctx, 'MASTER_MANUAL_PDF_DOWNLOADED', module='manual-operativo', metadata={'bytes': len(payload)})
+        return Response(payload, 200, {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename="Manual_Maestro_Primera_Infancia.pdf"',
+            'Cache-Control': 'no-store',
+        })
 
     @bp.get('/elian/platform-tour')
     def elian_platform_tour():
@@ -167,7 +193,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         allowed = set(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''), []))
         if allowed and module not in allowed:
             return jsonify({'error':'Módulo no autorizado para el rol actual.'}), 403
-        result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed))
+        knowledge=manual_for_role(str(ctx.get('rol') or ''),module_id=module,screen_id=str(data.get('screen_id') or ''),help_id=str(data.get('help_id') or ''))
+        result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed),knowledge=knowledge)
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
         return jsonify(result), 200
 

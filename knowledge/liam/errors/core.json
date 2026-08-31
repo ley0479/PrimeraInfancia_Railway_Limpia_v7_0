@@ -1,0 +1,16 @@
+{
+  "kind": "errors",
+  "items": [
+    {"code":"RPP_NO_PARTICIPANTS","title":"El grupo no tiene participantes","explanation":"La Base Maestra publicada no devuelve participantes de esa UDS y grupo para el periodo.","checks":["UDS exacta","Fecha de nacimiento válida","Periodo","Base publicada"],"action":"Selecciona un grupo con participantes o corrige y vuelve a publicar la Base Maestra."},
+    {"code":"RPP_TEMPLATE_NOT_FOUND","title":"No existe plantilla RPP vigente","explanation":"No hay una plantilla oficial RPP disponible para generar el archivo.","checks":["Plantilla oficial activa","Archivo accesible"],"action":"Un administrador debe publicar o restaurar la plantilla oficial RPP."},
+    {"code":"RPP_FILE_NOT_CREATED","title":"El RPP no fue creado","explanation":"La generación terminó sin producir un archivo válido para esa UDS y grupo.","checks":["Código de referencia","UDS","Grupo","Periodo"],"action":"Reintenta una vez y reporta el código de referencia si continúa."},
+    {"code":"RPP_GENERATION_FAILED","title":"Falló la generación RPP","explanation":"Ocurrió un error controlado durante la generación.","checks":["Base publicada","Plantilla","Participantes","Conexión con backend"],"action":"Conserva el request_id y entrégalo a soporte."},
+    {"code":"BASE_NOT_PUBLISHED","title":"Base Maestra no publicada","explanation":"La carga existe, pero todavía no está disponible como fuente oficial para otros módulos.","checks":["Diagnóstico","Procesamiento","Estado publicado"],"action":"Publica una versión válida de la Base Maestra."},
+    {"code":"UNIT_NOT_ASSIGNED","title":"Docente sin UDS asignada","explanation":"El rol no tiene alcance sobre la unidad solicitada.","checks":["Usuario","Fundación","UDS asignadas"],"action":"Solicita al administrador de la fundación que asigne la UDS correcta."},
+    {"code":"DASHBOARD_LOAD_FAILED","title":"El tablero integral no carga","explanation":"La consulta del tablero fue rechazada o el backend no respondió correctamente.","checks":["Sesión vigente","Fundación","Permisos","Conectividad backend","Código HTTP"],"action":"Actualiza la sesión; si persiste, reporta el mensaje y código de referencia."},
+    {"code":"USER_FORBIDDEN","title":"Usuario sin permisos","explanation":"El rol actual no está autorizado para la ruta o módulo.","checks":["Rol","Menú autorizado","Fundación"],"action":"No uses credenciales de otra persona; solicita la corrección del rol o permiso."},
+    {"code":"FILE_EMPTY","title":"Archivo vacío","explanation":"La fuente no contiene registros utilizables.","checks":["Hoja correcta","Filas","Formato"],"action":"Corrige el archivo y vuelve a cargarlo."},
+    {"code":"UNIT_COLUMN_NOT_MAPPED","title":"No se detectó la columna de unidad","explanation":"La fuente no contiene un encabezado reconocible para UDS/UCA/unidad.","checks":["Encabezados","Fila de títulos"],"action":"Corrige el encabezado según la plantilla autorizada."},
+    {"code":"TENANT_MISMATCH","title":"Error de fundación","explanation":"La operación intenta mezclar información de fundaciones distintas.","checks":["Fundación activa","Sesión","Archivo"],"action":"Cierra la operación y vuelve a entrar en la fundación correcta."}
+  ]
+}

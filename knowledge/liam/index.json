@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "guide_version": "2.7.4-manual-maestro-1",
+  "app_version": "2.7.4",
+  "last_verified_at": "2026-08-31",
+  "status": "verified",
+  "sources": [
+    "platform_identity.json",
+    "modules/core.json",
+    "roles/core.json",
+    "workflows/core.json",
+    "errors/core.json"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "kind": "roles",
+  "items": [
+    {"role_id":"SUPERADMIN","title":"Superadministrador","focus":["Fundaciones","Usuarios","Roles","Configuración","Auditoría"]},
+    {"role_id":"GERENTE","title":"Administrador de fundación","focus":["Bases","Unidades","Usuarios institucionales","Seguimiento","Reportes"]},
+    {"role_id":"COORDINADOR","title":"Coordinador","focus":["UDS asignadas","Revisiones","Cumplimiento","Reportes"]},
+    {"role_id":"DOCENTE","title":"Docente","focus":["Actividades","Evidencias","Formatos","Listados","Calendario"]},
+    {"role_id":"NUTRICIONISTA","title":"Nutricionista","focus":["Peso y talla","Alertas","Diagnósticos","Formatos","Informes"]},
+    {"role_id":"PSICOSOCIAL","title":"Psicosocial","focus":["Actividades","Evidencias","Seguimientos","Documentos"]},
+    {"role_id":"AUXILIAR_ADMINISTRATIVO","title":"Auxiliar administrativo","focus":["Bases","Formatos","Talento humano","Reportes"]}
+  ]
+}

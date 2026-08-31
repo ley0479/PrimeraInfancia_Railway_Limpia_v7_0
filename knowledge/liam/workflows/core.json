@@ -1,0 +1,9 @@
+{
+  "kind": "workflows",
+  "items": [
+    {"workflow_id":"cargar-cuentame","title":"Cómo cargar Cuéntame","roles":["SUPERADMIN","GERENTE","COORDINADOR","NUTRICIONISTA","AUXILIAR_ADMINISTRATIVO"],"module_id":"base-maestra","steps":["Confirma fundación y periodo.","Selecciona el archivo Cuéntame.","Revisa columnas y UDS detectadas.","Corrige errores críticos.","Procesa y publica la Base Maestra."],"result":"Base Maestra publicada."},
+    {"workflow_id":"generar-rpp","title":"Cómo descargar un RPP","roles":["SUPERADMIN","GERENTE","COORDINADOR","DOCENTE","AUXILIAR_ADMINISTRATIVO"],"module_id":"formatos","steps":["Confirma periodo y UDS.","Verifica que la Base Maestra esté publicada.","Abre Formatos.","Ubica el grupo etario con participantes.","Presiona Descargar RPP.","Si aparece un error, consulta su código en LIAM."],"result":"RPP XLSX de la UDS y grupo exactos.","important":"La Minuta Patrón no bloquea el RPP en la configuración vigente; la fuente es la plantilla oficial más la Base Maestra."},
+    {"workflow_id":"cargar-evidencia","title":"Cómo cargar una evidencia","roles":["SUPERADMIN","GERENTE","COORDINADOR","DOCENTE","NUTRICIONISTA","PSICOSOCIAL","AUXILIAR_ADMINISTRATIVO"],"module_id":"calendario-inteligente","steps":["Abre la actividad.","Lee los requisitos.","Selecciona la evidencia.","Guarda.","Comprueba el estado."],"result":"Evidencia asociada a la actividad."},
+    {"workflow_id":"crear-usuario","title":"Cómo crear y asignar un usuario","roles":["SUPERADMIN","GERENTE"],"module_id":"administracion","steps":["Selecciona la fundación.","Crea el usuario.","Asigna el rol.","Asigna las UDS necesarias.","Prueba el acceso y los módulos visibles."],"result":"Usuario con permisos y alcance definidos."}
+  ]
+}
