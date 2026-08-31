@@ -57,7 +57,7 @@
     const saved=data.progress?.current_module_id;index=Math.max(0,saved?data.modules.findIndex(m=>m.module_id===saved):0);if(index<0)index=0;status='in_progress';paused=false;
     const profile=data.profile||{};if(!profile.designer||!profile.created_date)throw new Error('La identidad institucional debe indicar diseñador y fecha de creación antes de iniciar el recorrido.');
     emit('tour-started',{tour_id:data.tour_id,total:data.modules.length,mode});await save('in_progress');
-    if(!identityPresented){identityPresented=true;const introduction=`Bienvenido a ${profile.name}. Esta plataforma fue diseñada por ${profile.designer} y fue creada el ${profile.created_date}. Su versión actual es ${profile.version||'la versión institucional configurada'}. ${profile.description||'Su propósito es apoyar la gestión integral de Primera Infancia.'} Ahora conocerás los módulos autorizados para tu rol.`;window.LIAM_STATE?.set('greeting');await options.announceAsync(introduction);}
+    if(!identityPresented){identityPresented=true;const introduction=`Comencemos. Esta es ${profile.name}. Esta plataforma fue diseñada por ${profile.designer} y fue creada el ${profile.created_date}. Su versión actual es ${profile.version||'la versión institucional configurada'}. ${profile.description||'Su propósito es apoyar la gestión integral de Primera Infancia.'} A continuación conocerás solamente los módulos autorizados para tu rol.`;window.LIAM_STATE?.set('greeting');await options.announceAsync(introduction);}
     options.enterPresenter?.();
     return present();
   }
