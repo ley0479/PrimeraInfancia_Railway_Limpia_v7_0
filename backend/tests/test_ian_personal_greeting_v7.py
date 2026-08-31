@@ -15,7 +15,9 @@ for contract in (
     "Esta plataforma fue creada y diseñada por",
     "state.profile.designer",
     "state.profile.created_date",
-    "await announceAsync(greeting);const identity=",
+    "state.profile.development_contributor",
+    "Contó con la colaboración de",
+    "await announceAsync(greeting);const contributor=",
     "await announceAsync(identity);await presentation()",
     "state.welcomed=true",
 ):

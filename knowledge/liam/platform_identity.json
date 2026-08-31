@@ -2,6 +2,9 @@
   "kind": "identity",
   "title": "Plataforma Primera Infancia",
   "purpose": "Gestionar información, actividades, evidencias, formatos y seguimiento institucional de la atención integral a la primera infancia.",
+  "designer": "Leison Palacios Blandón",
+  "development_contributor": "Yoiler Mosquera",
+  "created_date": "04 de junio de 2026",
   "scope": "Fundaciones, unidades de servicio y usuarios autorizados, con separación de información por fundación.",
   "security": [
     "Cada persona debe usar su propia cuenta.",
