@@ -12,11 +12,15 @@ for contract in (
     "Buenos días",
     "Buenas tardes",
     "Buenas noches",
-    "await announceAsync(greeting);await presentation()",
+    "Esta plataforma fue creada y diseñada por",
+    "state.profile.designer",
+    "state.profile.created_date",
+    "await announceAsync(greeting);const identity=",
+    "await announceAsync(identity);await presentation()",
     "state.welcomed=true",
 ):
     assert contract in controller, f"Falta contrato de saludo personal: {contract}"
 
-assert controller.index("await announceAsync(greeting)") < controller.index("await presentation()")
+assert controller.index("await announceAsync(greeting)") < controller.index("await announceAsync(identity)") < controller.index("await presentation()")
 assert "Comencemos. Esta es" in tour
 print("IAN_PERSONAL_GREETING_V7_PASS")
