@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Laboratorio visual aislado de temas para Primera Infancia 7.0">
+    <title>Laboratorio visual — Primera Infancia</title>
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="themes/institutional.css">
+    <link rel="stylesheet" href="themes/executive.css">
+    <link rel="stylesheet" href="theme-lab.css">
+</head>
+<body class="pi-theme-lab-page">
+    <div class="pi-theme-lab" data-theme="institutional">
+        <a class="pi-lab-skip-link" href="#pi-lab-main">Saltar al contenido</a>
+
+        <aside class="pi-lab-sidebar" id="pi-lab-sidebar" aria-label="Navegación de demostración">
+            <div class="pi-lab-brand"><span class="pi-lab-brand-mark" aria-hidden="true">PI</span><span><strong>Primera Infancia</strong><small>Laboratorio visual</small></span></div>
+            <nav class="pi-lab-nav" aria-label="Secciones simuladas">
+                <a class="is-active" href="#resumen" aria-current="page"><span class="pi-lab-nav-icon" aria-hidden="true">▦</span><span>Resumen ejecutivo</span></a>
+                <a href="#calendario"><span class="pi-lab-nav-icon" aria-hidden="true">□</span><span>Calendario</span></a>
+                <a href="#chequeo"><span class="pi-lab-nav-icon" aria-hidden="true">✓</span><span>Lista de chequeo</span></a>
+                <a href="#unidades"><span class="pi-lab-nav-icon" aria-hidden="true">⌂</span><span>Unidades de servicio</span></a>
+                <a href="#creditos"><span class="pi-lab-nav-icon" aria-hidden="true">◇</span><span>Créditos y consumo</span></a>
+            </nav>
+            <div class="pi-lab-sidebar-note"><span aria-hidden="true">ⓘ</span><p><strong>Entorno aislado</strong><br>Sin conexión a datos ni servicios reales.</p></div>
+        </aside>
+
+        <div class="pi-lab-shell">
+            <header class="pi-lab-header">
+                <button class="pi-lab-icon-button pi-lab-menu-toggle" type="button" aria-label="Abrir menú del laboratorio" aria-controls="pi-lab-sidebar" aria-expanded="false"><span aria-hidden="true">☰</span></button>
+                <label class="pi-lab-search"><span class="pi-lab-visually-hidden">Buscar en la demostración</span><span aria-hidden="true">⌕</span><input type="search" placeholder="Buscar unidad, reporte o actividad"></label>
+                <div class="pi-lab-header-actions">
+                    <button class="pi-lab-icon-button" type="button" aria-label="Notificaciones: 3 pendientes"><span aria-hidden="true">♢</span><span class="pi-lab-notification-count">3</span></button>
+                    <button class="pi-lab-profile" type="button" aria-label="Abrir perfil de Administrador General" title="Administrador General · Fundación Demostración" data-demo-action><span class="pi-lab-avatar" aria-hidden="true">AG</span><span class="pi-lab-profile-copy"><strong>Administrador General</strong><small>Superadministrador · <span class="pi-lab-online">● En línea</span></small></span><span aria-hidden="true">⌄</span></button>
+                </div>
+            </header>
+
+            <main class="pi-lab-main" id="pi-lab-main" tabindex="-1">
+                <section class="pi-lab-toolbar" aria-labelledby="lab-title">
+                    <div><p class="pi-lab-eyebrow">Vista comparativa · Datos ficticios</p><h1 id="lab-title">Panel de gestión integral</h1><p>Supervisión consolidada de la operación institucional.</p></div>
+                    <div class="pi-lab-theme-controls">
+                        <label for="pi-lab-theme-select">Tema del laboratorio</label>
+                        <select class="pi-lab-select" id="pi-lab-theme-select">
+                            <option value="institutional">Tema Institucional</option>
+                            <option value="executive">Tema Ejecutivo</option>
+                        </select>
+                        <button class="pi-lab-button pi-lab-button--secondary" id="pi-lab-reset-theme" type="button">↺ Restaurar Tema Institucional</button>
+                    </div>
+                </section>
+
+                <div class="pi-lab-alert pi-lab-alert--info" id="pi-lab-feedback" role="status" aria-live="polite"><span aria-hidden="true">ⓘ</span><span><strong>Laboratorio seguro.</strong> Los controles son demostrativos y no ejecutan operaciones reales.</span></div>
+
+                <section id="resumen" aria-labelledby="kpi-title"><h2 class="pi-lab-section-title" id="kpi-title">Indicadores principales</h2><div class="pi-lab-kpi-grid">
+                    <article class="pi-lab-card pi-lab-kpi"><span class="pi-lab-kpi-icon" aria-hidden="true">♙</span><div><strong>1.248</strong><span>Participantes atendidos</span><small class="pi-lab-positive">↑ 4,2 % este mes</small></div></article>
+                    <article class="pi-lab-card pi-lab-kpi"><span class="pi-lab-kpi-icon" aria-hidden="true">✓</span><div><strong>48</strong><span>Unidades activas</span><small>100 % en operación</small></div></article>
+                    <article class="pi-lab-card pi-lab-kpi"><span class="pi-lab-kpi-icon" aria-hidden="true">□</span><div><strong>325</strong><span>Entregables validados</span><small class="pi-lab-positive">↑ 18 esta semana</small></div></article>
+                    <article class="pi-lab-card pi-lab-kpi"><span class="pi-lab-kpi-icon" aria-hidden="true">◇</span><div><strong>128</strong><span>Reportes generados</span><small class="pi-lab-warning-text">12 pendientes de revisión</small></div></article>
+                </div></section>
+
+                <div class="pi-lab-content-grid">
+                    <section class="pi-lab-card pi-lab-calendar" id="calendario" aria-labelledby="calendar-title">
+                        <div class="pi-lab-card-header"><div><p class="pi-lab-eyebrow">Septiembre 2026</p><h2 id="calendar-title">Calendario operativo</h2></div><div><button class="pi-lab-icon-button" type="button" aria-label="Mes anterior">‹</button><button class="pi-lab-icon-button" type="button" aria-label="Mes siguiente">›</button></div></div>
+                        <div class="pi-lab-calendar-grid" aria-label="Calendario de ejemplo"><span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span><button type="button" disabled>31</button><button type="button">1</button><button type="button">2</button><button type="button">3</button><button type="button">4</button><button type="button">5</button><button type="button">6</button><button type="button">7</button><button type="button">8</button><button type="button" class="has-event event-training" aria-label="9 de septiembre, dos capacitaciones">9<small>2</small></button><button type="button">10</button><button type="button">11</button><button type="button">12</button><button type="button">13</button><button type="button">14</button><button type="button" class="is-today" aria-label="15 de septiembre, fecha seleccionada">15</button><button type="button">16</button><button type="button" class="has-event event-delivery" aria-label="17 de septiembre, una entrega">17<small>1</small></button><button type="button">18</button><button type="button">19</button><button type="button">20</button></div>
+                        <div class="pi-lab-calendar-legend" aria-label="Leyenda del calendario"><span><i class="legend-event"></i>Eventos</span><span><i class="legend-training"></i>Capacitaciones</span><span><i class="legend-delivery"></i>Entregas</span><span><i class="legend-reminder"></i>Recordatorios</span></div>
+                    </section>
+
+                    <section class="pi-lab-card" id="chequeo" aria-labelledby="checklist-title"><div class="pi-lab-card-header"><div><p class="pi-lab-eyebrow">Seguimiento semanal</p><h2 id="checklist-title">Lista de chequeo</h2></div><a class="pi-lab-text-link" href="#unidades">Ver todos</a></div><ul class="pi-lab-checklist"><li><input id="check-1" type="checkbox" checked><label for="check-1"><strong>Validar asistencia</strong><small>Septiembre 2026 · Centro Infantil Los Pinos</small></label><span class="pi-lab-badge pi-lab-badge--complete">✓ Completado</span></li><li><input id="check-2" type="checkbox"><label for="check-2"><strong>Revisar soportes</strong><small>Septiembre 2026 · UDS Demostración 1</small></label><span class="pi-lab-badge pi-lab-badge--pending">○ Pendiente</span></li><li><input id="check-3" type="checkbox"><label for="check-3"><strong>Consolidar informe mensual</strong><small>Agosto 2026 · Administrador General</small></label><span class="pi-lab-badge pi-lab-badge--progress">◷ En progreso</span></li><li><input id="check-4" type="checkbox"><label for="check-4"><strong>Actualizar evidencia</strong><small>Agosto 2026 · Hogar Infantil Pequeños Sueños</small></label><span class="pi-lab-badge pi-lab-badge--overdue">! Vencido</span></li></ul><button class="pi-lab-button pi-lab-button--primary pi-lab-checklist-action" type="button" data-demo-action>Revisar pendientes</button></section>
+                </div>
+
+                <section class="pi-lab-card pi-lab-credit-panel" id="creditos" aria-labelledby="credits-title"><div><p class="pi-lab-eyebrow">Suscripción demostrativa</p><h2 id="credits-title">Créditos y consumo</h2><p>Renovación simulada: 30 de septiembre de 2026</p></div><div class="pi-lab-meter-wrap"><div><span><strong>68 % consumido</strong><small>680 de 1.000 créditos utilizados · 320 disponibles</small></span><strong>68%</strong></div><div class="pi-lab-meter" role="progressbar" aria-label="68 por ciento consumido, 680 de 1000 créditos utilizados" aria-valuemin="0" aria-valuemax="100" aria-valuenow="68"><span></span></div></div><button class="pi-lab-button pi-lab-button--secondary" type="button" data-demo-action>Ver detalle</button></section>
+
+                <section class="pi-lab-card" id="unidades" aria-labelledby="units-title"><div class="pi-lab-card-header"><div><p class="pi-lab-eyebrow">Directorio de demostración</p><h2 id="units-title">Unidades de servicio</h2></div><button class="pi-lab-button pi-lab-button--primary" type="button" data-open-modal>＋ Nueva simulación</button></div><div class="pi-lab-table-scroll" tabindex="0" aria-label="Tabla desplazable de unidades"><table class="pi-lab-table"><thead><tr><th>Unidad</th><th>Responsable</th><th>Estado</th><th class="pi-lab-number">Cumplimiento</th><th>Próxima actividad</th><th>Acciones</th></tr></thead><tbody><tr><td><strong>UDS Demostración 1</strong><small>Código DEM-001</small></td><td>Administrador General</td><td><span class="pi-lab-badge pi-lab-badge--complete">● ACTIVO</span></td><td class="pi-lab-number">96%</td><td>08 sep. 2026</td><td><button class="pi-lab-button pi-lab-button--neutral pi-lab-button--small" type="button" data-demo-action>Consultar ···</button></td></tr><tr><td><strong>Centro Infantil Los Pinos</strong><small>Código DEM-002</small></td><td>Participante Ejemplo</td><td><span class="pi-lab-badge pi-lab-badge--pending">○ PENDIENTE</span></td><td class="pi-lab-number">84%</td><td>12 sep. 2026</td><td><button class="pi-lab-button pi-lab-button--neutral pi-lab-button--small" type="button" data-demo-action>Consultar ···</button></td></tr><tr><td><strong>Hogar Infantil Pequeños Sueños</strong><small>Código DEM-003</small></td><td>Administrador General</td><td><span class="pi-lab-badge pi-lab-badge--overdue">! VENCIDO</span></td><td class="pi-lab-number">71%</td><td>05 sep. 2026</td><td><button class="pi-lab-button pi-lab-button--neutral pi-lab-button--small" type="button" data-demo-action>Consultar ···</button></td></tr><tr><td><strong>UDS Demostración 1</strong><small>Código DEM-004</small></td><td>Participante Ejemplo</td><td><span class="pi-lab-badge pi-lab-badge--suspended">× SUSPENDIDO</span></td><td class="pi-lab-number">—</td><td>Sin programación</td><td><button class="pi-lab-button pi-lab-button--neutral pi-lab-button--small" type="button" data-demo-action>Consultar ···</button></td></tr></tbody></table></div></section>
+
+                <section class="pi-lab-component-demo" aria-labelledby="components-title"><h2 class="pi-lab-section-title" id="components-title">Controles y estados</h2><div class="pi-lab-card"><div class="pi-lab-form-grid"><div class="pi-lab-field"><label for="lab-name">Nombre de referencia</label><input class="pi-lab-input is-valid" id="lab-name" value="Participante Ejemplo" aria-describedby="lab-name-help"><small id="lab-name-help" class="pi-lab-help pi-lab-valid-text">✓ Información válida de demostración.</small></div><div class="pi-lab-field"><label for="lab-unit">Unidad</label><select class="pi-lab-select" id="lab-unit"><option>UDS Demostración 1</option><option>Centro Infantil Los Pinos</option></select><small class="pi-lab-help">Seleccione una unidad ficticia.</small></div><div class="pi-lab-field"><label for="lab-email">Código de referencia</label><input class="pi-lab-input is-invalid" id="lab-email" value="" aria-invalid="true" aria-describedby="lab-email-error"><small id="lab-email-error" class="pi-lab-error-text">! El código de demostración es obligatorio.</small></div><div class="pi-lab-field"><label for="lab-note">Observación</label><textarea class="pi-lab-input pi-lab-textarea" id="lab-note" rows="3">Seguimiento administrativo de ejemplo.</textarea><small class="pi-lab-help">No se almacena este contenido.</small></div><fieldset class="pi-lab-choice-group"><legend>Frecuencia</legend><label><input type="radio" name="frequency" checked> Mensual</label><label><input type="radio" name="frequency"> Trimestral</label></fieldset><div class="pi-lab-field"><label for="lab-disabled">Campo deshabilitado</label><input class="pi-lab-input" id="lab-disabled" value="Solo lectura" disabled><label class="pi-lab-checkbox"><input type="checkbox" checked> Recibir recordatorios simulados</label></div></div><div class="pi-lab-button-row"><button class="pi-lab-button pi-lab-button--primary" type="button" data-demo-action>Primario</button><button class="pi-lab-button pi-lab-button--secondary" type="button" data-demo-action>Secundario</button><button class="pi-lab-button pi-lab-button--neutral" type="button" data-demo-action>Neutral</button><button class="pi-lab-button pi-lab-button--success" type="button" data-demo-action>✓ Éxito</button><button class="pi-lab-button pi-lab-button--warning" type="button" data-demo-action>! Advertencia</button><button class="pi-lab-button pi-lab-button--danger" type="button" data-demo-action>× Peligro</button><button class="pi-lab-button pi-lab-button--neutral" type="button" disabled>Deshabilitado</button><button class="pi-lab-button pi-lab-button--primary is-loading" type="button" disabled aria-busy="true"><span class="pi-lab-spinner" aria-hidden="true"></span> Procesando…</button></div><div class="pi-lab-alert-grid"><div class="pi-lab-alert pi-lab-alert--success"><span aria-hidden="true">✓</span><span><strong>Operación simulada completa.</strong> Estado presentado con texto e icono.</span></div><div class="pi-lab-alert pi-lab-alert--warning"><span aria-hidden="true">!</span><span><strong>Atención requerida.</strong> Revise los elementos pendientes.</span></div><div class="pi-lab-alert pi-lab-alert--danger"><span aria-hidden="true">×</span><span><strong>Ejemplo de error.</strong> Ningún dato fue enviado.</span></div></div></div></section>
+            </main>
+        </div>
+
+        <div class="pi-lab-modal-backdrop" id="pi-lab-modal" hidden>
+            <section class="pi-lab-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description"><div class="pi-lab-card-header"><h2 id="modal-title">Modal de demostración</h2><button class="pi-lab-icon-button" type="button" data-close-modal aria-label="Cerrar modal">×</button></div><p id="modal-description">Este componente no guarda información ni se conecta con la plataforma.</p><label>Nombre simulado<input class="pi-lab-input" value="UDS Demostración 1"></label><div class="pi-lab-modal-actions"><button class="pi-lab-button pi-lab-button--neutral" type="button" data-close-modal>Cancelar</button><button class="pi-lab-button pi-lab-button--primary" type="button" data-close-modal>Confirmar demostración</button></div></section>
+        </div>
+    </div>
+    <script src="theme-lab.js" defer></script>
+</body>
+</html>
