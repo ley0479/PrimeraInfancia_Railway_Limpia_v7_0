@@ -1,0 +1,53 @@
+.pi-theme-lab[data-theme="executive"] {
+    color-scheme: light;
+    --pi-bg: #f4f6f9;
+    --pi-sidebar-bg: #071f3d;
+    --pi-sidebar-bg-secondary: #0b2b50;
+    --pi-header-bg: #ffffff;
+    --pi-surface: #ffffff;
+    --pi-surface-soft: #f8fafc;
+    --pi-text: #152238;
+    --pi-text-muted: #64748b;
+    --pi-text-inverse: #ffffff;
+    --pi-border: #dfe5ec;
+    --pi-border-strong: #c8d1dc;
+    --pi-primary: #0a2d55;
+    --pi-primary-hover: #123f72;
+    --pi-accent: #c89b2c;
+    --pi-accent-soft: #f8efd7;
+    --pi-success: #178447;
+    --pi-warning: #a86407;
+    --pi-danger: #b93232;
+    --pi-info: #2563a6;
+    --pi-focus: #e0ad2f;
+    --pi-radius-card: 10px;
+    --pi-radius-button: 7px;
+    --pi-shadow-card: 0 5px 16px rgb(21 34 56 / 7%);
+    --pi-space-unit: 4px;
+    --pi-sidebar-text: #edf3f9;
+    --pi-on-primary: #ffffff;
+    --pi-on-accent: #241a05;
+}
+
+.pi-theme-lab[data-theme="executive"] .pi-lab-sidebar {
+    background: linear-gradient(180deg, var(--pi-sidebar-bg), var(--pi-sidebar-bg-secondary));
+}
+
+.pi-theme-lab[data-theme="executive"] .pi-lab-nav a.is-active {
+    background: var(--pi-sidebar-bg-secondary);
+    color: var(--pi-text-inverse);
+    box-shadow: inset 3px 0 var(--pi-accent);
+}
+
+.pi-theme-lab[data-theme="executive"] .pi-lab-nav a.is-active .pi-lab-nav-icon,
+.pi-theme-lab[data-theme="executive"] .pi-lab-kpi-icon {
+    color: var(--pi-accent);
+}
+
+.pi-theme-lab[data-theme="executive"] .pi-lab-card {
+    border-color: var(--pi-border);
+}
+
+.pi-theme-lab[data-theme="executive"] .pi-lab-kpi {
+    border-left: 3px solid var(--pi-accent);
+}
