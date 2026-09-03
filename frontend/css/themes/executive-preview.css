@@ -67,7 +67,8 @@
 
     #app-shell > .pi-executive-preview-control {
         position: fixed;
-        right: 18px;
+        left: calc(18.5rem + 18px);
+        right: auto;
         bottom: 18px;
         z-index: 70;
         display: flex;
@@ -107,6 +108,14 @@
     #app-shell > .pi-executive-preview-control[data-state="institutional"] {
         background: #ffffff;
         color: #152238;
+    }
+}
+
+@media screen and (max-width: 800px) {
+    #app-shell > .pi-executive-preview-control {
+        left: max(12px, env(safe-area-inset-left, 0px));
+        right: auto;
+        bottom: max(12px, env(safe-area-inset-bottom, 0px));
     }
 }
 
