@@ -76,3 +76,13 @@ def test_restore_control_is_accessible_and_logout_is_observed() -> None:
     assert "cerrarSesion" in js
     assert "addEventListener('click'" in js
     assert "MutationObserver" in js
+
+
+def test_control_does_not_share_accessibility_corner() -> None:
+    css = read(CSS)
+    control = re.search(r'#app-shell > \.pi-executive-preview-control\s*\{([^}]+)\}', css)
+    assert control
+    declarations = control.group(1)
+    assert "left: calc(18.5rem + 18px)" in declarations
+    assert "right: auto" in declarations
+    assert "left: max(12px, env(safe-area-inset-left, 0px))" in css
