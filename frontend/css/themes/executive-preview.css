@@ -1,0 +1,117 @@
+/* Vista previa local y reversible. Nunca se aplica fuera de #app-shell. */
+@media screen {
+    #app-shell[data-preview-theme="executive"] {
+        color-scheme: light;
+        --pi-bg: #f4f6f9;
+        --pi-surface: #ffffff;
+        --pi-surface-soft: #f8fafc;
+        --pi-border: #dfe5ec;
+        --pi-text: #152238;
+        --pi-muted: #64748b;
+        --pi-primary: #0a2d55;
+        --pi-primary-hover: #123f72;
+        --pi-accent: #c89b2c;
+        --pi-success: #178447;
+        --pi-warning: #a86407;
+        --pi-danger: #b93232;
+        --pi-radius: 10px;
+        background: var(--pi-bg);
+        color: var(--pi-text);
+    }
+
+    #app-shell[data-preview-theme="executive"] #sidebar-institucional {
+        background: linear-gradient(180deg, #071f3d, #0b2b50);
+        border-color: rgb(255 255 255 / 12%);
+        color: #edf3f9;
+    }
+
+    #app-shell[data-preview-theme="executive"] #sidebar-institucional .pi-menu-item {
+        color: #dbe7f2;
+    }
+
+    #app-shell[data-preview-theme="executive"] #sidebar-institucional .pi-menu-item:hover,
+    #app-shell[data-preview-theme="executive"] #sidebar-institucional .pi-menu-item.active {
+        background: #0b2b50;
+        color: #ffffff;
+        box-shadow: inset 3px 0 var(--pi-accent);
+    }
+
+    #app-shell[data-preview-theme="executive"] > main {
+        background: var(--pi-bg);
+        color: var(--pi-text);
+    }
+
+    #app-shell[data-preview-theme="executive"] > main .bg-slate-950,
+    #app-shell[data-preview-theme="executive"] > main .bg-slate-900,
+    #app-shell[data-preview-theme="executive"] > main .bg-slate-800 {
+        background-color: var(--pi-surface);
+    }
+
+    #app-shell[data-preview-theme="executive"] > main .text-white,
+    #app-shell[data-preview-theme="executive"] > main .text-slate-100,
+    #app-shell[data-preview-theme="executive"] > main .text-slate-200,
+    #app-shell[data-preview-theme="executive"] > main .text-slate-300 {
+        color: var(--pi-text);
+    }
+
+    #app-shell[data-preview-theme="executive"] > main .text-slate-400,
+    #app-shell[data-preview-theme="executive"] > main .text-slate-500 {
+        color: var(--pi-muted);
+    }
+
+    #app-shell[data-preview-theme="executive"] > main .border-slate-900,
+    #app-shell[data-preview-theme="executive"] > main .border-slate-800,
+    #app-shell[data-preview-theme="executive"] > main .border-slate-700 {
+        border-color: var(--pi-border);
+    }
+
+    #app-shell > .pi-executive-preview-control {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 70;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        max-width: min(420px, calc(100vw - 24px));
+        padding: 10px 12px;
+        border: 1px solid #d5b45e;
+        border-radius: 10px;
+        background: #ffffff;
+        color: #152238;
+        box-shadow: 0 12px 32px rgb(21 34 56 / 18%);
+    }
+
+    #app-shell > .pi-executive-preview-control button {
+        min-height: 38px;
+        padding: 8px 12px;
+        border: 1px solid #0a2d55;
+        border-radius: 7px;
+        background: #0a2d55;
+        color: #ffffff;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+    }
+
+    #app-shell > .pi-executive-preview-control button:focus-visible {
+        outline: 3px solid #e0ad2f;
+        outline-offset: 3px;
+    }
+
+    #app-shell > .pi-executive-preview-control small {
+        display: block;
+        color: #64748b;
+    }
+
+    #app-shell > .pi-executive-preview-control[data-state="institutional"] {
+        background: #ffffff;
+        color: #152238;
+    }
+}
+
+@media print {
+    #app-shell[data-preview-theme="executive"] {
+        color-scheme: normal;
+    }
+}
