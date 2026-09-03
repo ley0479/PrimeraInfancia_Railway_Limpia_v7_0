@@ -67,11 +67,20 @@
         const theme = context.tema || {};
         const variables = context.variables || {};
         root.classList.add('theme-pi', 'tm-active');
+        root.dataset.theme = theme.codigo || pref.tema_codigo || 'ocean-deep';
         root.dataset.themeCode = theme.codigo || pref.tema_codigo || 'base-actual';
         root.dataset.tmMode = pref.modo || 'oscuro';
         root.dataset.tmContrast = pref.contraste || 'normal';
         root.dataset.tmLayout = pref.layout || 'normal';
         root.dataset.density = pref.densidad || 'comfortable';
+        root.dataset.tmDensity = pref.densidad || 'comfortable';
+        root.dataset.tmCards = pref.custom_json?.cards || 'elevated';
+        root.dataset.tmMotion = pref.custom_json?.animations === 'reduced' || pref.custom_json?.reduced_motion ? 'reduced' : 'full';
+        const configuredMode = theme.configuracion?.colorMode || (pref.modo === 'claro' ? 'light' : 'dark');
+        const resolvedMode = pref.modo === 'auto'
+            ? (window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+            : (pref.modo === 'claro' ? 'light' : configuredMode);
+        root.dataset.bsTheme = resolvedMode;
         root.dataset.sidebar = pref.layout === 'compacto' ? 'compact' : 'normal';
         root.style.setProperty('--pi-density-y', pref.densidad === 'compact' ? '.82' : (pref.densidad === 'spacious' ? '1.18' : '1'));
         STYLE_KEYS.forEach((key) => {
@@ -83,6 +92,11 @@
         writeCache(context);
         syncDashboardButton();
         syncMiniLabels();
+        window.dispatchEvent(new CustomEvent('app:theme-changed', { detail: {
+            themeKey: root.dataset.theme,
+            colorMode: resolvedMode,
+            variables: { ...variables }
+        }}));
     }
 
     function applyCachedTheme() {

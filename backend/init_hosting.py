@@ -103,6 +103,11 @@ def bootstrap_core_schema(config_class) -> None:
     from modules.panel_comercial.services import PanelComercialService
     PanelComercialService(config_class.DATABASE_PATH).init_schema()
 
+    # Theme Manager: esquema y catálogo únicamente durante pre-deploy.
+    from modules.theme_manager.services import init_schema as init_theme_manager_schema
+    init_theme_manager_schema(str(config_class.DATABASE_PATH))
+    print('[MIGRATION] UI theme engine: PASS', flush=True)
+
     from modules.motor_plantillas.services import init_schema as init_motor_plantillas_schema
     from services.rpp_minutas_service import init_schema as init_rpp_minutas_schema
     init_motor_plantillas_schema(config_class.DATABASE_PATH)
