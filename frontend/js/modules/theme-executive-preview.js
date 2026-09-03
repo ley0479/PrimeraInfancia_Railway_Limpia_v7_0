@@ -1,11 +1,13 @@
 (function () {
     'use strict';
 
-    const DEFAULT_ENABLED = false;
+    const DEFAULT_ENABLED = true;
     const STORAGE_KEY = 'pi_executive_theme_preview_v1';
     const ALLOWED_VALUE = 'executive';
     const CONTROL_ID = 'pi-executive-preview-control';
-    const enabled = DEFAULT_ENABLED || window.__PI_EXECUTIVE_PREVIEW_ENABLED__ === true;
+    const enabled = typeof window.__PI_EXECUTIVE_PREVIEW_ENABLED__ === 'boolean'
+        ? window.__PI_EXECUTIVE_PREVIEW_ENABLED__
+        : DEFAULT_ENABLED;
 
     function shellElement() {
         return document.getElementById('app-shell');
@@ -116,4 +118,3 @@
 
     window.ExecutiveThemePreview = Object.freeze({ activate: activateTheme, restore: restoreTheme, synchronize });
 })();
-
