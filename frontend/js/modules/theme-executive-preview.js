@@ -3,15 +3,20 @@
 
     const DEFAULT_ENABLED = true;
     const STORAGE_KEY = 'pi_executive_theme_preview_v1';
-    const ALLOWED_VALUE = 'executive';
     const CONTROL_ID = 'pi-executive-preview-control';
+    const THEMES = Object.freeze({
+        institutional: 'Tema Institucional',
+        executive: 'Tema Ejecutivo',
+        'corporate-glass': 'Corporate Glass',
+        'quantum-dark': 'Quantum Dark',
+        biotech: 'Bio-Tech Precision',
+        creator: 'Creator Market'
+    });
     const enabled = typeof window.__PI_EXECUTIVE_PREVIEW_ENABLED__ === 'boolean'
         ? window.__PI_EXECUTIVE_PREVIEW_ENABLED__
         : DEFAULT_ENABLED;
 
-    function shellElement() {
-        return document.getElementById('app-shell');
-    }
+    function shellElement() { return document.getElementById('app-shell'); }
 
     function storedUser() {
         try {
@@ -36,33 +41,33 @@
         try {
             const value = localStorage.getItem(STORAGE_KEY);
             if (!value) return 'institutional';
-            if (value === ALLOWED_VALUE) return value;
+            if (Object.hasOwn(THEMES, value) && value !== 'institutional') return value;
             localStorage.removeItem(STORAGE_KEY);
         } catch (_) {}
         return 'institutional';
     }
 
-    function removeControl() {
-        document.getElementById(CONTROL_ID)?.remove();
-    }
+    function removeControl() { document.getElementById(CONTROL_ID)?.remove(); }
 
-    function restoreTheme(removePreference = true) {
+    function applyTheme(theme, persist = true) {
         const shell = shellElement();
-        if (shell) delete shell.dataset.previewTheme;
-        if (removePreference) {
-            try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+        const safeTheme = Object.hasOwn(THEMES, theme) ? theme : 'institutional';
+        if (!enabled || !isSuperadmin() || safeTheme === 'institutional') {
+            if (shell) delete shell.dataset.previewTheme;
+            if (persist) {
+                try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+            }
+        } else if (shell) {
+            shell.dataset.previewTheme = safeTheme;
+            if (persist) {
+                try { localStorage.setItem(STORAGE_KEY, safeTheme); } catch (_) {}
+            }
         }
         renderControl();
     }
 
-    function activateTheme() {
-        if (!enabled || !isSuperadmin()) return restoreTheme(true);
-        const shell = shellElement();
-        if (!shell) return;
-        shell.dataset.previewTheme = ALLOWED_VALUE;
-        try { localStorage.setItem(STORAGE_KEY, ALLOWED_VALUE); } catch (_) {}
-        renderControl();
-    }
+    function restoreTheme(removePreference = true) { applyTheme('institutional', removePreference); }
+    function activateTheme(theme = 'executive') { applyTheme(theme, true); }
 
     function renderControl() {
         const shell = shellElement();
@@ -75,18 +80,19 @@
             control = document.createElement('aside');
             control.id = CONTROL_ID;
             control.className = 'pi-executive-preview-control no-print';
-            control.setAttribute('aria-label', 'Vista previa Tema Ejecutivo');
-            control.innerHTML = '<div aria-live="polite"><strong>Vista previa Tema Ejecutivo</strong><small data-preview-status></small></div><button type="button" data-preview-toggle></button>';
+            control.setAttribute('aria-label', 'Selector de temas visuales');
+            control.innerHTML = '<label for="pi-theme-selector"><strong>Diseño de la plataforma</strong><small data-preview-status aria-live="polite"></small></label><select id="pi-theme-selector" data-preview-selector aria-label="Seleccionar tema"></select>';
+            const selector = control.querySelector('[data-preview-selector]');
+            selector.innerHTML = Object.entries(THEMES).map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+            selector.addEventListener('change', event => applyTheme(event.target.value, true));
             shell.appendChild(control);
-            control.querySelector('[data-preview-toggle]').addEventListener('click', () => {
-                if (shell.dataset.previewTheme === ALLOWED_VALUE) restoreTheme(true);
-                else activateTheme();
-            });
         }
-        const active = shell.dataset.previewTheme === ALLOWED_VALUE;
-        control.dataset.state = active ? 'executive' : 'institutional';
-        control.querySelector('[data-preview-status]').textContent = active ? 'Activa solo en este navegador.' : 'Tema Institucional activo.';
-        control.querySelector('[data-preview-toggle]').textContent = active ? 'Restaurar Tema Institucional' : 'Activar Tema Ejecutivo';
+        const active = shell.dataset.previewTheme || 'institutional';
+        control.dataset.state = active;
+        control.querySelector('[data-preview-selector]').value = active;
+        control.querySelector('[data-preview-status]').textContent = active === 'institutional'
+            ? 'Diseño original activo.'
+            : `${THEMES[active]} activo solo en este navegador.`;
     }
 
     function synchronize() {
@@ -96,19 +102,13 @@
             removeControl();
             return;
         }
-        if (readPreference() === ALLOWED_VALUE) shell.dataset.previewTheme = ALLOWED_VALUE;
-        else delete shell.dataset.previewTheme;
-        renderControl();
+        applyTheme(readPreference(), false);
     }
 
-    document.addEventListener('click', (event) => {
+    document.addEventListener('click', event => {
         if (event.target.closest('[onclick*="cerrarSesion"]')) restoreTheme(true);
     }, true);
-
-    window.addEventListener('storage', (event) => {
-        if (event.key === STORAGE_KEY) synchronize();
-    });
-
+    window.addEventListener('storage', event => { if (event.key === STORAGE_KEY) synchronize(); });
     window.addEventListener('DOMContentLoaded', () => {
         const shell = shellElement();
         if (!shell) return;
@@ -116,5 +116,5 @@
         synchronize();
     });
 
-    window.ExecutiveThemePreview = Object.freeze({ activate: activateTheme, restore: restoreTheme, synchronize });
+    window.ExecutiveThemePreview = Object.freeze({ activate: activateTheme, restore: restoreTheme, synchronize, themes: THEMES });
 })();

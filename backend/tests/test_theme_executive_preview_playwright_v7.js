@@ -66,18 +66,31 @@ async function openPage(browser, baseUrl, { enabled = true, role = 'SUPERADMIN',
         page = await openPage(browser, baseUrl, { preference: 'desconocido' });
         assert.equal(await page.evaluate(key => localStorage.getItem(key), KEY), null);
         assert.equal(await page.locator('#app-shell').getAttribute('data-preview-theme'), null);
-        await page.getByRole('button', { name: 'Activar Tema Ejecutivo' }).click();
+        const selector = page.getByRole('combobox', { name: 'Seleccionar tema' });
+        assert.deepEqual(await selector.locator('option').allTextContents(), [
+            'Tema Institucional', 'Tema Ejecutivo', 'Corporate Glass',
+            'Quantum Dark', 'Bio-Tech Precision', 'Creator Market'
+        ]);
+        await selector.selectOption('executive');
         assert.equal(await page.locator('#app-shell').getAttribute('data-preview-theme'), 'executive');
         assert.equal(await page.evaluate(key => localStorage.getItem(key), KEY), 'executive');
         assert.equal(await page.locator('main').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(244, 246, 249)');
-        await page.getByRole('button', { name: 'Restaurar Tema Institucional' }).click();
+        await selector.selectOption('institutional');
         assert.equal(await page.locator('#app-shell').getAttribute('data-preview-theme'), null);
         assert.equal(await page.evaluate(key => localStorage.getItem(key), KEY), null);
 
-        await page.getByRole('button', { name: 'Activar Tema Ejecutivo' }).click();
+        await selector.selectOption('executive');
         await page.getByRole('button', { name: 'Salir' }).click();
         assert.equal(await page.evaluate(key => localStorage.getItem(key), KEY), null);
         assert.equal(await page.locator('#app-shell').getAttribute('data-preview-theme'), null);
+        await page.close();
+
+        page = await openPage(browser, baseUrl);
+        for (const theme of ['corporate-glass', 'quantum-dark', 'biotech', 'creator']) {
+            await page.getByRole('combobox', { name: 'Seleccionar tema' }).selectOption(theme);
+            assert.equal(await page.locator('#app-shell').getAttribute('data-preview-theme'), theme);
+            assert.equal(await page.evaluate(key => localStorage.getItem(key), KEY), theme);
+        }
         await page.close();
 
         page = await openPage(browser, baseUrl, { preference: 'executive' });
@@ -86,7 +99,7 @@ async function openPage(browser, baseUrl, { enabled = true, role = 'SUPERADMIN',
         assert.equal(await page.locator('#app-shell').evaluate(el => getComputedStyle(el).colorScheme), 'normal');
         await page.close();
 
-        console.log('7 escenarios Playwright preview OK');
+        console.log('8 escenarios Playwright de temas OK');
     } finally {
         await browser.close();
         await new Promise(resolve => server.close(resolve));

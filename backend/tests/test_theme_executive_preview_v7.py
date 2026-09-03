@@ -21,8 +21,8 @@ def read(path: Path) -> str:
 def test_preview_files_are_loaded_with_cache_busting() -> None:
     html = read(INDEX)
     assert CSS.is_file() and JS.is_file()
-    assert './css/themes/executive-preview.css?v=2.7.0-executive-preview-1' in html
-    assert './js/modules/theme-executive-preview.js?v=2.7.0-executive-preview-1' in html
+    assert './css/themes/executive-preview.css?v=2.7.0-theme-selector-1' in html
+    assert './js/modules/theme-executive-preview.js?v=2.7.0-theme-selector-1' in html
     assert html.index('executive-preview.css') < html.index('accessibility-pi.css')
     assert html.index('app.js?v=') < html.index('theme-executive-preview.js')
 
@@ -37,7 +37,7 @@ def test_preview_is_local_superadmin_only_and_supports_emergency_disable() -> No
     assert "localStorage.removeItem(STORAGE_KEY)" in js
     assert "dataset.previewTheme" in js
     assert "delete shell.dataset.previewTheme" in js
-    assert "executive" in js and "institutional" in js
+    assert all(theme in js for theme in ('executive', 'institutional', 'corporate-glass', 'quantum-dark', 'biotech', 'creator'))
 
 
 def test_preview_has_no_network_routes_or_protected_data_operations() -> None:
@@ -70,8 +70,9 @@ def test_css_is_scoped_and_print_is_neutralized() -> None:
 
 def test_restore_control_is_accessible_and_logout_is_observed() -> None:
     js = read(JS)
-    assert "Restaurar Tema Institucional" in js
-    assert "Vista previa Tema Ejecutivo" in js
+    assert "Tema Institucional" in js
+    assert "Selector de temas visuales" in js
+    assert "Seleccionar tema" in js
     assert "aria-live" in js
     assert "cerrarSesion" in js
     assert "addEventListener('click'" in js
