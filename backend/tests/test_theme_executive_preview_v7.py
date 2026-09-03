@@ -27,9 +27,10 @@ def test_preview_files_are_loaded_with_cache_busting() -> None:
     assert html.index('app.js?v=') < html.index('theme-executive-preview.js')
 
 
-def test_preview_is_local_superadmin_only_and_disabled_by_default() -> None:
+def test_preview_is_local_superadmin_only_and_supports_emergency_disable() -> None:
     js = read(JS)
-    assert "const DEFAULT_ENABLED = false" in js
+    assert "const DEFAULT_ENABLED = true" in js
+    assert "typeof window.__PI_EXECUTIVE_PREVIEW_ENABLED__ === 'boolean'" in js
     assert "SUPERADMIN" in js
     assert STORAGE_KEY in js
     assert "localStorage.setItem(STORAGE_KEY" in js
