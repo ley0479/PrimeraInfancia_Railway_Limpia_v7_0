@@ -33,15 +33,19 @@ def main():
     require("ian-launcher-avatar" in controller, "Falta la silueta única del lanzador")
     require("render('#liam-avatar-wrap'" in controller, "El panel no reutiliza el avatar del lanzador")
     require("lia-human-v1.png" in controller, "No se restauró la ilustración 2D institucional anterior")
-    require("ian-avatar-image" in renderer and "trustedAsset" in renderer, "La imagen 2D no es el recurso visual principal o no está validada")
+    require("ian-avatar-rig" in renderer and "trustedAsset" in renderer, "La identidad visual no está montada en el rig validado")
+    require("rigMarkup" in renderer and "clipPath" in renderer and "mask" in renderer, "El avatar no separa cabeza, cuerpo y brazos")
     require("avatar_asset_path" in controller, "La selección visual guardada no llega al avatar 2D")
     require("liam-mouth-motion" not in controller[controller.index("function mountIan"):controller.index("function applyIanVisual")], "La interfaz activa todavía superpone una boca")
     for layer in ("ian-head-layer", "ian-mouth-layer", "ian-arm-left", "ian-arm-right", "ian-eyes"):
         require(layer in renderer, f"Falta capa SVG real: {layer}")
+    require("ian-eyelids" in renderer, "Falta el parpadeo independiente del rostro aprobado")
     require("data-gender" in renderer and "data-variant" in renderer, "El SVG no admite género y variante")
     require("background:transparent!important" in css and "box-shadow:none!important" in css, "El lanzador todavía dibuja un cuadro")
     require(".ian-mouth-open" in css and "[data-state=speaking]" in css, "La boca interna no responde al estado de voz")
     require("ian-wave" in css and "ian-point-left" in css and "ian-point-right" in css, "Los brazos no tienen gestos reales")
+    require("[data-state=pointing_left] .ian-avatar-rig .ian-arm-left" in css, "El objetivo izquierdo no activa el brazo visual izquierdo")
+    require("[data-state=pointing_right] .ian-avatar-rig .ian-arm-right" in css, "El objetivo derecho no activa el brazo visual derecho")
     require("ian-avatar.css" in index, "La hoja correctiva no llega al navegador")
     require(index.index("ian-avatar-renderer.js") < index.index("liam-controller.js"), "El SVG no se carga antes del controlador")
     require(index.index("liam-state-machine.js") < index.index("liam-controller.js"), "El estado básico no se carga antes del controlador")
@@ -58,6 +62,9 @@ def main():
     require(".ian-avatar-visual, .ian-avatar-svg" in orchestrator, "Los estados no alcanzan la imagen principal y el respaldo SVG")
     for motion in ("ian-image-breathe", "ian-image-greeting", "ian-image-thinking", "ian-image-speaking"):
         require(motion in css, f"Falta movimiento humanizado para imagen: {motion}")
+    approved_face = ROOT / "frontend/assets/lia/elian-afro-institutional-female-v1.png"
+    png = approved_face.read_bytes()
+    require(png[:8] == b'\x89PNG\r\n\x1a\n' and png[25] == 6, "La identidad aprobada debe conservar transparencia RGBA real")
     for event in ("start", "audio-ready", "play", "pause", "resume", "end", "error", "boundary"):
         require(f"'{event}'" in speech, f"Falta evento de voz: {event}")
     require("LIAM_LIP_SYNC?.pause" in speech and "LIAM_LIP_SYNC?.resume" in speech, "Pausa y reanudación no controlan la boca")

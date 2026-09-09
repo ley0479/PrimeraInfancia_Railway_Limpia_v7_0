@@ -7,6 +7,7 @@
     afro_colombian_technological:{male:'./assets/lia/elian-afro-technological-male-v1.png',female:'./assets/lia/elian-afro-technological-female-v1.png'},
     afro_colombian_educational:{male:'./assets/lia/elian-afro-educational-male-v1.png',female:'./assets/lia/elian-afro-educational-female-v1.png'}
   });
+  let rigSequence=0;
   function trustedAsset(options,gender,variant){
     const requested=String(options.assetPath||'').replace(/^\//,'./');
     const allowed=new Set(['./assets/lia/lia-human-v1.png',...Object.values(assets).flatMap(Object.values)]);
@@ -22,12 +23,33 @@
       <g class="ian-tablet-layer"><rect x="82" y="203" width="76" height="58" rx="7"/><path d="M91 214h58M91 226h42M91 238h49"/></g>
     </svg>`;
   }
+  function rigMarkup(options={}){
+    const gender=genders.has(options.gender)?options.gender:'female';
+    const variant=variants.has(options.variant)?options.variant:'afro_colombian_institutional';
+    const asset=trustedAsset(options,gender,variant);
+    const compact=options.compact?' ian-avatar-compact':'';
+    const id=`ian-rig-${++rigSequence}`;
+    return `<svg class="ian-avatar-svg ian-avatar-visual ian-avatar-rig${compact}" data-gender="${gender}" data-variant="${variant}" viewBox="0 0 1024 1536" role="img" aria-label="LIAM, asistente virtual articulada">
+      <defs>
+        <clipPath id="${id}-head"><path d="M175 0H760V530Q720 680 500 690Q260 660 175 520Z"/></clipPath>
+        <clipPath id="${id}-left-arm"><path d="M70 535L370 525L555 815L682 905L615 1075L430 1000L345 1180L75 1160Z"/></clipPath>
+        <clipPath id="${id}-right-arm"><path d="M595 570L840 570L970 1115L690 1165L600 1015L540 875Z"/></clipPath>
+        <mask id="${id}-body"><rect width="1024" height="1536" fill="white"/><path d="M175 0H760V530Q720 680 500 690Q260 660 175 520Z" fill="black"/><path d="M70 535L370 525L555 815L682 905L615 1075L430 1000L345 1180L75 1160Z" fill="black"/><path d="M595 570L840 570L970 1115L690 1165L600 1015L540 875Z" fill="black"/></mask>
+      </defs>
+      <g class="ian-body-layer"><image href="${asset}" width="1024" height="1536" mask="url(#${id}-body)"/></g>
+      <g class="ian-head-layer"><image href="${asset}" width="1024" height="1536" clip-path="url(#${id}-head)"/></g>
+      <g class="ian-face-controls" aria-hidden="true"><g class="ian-eyelids"><path d="M405 310q39-25 78 0q-39 20-78 0M548 310q38-24 75 0q-37 20-75 0"/></g><g class="ian-mouth-layer"><ellipse class="ian-mouth-open" cx="511" cy="430" rx="42" ry="11"/></g></g>
+      <g class="ian-arm ian-arm-left"><image href="${asset}" width="1024" height="1536" clip-path="url(#${id}-left-arm)"/></g>
+      <g class="ian-arm ian-arm-right"><image href="${asset}" width="1024" height="1536" clip-path="url(#${id}-right-arm)"/></g>
+    </svg>`;
+  }
   function render(target,options={}){
     const el=typeof target==='string'?document.querySelector(target):target;if(!el)return null;
     const gender=genders.has(options.gender)?options.gender:'female',variant=variants.has(options.variant)?options.variant:'afro_colombian_institutional';
-    const image=document.createElement('img');image.className=`ian-avatar-image ian-avatar-visual${options.compact?' ian-avatar-compact':''}`;image.dataset.gender=gender;image.dataset.variant=variant;image.alt=options.compact?'Silueta 2D de LIAM':'LIAM, asistente 2D de Primera Infancia';image.src=trustedAsset(options,gender,variant);image.decoding='async';image.draggable=false;
-    image.onerror=()=>{el.innerHTML=markup({gender,variant,compact:options.compact});};
-    el.replaceChildren(image);return image;
+    el.innerHTML=rigMarkup({...options,gender,variant});
+    const rig=el.querySelector('.ian-avatar-rig');
+    rig?.querySelectorAll('image').forEach(image=>image.addEventListener('error',()=>{el.innerHTML=markup({gender,variant,compact:options.compact})},{once:true}));
+    return rig;
   }
-  window.IAN_AVATAR=Object.freeze({markup,render,assets});
+  window.IAN_AVATAR=Object.freeze({markup,rigMarkup,render,assets});
 })();
