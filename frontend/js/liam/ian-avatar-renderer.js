@@ -7,11 +7,9 @@
     afro_colombian_technological:{male:'./assets/lia/elian-afro-technological-male-v1.png',female:'./assets/lia/elian-afro-technological-female-v1.png'},
     afro_colombian_educational:{male:'./assets/lia/elian-afro-educational-male-v1.png',female:'./assets/lia/elian-afro-educational-female-v1.png'}
   });
-  const rigFrames=Object.freeze({idle:'./assets/lia/liam-rig-base-female-v2.png',speaking:'./assets/lia/liam-rig-speaking-female-v2.png',greeting:'./assets/lia/liam-rig-greeting-female-v2.png',guiding:'./assets/lia/liam-rig-pointing-left-female-v2.png'});
   function trustedAsset(options,gender,variant){
     const requested=String(options.assetPath||'').replace(/^\//,'./');
-    const allowed=new Set(['./assets/lia/lia-human-v1.png',...Object.values(assets).flatMap(Object.values),...Object.values(rigFrames)]);
-    if(gender==='female'&&variant==='afro_colombian_institutional'&&(requested===assets[variant].female||requested===rigFrames.idle))return rigFrames.idle;
+    const allowed=new Set(['./assets/lia/lia-human-v1.png',...Object.values(assets).flatMap(Object.values)]);
     return allowed.has(requested)?requested:assets[variant][gender];
   }
   function markup(options={}){
@@ -28,8 +26,8 @@
     const el=typeof target==='string'?document.querySelector(target):target;if(!el)return null;
     const gender=genders.has(options.gender)?options.gender:'female',variant=variants.has(options.variant)?options.variant:'afro_colombian_institutional';
     const image=document.createElement('img');image.className=`ian-avatar-image ian-avatar-visual${options.compact?' ian-avatar-compact':''}`;image.dataset.gender=gender;image.dataset.variant=variant;image.alt=options.compact?'Silueta 2D de LIAM':'LIAM, asistente 2D de Primera Infancia';image.src=trustedAsset(options,gender,variant);image.decoding='async';image.draggable=false;
-    image.onerror=()=>{el.innerHTML=markup({gender,variant,compact:options.compact});};if(gender==='female'&&variant==='afro_colombian_institutional')Object.values(rigFrames).forEach(src=>{const preload=new Image();preload.src=src});
+    image.onerror=()=>{el.innerHTML=markup({gender,variant,compact:options.compact});};
     el.replaceChildren(image);return image;
   }
-  window.IAN_AVATAR=Object.freeze({markup,render,assets,rigFrames});
+  window.IAN_AVATAR=Object.freeze({markup,render,assets});
 })();
