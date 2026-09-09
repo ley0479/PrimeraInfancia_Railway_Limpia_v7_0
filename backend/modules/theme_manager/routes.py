@@ -30,12 +30,7 @@ def current_user() -> dict:
 
 
 def register_theme_manager(app, database_path: str) -> None:
-    init_schema(database_path)
     bp = Blueprint('theme_manager', __name__, url_prefix='/api/theme-manager')
-
-    @bp.before_request
-    def _ensure_schema():
-        init_schema(database_path)
 
     @bp.route('/actual', methods=['GET'])
     @require_roles(*ALL_ROLES)

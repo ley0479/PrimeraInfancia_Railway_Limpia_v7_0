@@ -165,6 +165,19 @@ def init_schema(database_path: str) -> None:
     conn = connect(database_path)
     conn.executescript(SCHEMA_SQL)
     seed_system_themes(conn)
+    legacy_codes = ('base-actual', 'claro-institucional', 'verde-primera-infancia')
+    conn.execute(
+        "UPDATE tm_temas SET activo=0, categoria='legacy', fecha_actualizacion=? WHERE es_sistema=1 AND codigo IN (?, ?, ?)",
+        (now_iso(), *legacy_codes),
+    )
+    conn.execute(
+        "UPDATE tm_config_corporacion SET tema_default_codigo='ocean-deep' WHERE tema_default_codigo IN (?, ?, ?)",
+        legacy_codes,
+    )
+    conn.execute(
+        "UPDATE tm_usuario_preferencias SET tema_codigo='ocean-deep' WHERE tema_codigo IN (?, ?, ?)",
+        legacy_codes,
+    )
     now = now_iso()
     conn.execute(
         """
@@ -172,7 +185,7 @@ def init_schema(database_path: str) -> None:
         (fundacion_id, corporacion_id, tema_default_codigo, permitir_usuario_cambiar,
          modo_default, contraste_default, font_scale_default, layout_default, densidad_default,
          radio_default, fecha_creacion, fecha_actualizacion)
-        VALUES (1, NULL, 'base-actual', 1, 'oscuro', 'normal', 100, 'normal', 'comfortable', 16, ?, ?)
+        VALUES (1, NULL, 'ocean-deep', 1, 'oscuro', 'normal', 100, 'normal', 'comfortable', 16, ?, ?)
         ON CONFLICT DO NOTHING
         """,
         (now, now),
@@ -185,7 +198,6 @@ def audit(database_path: str, accion: str, user: dict[str, Any] | None = None, e
           entidad_id: Any = None, antes: Any = None, despues: Any = None, ip: str | None = None,
           corporacion_id: int | None = None) -> None:
     try:
-        init_schema(database_path)
         user = user or {}
         conn = connect(database_path)
         conn.execute(
@@ -221,7 +233,6 @@ def row_to_theme(row: sqlite3.Row | dict[str, Any] | None) -> dict[str, Any] | N
 
 
 def get_theme(database_path: str, codigo: str) -> dict[str, Any] | None:
-    init_schema(database_path)
     conn = connect(database_path)
     row = conn.execute('SELECT * FROM tm_temas WHERE codigo=?', (codigo,)).fetchone()
     conn.close()
@@ -229,8 +240,9 @@ def get_theme(database_path: str, codigo: str) -> dict[str, Any] | None:
 
 
 def list_themes(database_path: str, include_inactive: bool = False, fundacion_id: int | None = None) -> list[dict[str, Any]]:
-    init_schema(database_path)
-    where = [] if include_inactive else ['activo=1']
+    where = ["categoria <> 'legacy'"]
+    if not include_inactive:
+        where.append('activo=1')
     params: list[Any] = []
     # Los temas de sistema son globales; los personalizados pueden quedar asociados a una fundación.
     if fundacion_id:
@@ -247,7 +259,6 @@ def list_themes(database_path: str, include_inactive: bool = False, fundacion_id
 
 
 def get_corporation_config(database_path: str, fundacion_id: int, corporacion_id: int | None = None) -> dict[str, Any]:
-    init_schema(database_path)
     conn = connect(database_path)
     row = conn.execute(
         """
@@ -269,7 +280,7 @@ def get_corporation_config(database_path: str, fundacion_id: int, corporacion_id
             (fundacion_id, corporacion_id, tema_default_codigo, permitir_usuario_cambiar, modo_default,
              contraste_default, font_scale_default, layout_default, densidad_default, radio_default,
              fecha_creacion, fecha_actualizacion)
-            VALUES (?, ?, 'base-actual', 1, 'oscuro', 'normal', 100, 'normal', 'comfortable', 16, ?, ?)
+            VALUES (?, ?, 'ocean-deep', 1, 'oscuro', 'normal', 100, 'normal', 'comfortable', 16, ?, ?)
             """,
             (fundacion_id or 1, corporacion_id, now, now),
         )
@@ -288,7 +299,7 @@ def get_corporation_config(database_path: str, fundacion_id: int, corporacion_id
 def sanitize_preference(payload: dict[str, Any] | None, fallback: dict[str, Any]) -> dict[str, Any]:
     payload = payload or {}
     pref = dict(fallback or {})
-    codigo = sanitize_code(payload.get('tema_codigo') or payload.get('codigo') or pref.get('tema_codigo') or 'base-actual', 'base-actual')
+    codigo = sanitize_code(payload.get('tema_codigo') or payload.get('codigo') or pref.get('tema_codigo') or 'ocean-deep', 'ocean-deep')
     pref['tema_codigo'] = codigo
     mode = str(payload.get('modo') or pref.get('modo') or pref.get('modo_default') or 'oscuro')
     pref['modo'] = mode if mode in ALLOWED_MODES else 'oscuro'
@@ -307,7 +318,6 @@ def sanitize_preference(payload: dict[str, Any] | None, fallback: dict[str, Any]
 def get_user_preference(database_path: str, usuario_id: int | None, fundacion_id: int) -> dict[str, Any] | None:
     if not usuario_id:
         return None
-    init_schema(database_path)
     conn = connect(database_path)
     row = conn.execute(
         'SELECT * FROM tm_usuario_preferencias WHERE usuario_id=? AND fundacion_id=?',
@@ -357,7 +367,7 @@ def current_context(database_path: str, user: dict[str, Any] | None = None) -> d
     can_change = bool(corp_config.get('permitir_usuario_cambiar')) or can_admin
     user_pref = get_user_preference(database_path, usuario_id, fundacion_id) if can_change else None
     fallback = {
-        'tema_codigo': corp_config.get('tema_default_codigo') or 'base-actual',
+        'tema_codigo': corp_config.get('tema_default_codigo') or 'ocean-deep',
         'modo': corp_config.get('modo_default') or 'oscuro',
         'contraste': corp_config.get('contraste_default') or 'normal',
         'font_scale': corp_config.get('font_scale_default') or 100,
@@ -367,10 +377,10 @@ def current_context(database_path: str, user: dict[str, Any] | None = None) -> d
         'custom_json': None,
     }
     pref = sanitize_preference(user_pref or {}, fallback) if user_pref else sanitize_preference({}, fallback)
-    theme = get_theme(database_path, pref['tema_codigo']) or get_theme(database_path, corp_config.get('tema_default_codigo') or 'base-actual') or get_theme(database_path, 'base-actual')
+    theme = get_theme(database_path, pref['tema_codigo']) or get_theme(database_path, corp_config.get('tema_default_codigo') or 'ocean-deep') or get_theme(database_path, 'ocean-deep')
     if not theme or not theme.get('activo'):
-        theme = get_theme(database_path, 'base-actual')
-        pref['tema_codigo'] = 'base-actual'
+        theme = get_theme(database_path, 'ocean-deep')
+        pref['tema_codigo'] = 'ocean-deep'
     variables = compute_variables(theme, pref)
     return {
         'tema': theme,
@@ -396,7 +406,7 @@ def save_user_preference(database_path: str, user: dict[str, Any], payload: dict
     if not bool(corp_config.get('permitir_usuario_cambiar')) and user.get('rol') not in {'SUPERADMIN', 'GERENTE'}:
         raise PermissionError('El cambio de diseño por usuario no está habilitado para esta corporación.')
     fallback = {
-        'tema_codigo': corp_config.get('tema_default_codigo') or 'base-actual',
+        'tema_codigo': corp_config.get('tema_default_codigo') or 'ocean-deep',
         'modo': corp_config.get('modo_default') or 'oscuro',
         'contraste': corp_config.get('contraste_default') or 'normal',
         'font_scale': corp_config.get('font_scale_default') or 100,
@@ -449,7 +459,7 @@ def save_corporation_config(database_path: str, user: dict[str, Any], payload: d
     corporacion_id = payload.get('corporacion_id')
     if corporacion_id in {'', 'null', 'None'}:
         corporacion_id = None
-    theme_code = sanitize_code(payload.get('tema_default_codigo') or payload.get('tema_codigo') or 'base-actual', 'base-actual')
+    theme_code = sanitize_code(payload.get('tema_default_codigo') or payload.get('tema_codigo') or 'ocean-deep', 'ocean-deep')
     theme = get_theme(database_path, theme_code)
     if not theme or not theme.get('activo'):
         raise ValueError('El tema predeterminado seleccionado no existe o está inactivo.')

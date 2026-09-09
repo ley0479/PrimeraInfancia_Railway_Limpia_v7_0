@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS tm_config_corporacion (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fundacion_id INTEGER NOT NULL DEFAULT 1,
     corporacion_id INTEGER,
-    tema_default_codigo TEXT NOT NULL DEFAULT 'base-actual',
+    tema_default_codigo TEXT NOT NULL DEFAULT 'ocean-deep',
     permitir_usuario_cambiar INTEGER DEFAULT 1,
     modo_default TEXT DEFAULT 'oscuro',
     contraste_default TEXT DEFAULT 'normal',
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS tm_usuario_preferencias (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     usuario_id INTEGER NOT NULL,
     fundacion_id INTEGER NOT NULL DEFAULT 1,
-    tema_codigo TEXT NOT NULL DEFAULT 'base-actual',
+    tema_codigo TEXT NOT NULL DEFAULT 'ocean-deep',
     modo TEXT DEFAULT 'oscuro',
     contraste TEXT DEFAULT 'normal',
     font_scale INTEGER DEFAULT 100,
@@ -218,3 +218,7 @@ SYSTEM_THEMES = [
         },
     },
 ]
+
+# El registro profesional sustituye el catálogo heredado sin duplicar módulos.
+from .theme_registry import build_system_themes
+SYSTEM_THEMES = build_system_themes(DEFAULT_THEME_CONFIG)

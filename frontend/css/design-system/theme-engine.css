@@ -1,0 +1,47 @@
+/* Capa única de adaptación visual. No altera permisos, rutas ni documentos. */
+@media screen {
+    html.tm-active body,
+    html.tm-active #app-shell,
+    html.tm-active #app-shell > main { background-color: var(--pi-bg); color: var(--pi-text); }
+
+    html.tm-active #sidebar-institucional { background: var(--pi-sidebar-bg, var(--pi-surface)); border-color: var(--pi-border); }
+    html.tm-active #sidebar-institucional .pi-menu-item { color: var(--pi-sidebar-text, var(--pi-text)); }
+    html.tm-active #sidebar-institucional .pi-menu-item:hover,
+    html.tm-active #sidebar-institucional .pi-menu-item.active { background: color-mix(in srgb, var(--pi-primary) 24%, transparent); box-shadow: inset 3px 0 var(--pi-accent); }
+
+    html.tm-active #app-shell > main .bg-slate-950,
+    html.tm-active #app-shell > main .bg-slate-900,
+    html.tm-active #app-shell > main .bg-slate-800 { background-color: var(--pi-surface); }
+    html.tm-active #app-shell > main .bg-slate-700 { background-color: var(--pi-surface-soft); }
+    html.tm-active #app-shell > main .text-white,
+    html.tm-active #app-shell > main .text-slate-100,
+    html.tm-active #app-shell > main .text-slate-200,
+    html.tm-active #app-shell > main .text-slate-300 { color: var(--pi-text); }
+    html.tm-active #app-shell > main .text-slate-400,
+    html.tm-active #app-shell > main .text-slate-500 { color: var(--pi-muted); }
+    html.tm-active #app-shell > main .border-slate-900,
+    html.tm-active #app-shell > main .border-slate-800,
+    html.tm-active #app-shell > main .border-slate-700 { border-color: var(--pi-border); }
+
+    html.tm-active .tm-card,
+    html.tm-active .tm-panel,
+    html.tm-active #app-shell > main section { border-radius: var(--pi-radius); }
+    html.tm-active[data-tm-cards="elevated"] #app-shell > main section { box-shadow: 0 10px 28px rgb(0 0 0 / 16%); }
+    html.tm-active[data-tm-density="compact"] #app-shell > main { --pi-density-y: .82; }
+    html.tm-active[data-tm-density="spacious"] #app-shell > main { --pi-density-y: 1.18; }
+
+    html.tm-active[data-theme="ocean-deep"] { --pi-sidebar-bg: #071a31; --pi-sidebar-text: #f3f8ff; }
+    html.tm-active[data-theme="neutral-professional"] { --pi-sidebar-bg: #ffffff; --pi-sidebar-text: #17243b; }
+    html.tm-active[data-theme="natura-green"] { --pi-sidebar-bg: #173f2b; --pi-sidebar-text: #f4f7f0; }
+    html.tm-active[data-theme="aurora-violet"] { --pi-sidebar-bg: #170b36; --pi-sidebar-text: #faf6ff; }
+    html.tm-active[data-theme="warm-sand"] { --pi-sidebar-bg: #6b4929; --pi-sidebar-text: #fffaf2; }
+    html.tm-active[data-theme="executive-premium"] { --pi-sidebar-bg: #050607; --pi-sidebar-text: #f7f3e9; }
+
+    html.tm-active[data-tm-motion="reduced"] *,
+    html.tm-active[data-tm-motion="reduced"] *::before,
+    html.tm-active[data-tm-motion="reduced"] *::after { animation-duration: .01ms; animation-iteration-count: 1; transition-duration: .01ms; }
+}
+
+@media print {
+    html.tm-active { color-scheme: normal; }
+}
