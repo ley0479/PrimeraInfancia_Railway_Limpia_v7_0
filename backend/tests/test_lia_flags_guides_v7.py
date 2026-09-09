@@ -11,11 +11,18 @@ from modules.asistente_capacitacion.config import public_flags
 from modules.asistente_capacitacion.guides import GUIDES
 
 os.environ.pop('ENABLE_LIA_ASSISTANT', None)
+os.environ.pop('ENABLE_LIAM_ASSISTANT', None)
 flags = public_flags()
 assert flags['enabled'] is False
 assert flags['voice_enabled'] is False
 assert flags['ai_enabled'] is False
 assert flags['realtime_enabled'] is False
+
+os.environ['ENABLE_LIAM_ASSISTANT'] = 'true'
+flags = public_flags()
+assert flags['enabled'] is True
+assert flags['text_enabled'] is True
+os.environ.pop('ENABLE_LIAM_ASSISTANT', None)
 
 required = {'dashboard','base-maestra','talento','salud-nutricion','calendario-inteligente','motor-documental','formatos','administracion','relacion-mes'}
 assert required.issubset(GUIDES)

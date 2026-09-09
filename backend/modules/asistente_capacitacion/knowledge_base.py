@@ -7,6 +7,9 @@ import json
 from pathlib import Path
 import textwrap
 
+from modules.seguridad.services import ROLE_MENU_PERMISSIONS
+from .elian_module_registry import ELIAN_MODULE_REGISTRY
+
 
 KNOWLEDGE_ROOT = Path(__file__).resolve().parents[3] / "knowledge" / "liam"
 
@@ -24,6 +27,33 @@ def load_knowledge() -> dict:
         document = _read_json(source)
         kind = document.get("kind", "identity")
         result[kind] = document.get("items", document)
+    # La ficha detallada se redacta de forma progresiva. Mientras tanto, el
+    # registro transversal garantiza que LIAM conozca todos los módulos reales
+    # y nunca responda con una pantalla inventada.
+    authored = {item.get("module_id") for item in result.get("modules", [])}
+    role_map = {
+        module_id: [role for role, allowed in ROLE_MENU_PERMISSIONS.items() if module_id in allowed]
+        for module_id in (item["module_id"] for item in ELIAN_MODULE_REGISTRY)
+    }
+    generated = []
+    for item in ELIAN_MODULE_REGISTRY:
+        if item["module_id"] in authored:
+            continue
+        generated.append({
+            "module_id": item["module_id"], "screen_id": f'{item["module_id"]}.main',
+            "title": item["title"], "technical_name": item["module_id"],
+            "objective": item["purpose"], "roles": role_map.get(item["module_id"], []),
+            "location": f'Menú → {item["title"]}', "prerequisites": item["inputs"],
+            "inputs": item["inputs"], "tools": [], "process": [
+                "Confirma la fundación, el rol y el periodo visibles.",
+                "Abre únicamente la función autorizada que necesitas.",
+                "Revisa los datos y confirma el resultado antes de continuar.",
+            ], "result": item["outputs"], "result_location": item["title"],
+            "validations": item["validations"], "common_errors": item["frequent_errors"],
+            "solution": "Revisa los requisitos visibles y conserva el código de referencia si el problema continúa.",
+            "next_step": item["next_step"], "status": "registry_verified", "controls": [],
+        })
+    result.setdefault("modules", []).extend(generated)
     return result
 
 

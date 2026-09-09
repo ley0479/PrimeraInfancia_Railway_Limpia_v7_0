@@ -12,8 +12,9 @@ from .assistant_service import respond
 from .platform_profile import get_platform_profile
 from .tool_registry import ALLOWED_TOOLS, execute
 from .rate_limit import allow
-from .provider_adapter import provider_status
+from .provider_adapter import OpenAIResponsesProvider, ProviderUnavailable, provider_status
 from .knowledge_base import manual_for_role, build_manual_pdf
+from .privacy_service import redact
 import json, uuid
 
 
@@ -145,18 +146,21 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             'afro_colombian_technological':{'label':'Afrocolombiano tecnológico','assets':{'male':'./assets/lia/elian-afro-technological-male-v1.png','female':'./assets/lia/elian-afro-technological-female-v1.png'},'ready_genders':['male','female']},
             'afro_colombian_educational':{'label':'Afrocolombiano educativo','assets':{'male':'./assets/lia/elian-afro-educational-male-v1.png','female':'./assets/lia/elian-afro-educational-female-v1.png'},'ready_genders':['male','female']},
         }
-        defaults={'assistant_name':'IAN','avatar_gender':'male','avatar_variant':'afro_colombian_institutional','skin_tone':'dark','hair_style':'short_coily','clothing_style':'institutional_vest','primary_color':'#123A63','secondary_color':'#16C6D8','voice_gender':'male','voice_speed':.95,'headset_enabled':1,'tablet_enabled':1,'hologram_enabled':1,'animation_enabled':1,'walk_enabled':0,'lip_sync_enabled':1,'motion_level':'light','avatar_asset_path':variants['afro_colombian_institutional']['assets']['male']}
+        defaults={'assistant_name':'LIAM','avatar_gender':'female','avatar_variant':'afro_colombian_institutional','skin_tone':'dark','hair_style':'short_coily','clothing_style':'institutional_vest','primary_color':'#123A63','secondary_color':'#16C6D8','voice_gender':'female','voice_speed':.95,'headset_enabled':1,'tablet_enabled':1,'hologram_enabled':1,'animation_enabled':1,'walk_enabled':1,'lip_sync_enabled':1,'motion_level':'full','avatar_asset_path':variants['afro_colombian_institutional']['assets']['female']}
         conn=connect();row=conn.execute('SELECT * FROM elian_visual_configuration WHERE fundacion_id=?',(fid,)).fetchone()
         if request.method=='GET':
-            conn.close();config={**defaults,**(dict(row) if row else {})};selected=variants.get(config['avatar_variant'],variants['afro_colombian_institutional']);ready=config['avatar_gender'] in selected['ready_genders'];return jsonify({'configuration':config,'variants':variants,'genders':['male','female'],'editable':str(ctx.get('rol') or '') in {'SUPERADMIN','GERENTE'},'fallback_active':not ready}),200
+            conn.close();config={**defaults,**(dict(row) if row else {})}
+            if str(config.get('assistant_name') or '').upper() in {'IAN','ELIAN'}:
+                config.update({'assistant_name':'LIAM','avatar_gender':'female','voice_gender':'female','motion_level':'full','walk_enabled':1,'avatar_asset_path':variants['afro_colombian_institutional']['assets']['female']})
+            selected=variants.get(config['avatar_variant'],variants['afro_colombian_institutional']);ready=config['avatar_gender'] in selected['ready_genders'];return jsonify({'configuration':config,'variants':variants,'genders':['male','female'],'editable':str(ctx.get('rol') or '') in {'SUPERADMIN','GERENTE'},'fallback_active':not ready}),200
         if str(ctx.get('rol') or '') not in {'SUPERADMIN','GERENTE'}:conn.close();return jsonify({'error':'Solo un administrador autorizado puede cambiar la apariencia global.'}),403
         data=request.get_json(silent=True) or {};gender=str(data.get('avatar_gender') or defaults['avatar_gender']);variant=str(data.get('avatar_variant') or defaults['avatar_variant']);motion=str(data.get('motion_level') or defaults['motion_level'])
         if gender not in {'male','female'} or variant not in variants or motion not in {'full','light','reduced'}:conn.close();return jsonify({'error':'La variante visual solicitada no está registrada.'}),422
-        asset=variants[variant]['assets'][gender];asset_ready=gender in variants[variant]['ready_genders'];name=str(data.get('assistant_name') or 'IAN').strip()[:40] or 'IAN';now=datetime.now().isoformat(timespec='seconds')
+        asset=variants[variant]['assets'][gender];asset_ready=gender in variants[variant]['ready_genders'];name=str(data.get('assistant_name') or 'LIAM').strip()[:40] or 'LIAM';now=datetime.now().isoformat(timespec='seconds')
         values=(name,gender,variant,str(data.get('skin_tone') or 'dark')[:30],str(data.get('hair_style') or 'short_coily')[:40],str(data.get('clothing_style') or 'institutional_vest')[:40],str(data.get('primary_color') or '#123A63')[:16],str(data.get('secondary_color') or '#16C6D8')[:16],str(data.get('voice_gender') or gender)[:12],max(.6,min(1.5,float(data.get('voice_speed') or .95))),1 if data.get('headset_enabled',True) else 0,1 if data.get('tablet_enabled',True) else 0,1 if data.get('hologram_enabled',True) else 0,1 if data.get('animation_enabled',True) else 0,1 if data.get('walk_enabled',False) else 0,1 if data.get('lip_sync_enabled',False) else 0,motion,asset)
         conn.execute('''INSERT INTO elian_visual_configuration(fundacion_id,assistant_name,avatar_gender,avatar_variant,skin_tone,hair_style,clothing_style,primary_color,secondary_color,voice_gender,voice_speed,headset_enabled,tablet_enabled,hologram_enabled,animation_enabled,walk_enabled,lip_sync_enabled,motion_level,avatar_asset_path,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(fundacion_id) DO UPDATE SET assistant_name=excluded.assistant_name,avatar_gender=excluded.avatar_gender,avatar_variant=excluded.avatar_variant,skin_tone=excluded.skin_tone,hair_style=excluded.hair_style,clothing_style=excluded.clothing_style,primary_color=excluded.primary_color,secondary_color=excluded.secondary_color,voice_gender=excluded.voice_gender,voice_speed=excluded.voice_speed,headset_enabled=excluded.headset_enabled,tablet_enabled=excluded.tablet_enabled,hologram_enabled=excluded.hologram_enabled,animation_enabled=excluded.animation_enabled,walk_enabled=excluded.walk_enabled,lip_sync_enabled=excluded.lip_sync_enabled,motion_level=excluded.motion_level,avatar_asset_path=excluded.avatar_asset_path,updated_by=excluded.updated_by,updated_at=excluded.updated_at''',(fid,*values,uid,now,now));conn.commit();conn.close();audit_lia(ctx,'ELIAN_VISUAL_CONFIGURATION_UPDATED',module='administracion',metadata={'variant':variant,'gender':gender,'asset_ready':asset_ready})
         saved=dict(zip(('assistant_name','avatar_gender','avatar_variant','skin_tone','hair_style','clothing_style','primary_color','secondary_color','voice_gender','voice_speed','headset_enabled','tablet_enabled','hologram_enabled','animation_enabled','walk_enabled','lip_sync_enabled','motion_level','avatar_asset_path'),values))
-        return jsonify({'message':'Configuración visual de IAN actualizada.','configuration':saved,'asset_ready':asset_ready}),200
+        return jsonify({'message':'Configuración visual de LIAM actualizada.','configuration':saved,'asset_ready':asset_ready}),200
 
     @bp.post('/progreso')
     def progreso():
@@ -195,6 +199,18 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             return jsonify({'error':'Módulo no autorizado para el rol actual.'}), 403
         knowledge=manual_for_role(str(ctx.get('rol') or ''),module_id=module,screen_id=str(data.get('screen_id') or ''),help_id=str(data.get('help_id') or ''))
         result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed),knowledge=knowledge)
+        if flags['ai_enabled'] and provider_status()['ready']:
+            try:
+                generated=OpenAIResponsesProvider().respond(messages=[{'role':'user','content':redact(question)}],context={
+                    'role':str(ctx.get('rol') or ''),'module':module,'manual':knowledge,
+                    'verified_draft':result['message'],'required_confidence':result['confidence'],
+                },tools=[])
+                safe_generated=redact(generated['message'])
+                result.update({'message':safe_generated,'speech_text':safe_generated,
+                    'provider':generated['provider'],'model':generated['model'],
+                    'provider_response_id':generated.get('response_id')})
+            except ProviderUnavailable as exc:
+                app.logger.warning('LIAM usa recuperación local por indisponibilidad del proveedor: %s',str(exc))
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
         return jsonify(result), 200
 
@@ -202,7 +218,16 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def health():
         flags = public_flags()
         provider=provider_status()
-        return jsonify({'status':'ok','enabled':flags['enabled'],'mode':'institutional_static' if not provider['ready'] else 'provider','provider_ready':provider['ready'],'realtime_enabled':flags['realtime_enabled']}), 200
+        mode='provider' if provider['ready'] else 'institutional_static'
+        return jsonify({'status':'ok','enabled':flags['enabled'],'mode':mode,'provider_ready':provider['ready'],
+            'components':{'text':flags['text_enabled'],'context':flags['context_help_enabled'],
+                'tours':flags['guided_tours_enabled'],'voice':flags['voice_enabled'],
+                'generative_ai':flags['ai_enabled'] and provider['ready'],
+                'realtime_voice':flags['realtime_enabled']},
+            'operational':flags['enabled'] and flags['text_enabled'],
+            'degraded_reasons':([] if flags['enabled'] else ['assistant_disabled'])+
+                ([] if flags['text_enabled'] else ['text_disabled'])+
+                ([] if not flags['ai_enabled'] or provider['ready'] else ['provider_not_ready'])}), 200
 
     @bp.get('/tools')
     def tools_available():

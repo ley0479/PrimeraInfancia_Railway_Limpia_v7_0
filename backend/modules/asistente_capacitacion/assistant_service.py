@@ -1,79 +1,65 @@
-"""Motor estático verificable de LÍA; el proveedor de IA permanece opcional."""
+"""Motor conversacional verificable de LIAM con recuperación del Manual Maestro."""
 from __future__ import annotations
-import uuid
+import re, unicodedata, uuid
 from .guides import DEFAULT_GUIDE, GUIDES
 from .privacy_service import redact
 from .platform_profile import get_platform_profile
 
-def respond(*, question: str, module: str, role: str, allowed_modules=None, knowledge=None) -> dict:
-    guide = dict(GUIDES.get(module, DEFAULT_GUIDE))
-    q = question.casefold()
-    actions = []
-    confidence = 'confirmed'
-    profile = get_platform_profile()
-    allowed_modules = list(allowed_modules or [])
-    module_names = [GUIDES[key]['titulo'] for key in allowed_modules if key in GUIDES]
-    knowledge = knowledge or {}
-    active_control = knowledge.get('active_control')
-    matched_error = next((item for item in knowledge.get('errors', []) if item.get('code', '').casefold() in q), None)
-    if any(word in q for word in ('qué es esta plataforma', 'que es esta plataforma', 'para qué sirve', 'para que sirve')):
-        message = (f'{profile["description"]} Sirve para centralizar la Base Maestra, el talento humano, '
-                   'salud y nutrición, la gestión pedagógica y psicosocial, el calendario, las evidencias, '
-                   'los formatos y el seguimiento autorizado, manteniendo separación por fundación y permisos por rol.')
-    elif any(word in q for word in ('qué versión', 'que version', 'versión actual', 'version actual')):
-        message = f'La versión configurada actualmente es {profile["version"]}.'
-    elif any(word in q for word in ('qué módulos', 'que modulos', 'módulos tiene', 'modulos tiene')):
-        message = (f'Para el rol {role or "actual"} hay {len(module_names)} módulos autorizados: ' + ', '.join(module_names) + '.') if module_names else 'No encontré módulos autorizados confirmados para esta sesión.'
-    elif any(word in q for word in ('qué puedo hacer', 'que puedo hacer', 'según mi rol', 'segun mi rol')):
-        message = (f'Tu rol actual es {role or "no identificado"}. Puedes consultar y usar únicamente estas áreas autorizadas: ' + ', '.join(module_names) + '. LÍA adapta las guías y herramientas a esos permisos.') if module_names else f'Tu rol actual es {role or "no identificado"}, pero no encontré áreas autorizadas confirmadas.'
-    elif any(word in q for word in ('flujo general', 'cómo se utiliza la plataforma', 'como se utiliza la plataforma', 'cómo funciona la plataforma', 'como funciona la plataforma')):
-        message = ('Flujo general: 1. Inicia sesión y confirma la fundación. 2. Carga o actualiza las fuentes autorizadas en Base Maestra. '
-                   '3. Revisa unidades, participantes y talento humano. 4. Consulta el calendario y los entregables. '
-                   '5. Trabaja en el módulo correspondiente. 6. Carga evidencias o genera borradores. '
-                   '7. Revisa, confirma y descarga únicamente resultados validados por el sistema y el profesional responsable.')
-    elif any(word in q for word in ('quién diseñó', 'quien diseño', 'quién creó', 'quien creo', 'fecha de creación', 'fecha de creacion', 'presenta la plataforma', 'presentar la plataforma')):
+STOP = frozenset("a al como con cual de del donde el en es esta este hacer la las lo los me mi para por puedo que se un una y".split())
+
+def _plain(value):
+    value=unicodedata.normalize("NFKD",str(value or "").casefold())
+    return "".join(c for c in value if not unicodedata.combining(c))
+
+def _tokens(value): return {x for x in re.findall(r"[a-z0-9]{2,}",_plain(value)) if x not in STOP}
+def _text(item): return " ".join(str(x) for v in item.values() if not isinstance(v,dict) for x in (v if isinstance(v,list) else [v]))
+def _best(question,items):
+    wanted=_tokens(question);winner=None;score=0
+    for item in items:
+        current=len(wanted&_tokens(_text(item)))+2*len(wanted&_tokens(item.get("title") or item.get("code") or ""))
+        if current>score:winner,score=item,current
+    return winner,score
+def _steps(values): return "\n".join(f"{n}. {step}" for n,step in enumerate(values or [],1))
+
+def respond(*,question:str,module:str,role:str,allowed_modules=None,knowledge=None,history=None)->dict:
+    guide=dict(GUIDES.get(module,DEFAULT_GUIDE));q=_plain(question);actions=[];confidence="confirmed";evidence=[]
+    profile=get_platform_profile();allowed_modules=list(allowed_modules or []);knowledge=knowledge or {}
+    names=[GUIDES[x]["titulo"] for x in allowed_modules if x in GUIDES];control=knowledge.get("active_control")
+    errors=knowledge.get("errors",[]);workflows=knowledge.get("workflows",[]);modules=knowledge.get("modules",[])
+    error=next((x for x in errors if _plain(x.get("code")) in q),None);workflow,ws=_best(question,workflows);record,ms=_best(question,modules)
+    if any(x in q for x in ("hola","buenos dias","buenas tardes","buenas noches")) and len(_tokens(q))<=3:
+        message="¡Hola! Soy LIAM. Puedo explicarte esta pantalla, guiarte paso a paso o ayudarte a entender un error de la plataforma."
+    elif any(x in q for x in ("que es esta plataforma","para que sirve")):
+        message=f'{profile["description"]} Sirve para centralizar la Base Maestra, el talento humano, salud y nutrición, la gestión integral pedagógica y psicosocial, el calendario, las evidencias, los formatos y el seguimiento autorizado, manteniendo separación por fundación y permisos por rol.'
+    elif any(x in q for x in ("que version","version actual")): message=f'La versión configurada actualmente es {profile["version"]}.'
+    elif any(x in q for x in ("que modulos","modulos tiene")):
+        message=(f"Para el rol {role or 'actual'} hay {len(names)} módulos autorizados: "+", ".join(names)+".") if names else "No encontré módulos autorizados confirmados para esta sesión."
+    elif any(x in q for x in ("que puedo hacer","segun mi rol")):
+        message=(f"Tu rol actual es {role or 'no identificado'}. Puedes consultar y usar únicamente estas áreas autorizadas: "+", ".join(names)+". LIAM adapta las guías y herramientas a esos permisos.") if names else f"Tu rol actual es {role or 'no identificado'}, pero no encontré áreas autorizadas confirmadas."
+    elif any(x in q for x in ("flujo general","como se utiliza la plataforma","como funciona la plataforma")):
+        message="Flujo general: 1. Inicia sesión y confirma la fundación. 2. Carga o actualiza las fuentes autorizadas en Base Maestra. 3. Revisa unidades, participantes y talento humano. 4. Consulta el calendario y los entregables. 5. Trabaja en el módulo correspondiente. 6. Carga evidencias o genera borradores. 7. Revisa, confirma y descarga únicamente resultados validados por el sistema y el profesional responsable."
+    elif any(x in q for x in ("quien diseno","quien creo","fecha de creacion","presenta la plataforma")):
         if profile['identity_confirmed']:
-            message = f'{profile["description"]} Fue diseñada por {profile["designer"]}, su fecha institucional de creación es {profile["created_date"]} y la versión actual es {profile["version"]}.'
+            message=f'{profile["description"]} Fue diseñada por {profile["designer"]}, su fecha institucional de creación es {profile["created_date"]} y la versión actual es {profile["version"]}.'
         else:
-            message = f'{profile["description"]} La autoría y la fecha de creación todavía no han sido confirmadas en la configuración institucional; no debo inventarlas.'
-            confidence = 'insufficient'
-    elif matched_error:
-        message = (f'{matched_error["code"]}: {matched_error["explanation"]} '
-                   f'Qué debes hacer: {matched_error["action"]} '
-                   f'Comprueba: {", ".join(matched_error.get("checks", []))}.')
-    elif any(word in q for word in ('dónde', 'donde', 'clic', 'botón', 'boton')):
-        target = active_control.get('help_id') if active_control else f'{module}.open'
-        title = active_control.get('title') if active_control else guide['titulo']
-        message = f'Te mostraré el acceso registrado de {title}. LÍA no pulsará ni guardará nada por ti.'
-        actions = [{'type':'scroll_to','target':target}, {'type':'highlight','target':target}]
-    elif any(word in q for word in ('error', 'falló', 'fallo', 'no carga', 'no descarga', 'validación')):
-        message = ('Podemos revisarlo con calma. Todavía no hay información suficiente para confirmar la causa. '
-                   'Primero revisa el código y mensaje exactos, el estado del proceso y los requisitos visibles. '
-                   'Si compartes el error estructurado sin datos personales, podré orientarte con mayor precisión.')
-        confidence = 'insufficient'
-    elif active_control and any(word in q for word in ('cómo', 'como', 'paso', 'qué hago', 'que hago', 'pantalla', 'rpp')):
-        message = (f'{active_control["title"]}: {active_control["purpose"]}\n' +
-                   '\n'.join(f'{i}. {step}' for i, step in enumerate(active_control.get('process', []), 1)) +
-                   f'\nSiguiente paso: {active_control.get("next_step", "Confirma el resultado.")}')
-    elif any(word in q for word in ('cómo', 'como', 'paso', 'qué hago', 'que hago', 'pantalla')):
-        message = f'{guide.get("proposito", guide["resumen"])}\n' + '\n'.join(f'{i}. {step}' for i, step in enumerate(guide.get('pasos', []), 1))
+            message=f'{profile["description"]} La autoría y la fecha de creación todavía no han sido confirmadas en la configuración institucional; no debo inventarlas.';confidence="insufficient"
+    elif error:
+        message=f'{error["code"]}: {error["explanation"]} Qué debes hacer: {error["action"]} Comprueba: {", ".join(error.get("checks",[]))}.';evidence=[{"kind":"error","id":error["code"]}]
+    elif control and any(x in q for x in ("como","paso","que hago","pantalla","boton","clic")):
+        message=f'{control["title"]}: {control["purpose"]}\n{_steps(control.get("process",[]))}\nSiguiente paso: {control.get("next_step","Confirma el resultado.")}'
+        target=control.get("help_id");actions=[{"type":"scroll_to","target":target},{"type":"highlight","target":target}] if target else [];evidence=[{"kind":"control","id":target}]
+    elif workflow and ws>=2:
+        message=f'{workflow["title"]}:\n{_steps(workflow.get("steps",[]))}\nResultado esperado: {workflow.get("result","Confirma el resultado en pantalla.")}';evidence=[{"kind":"workflow","id":workflow.get("workflow_id")}]
+    elif record and ms>=2:
+        message=f'{record["title"]}: {record["objective"]}\nRequisitos: {", ".join(record.get("prerequisites",[]))}.\nPaso a paso:\n{_steps(record.get("process",[]))}\nResultado esperado: {record.get("result","Confirma el resultado en pantalla.")}\nSiguiente paso: {record.get("next_step","Revisa el resultado.")}'
+        evidence=[{"kind":"module","id":record.get("module_id")}]
+    elif any(x in q for x in ("donde","clic","boton")):
+        target=control.get("help_id") if control else f"{module}.open";title=control.get("title") if control else guide["titulo"]
+        message=f"Te mostraré el acceso registrado de {title}. LIAM no pulsará ni guardará nada por ti.";actions=[{"type":"scroll_to","target":target},{"type":"highlight","target":target}]
+    elif any(x in q for x in ("error","fallo","no carga","no descarga","validacion")):
+        message="Podemos revisarlo con calma. Comparte el código y el mensaje exactos, sin datos personales, para orientarte con precisión.";confidence="insufficient"
+    elif any(x in q for x in ("como","paso","que hago","pantalla")): message=f'{guide.get("proposito",guide["resumen"])}\n{_steps(guide.get("pasos",[]))}'
     else:
-        message = (f'Estás en {guide["titulo"]}. Puedo explicar esta pantalla, mostrar el acceso registrado, '
-                   'orientarte paso a paso o ayudarte a interpretar un error confirmado por la plataforma.')
-    safe = redact(message)
-    return {
-        'message': safe, 'speech_text': safe, 'avatar_state': 'guiding' if actions else 'idle',
-        'assistant_state': 'guiding' if actions else 'idle',
-        'avatar': {
-            'gesture': 'point_direction' if actions else 'show_tablet',
-            'expression': 'friendly',
-            'look_at': actions[0]['target'] if actions else None,
-        },
-        'movement': {'mode': 'none', 'destination': None},
-        'highlight': {'target': actions[0]['target'], 'mode': 'outline'} if actions else None,
-        'tablet': {'type': 'message', 'title': guide['titulo'], 'value': safe[:140]},
-        'severity': 'info', 'confidence': confidence, 'confirmation_required': False,
-        'suggestions': ['Conocer la plataforma', 'Explícame esta pantalla', 'Ver versión actual', 'Ver mis pendientes'],
-        'actions': actions, 'diagnostic': None, 'request_id': uuid.uuid4().hex,
-        'module': module, 'role': role, 'provider': 'institutional_static',
-    }
+        message=f'Estás en {guide["titulo"]}. No encontré una instrucción suficientemente precisa en el Manual Maestro para esa pregunta. Menciona la tarea, el botón o el código del error.';confidence="insufficient"
+    safe=redact(message);target=actions[0]["target"] if actions else None
+    return {"message":safe,"speech_text":safe,"avatar_state":"guiding" if actions else "speaking","assistant_state":"guiding" if actions else "speaking","avatar":{"gesture":"point_direction" if actions else "show_tablet","expression":"friendly","look_at":target},"movement":{"mode":"walk" if actions else "none","destination":target},"highlight":{"target":target,"mode":"outline"} if actions else None,"tablet":{"type":"message","title":guide["titulo"],"value":safe[:140]},"severity":"info","confidence":confidence,"confirmation_required":False,"suggestions":["Explícame esta pantalla","Guíame paso a paso","¿Qué puedo hacer según mi rol?","Ayúdame con un error"],"actions":actions,"evidence":evidence,"diagnostic":None,"request_id":uuid.uuid4().hex,"module":module,"role":role,"provider":"institutional_static"}

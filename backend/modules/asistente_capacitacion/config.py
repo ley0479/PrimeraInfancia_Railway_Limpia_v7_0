@@ -19,17 +19,22 @@ def _int(name: str, default: int, minimum: int, maximum: int) -> int:
     return max(minimum, min(maximum, value))
 
 
+def _bool_alias(primary: str, legacy: str, default: bool = False) -> bool:
+    """Lee la bandera LIAM y conserva compatibilidad con el nombre LÍA anterior."""
+    return _bool(primary, default) if os.getenv(primary) is not None else _bool(legacy, default)
+
+
 def public_flags() -> dict:
-    enabled = _bool('ENABLE_LIA_ASSISTANT', False)
+    enabled = _bool_alias('ENABLE_LIAM_ASSISTANT', 'ENABLE_LIA_ASSISTANT', False)
     return {
         'enabled': enabled,
-        'text_enabled': enabled and _bool('LIA_TEXT_ENABLED', True),
-        'context_help_enabled': enabled and _bool('LIA_CONTEXT_HELP_ENABLED', True),
-        'guided_tours_enabled': enabled and _bool('LIA_GUIDED_TOURS_ENABLED', True),
-        'voice_enabled': enabled and _bool('LIA_VOICE_ENABLED', False),
+        'text_enabled': enabled and _bool_alias('LIAM_TEXT_ENABLED', 'LIA_TEXT_ENABLED', True),
+        'context_help_enabled': enabled and _bool_alias('LIAM_CONTEXT_GUIDE_ENABLED', 'LIA_CONTEXT_HELP_ENABLED', True),
+        'guided_tours_enabled': enabled and _bool_alias('LIAM_TOURS_ENABLED', 'LIA_GUIDED_TOURS_ENABLED', True),
+        'voice_enabled': enabled and _bool_alias('LIAM_VOICE_ENABLED', 'LIA_VOICE_ENABLED', False),
         'browser_tts_enabled': enabled and _bool('LIA_BROWSER_TTS_ENABLED', True),
         'realtime_enabled': enabled and _bool('LIA_REALTIME_ENABLED', False),
-        'ai_enabled': enabled and _bool('LIA_AI_ENABLED', False),
+        'ai_enabled': enabled and _bool_alias('LIAM_AI_ENABLED', 'LIA_AI_ENABLED', False),
         'feedback_enabled': enabled and _bool('LIA_FEEDBACK_ENABLED', True),
         'diagnostics_enabled': enabled and _bool('LIA_DIAGNOSTICS_ENABLED', True),
         'max_message_length': _int('LIA_MAX_MESSAGE_LENGTH', 2000, 100, 5000),
@@ -70,9 +75,12 @@ def public_liam_flags() -> dict:
 def public_elian_flags() -> dict:
     """Identidad nueva con fallback compatible a la activación actual de LIAM."""
     legacy = public_liam_flags()
+    liam_enabled = os.getenv('ENABLE_LIAM_ASSISTANT')
     ian_enabled = os.getenv('ENABLE_IAN_ASSISTANT')
     elian_enabled = os.getenv('ENABLE_ELIAN_ASSISTANT')
-    if ian_enabled is not None:
+    if liam_enabled is not None:
+        enabled = _bool('ENABLE_LIAM_ASSISTANT', False)
+    elif ian_enabled is not None:
         enabled = _bool('ENABLE_IAN_ASSISTANT', False)
     elif elian_enabled is not None:
         enabled = _bool('ENABLE_ELIAN_ASSISTANT', False)
@@ -81,9 +89,9 @@ def public_elian_flags() -> dict:
     return {
         **legacy,
         'enabled': enabled,
-        'assistant_name': (os.getenv('IAN_ASSISTANT_NAME') or os.getenv('ELIAN_ASSISTANT_NAME') or 'IAN').strip()[:40] or 'IAN',
+        'assistant_name': (os.getenv('LIAM_ASSISTANT_NAME') or os.getenv('IAN_ASSISTANT_NAME') or os.getenv('ELIAN_ASSISTANT_NAME') or 'LIAM').strip()[:40] or 'LIAM',
         'platform_tour_enabled': enabled and _bool('ELIAN_PLATFORM_TOUR_ENABLED', True),
-        'avatar_gender': (os.getenv('ELIAN_AVATAR_GENDER') or 'male').strip().lower(),
+        'avatar_gender': (os.getenv('LIAM_AVATAR_GENDER') or os.getenv('ELIAN_AVATAR_GENDER') or 'female').strip().lower(),
         'avatar_variant': (os.getenv('ELIAN_AVATAR_VARIANT') or 'afro_colombian_institutional').strip().lower(),
         'skin_tone': (os.getenv('ELIAN_SKIN_TONE') or 'dark').strip().lower(),
         'ui_mode': (os.getenv('ELIAN_UI_MODE') or 'adaptive').strip().lower(),

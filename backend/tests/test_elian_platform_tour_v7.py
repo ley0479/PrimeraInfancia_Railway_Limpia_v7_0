@@ -20,7 +20,8 @@ os.environ.pop('ENABLE_IAN_ASSISTANT', None)
 os.environ.pop('ENABLE_ELIAN_ASSISTANT', None)
 flags = public_elian_flags()
 assert flags['enabled'] is True
-assert flags['assistant_name'] == 'IAN'
+assert flags['assistant_name'] == 'LIAM'
+assert flags['avatar_gender'] == 'female'
 assert 'ENABLE_IAN_ASSISTANT' in config_source
 assert flags['avatar_variant'] == 'afro_colombian_institutional'
 

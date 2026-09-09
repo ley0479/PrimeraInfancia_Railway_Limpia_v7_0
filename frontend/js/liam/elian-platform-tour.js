@@ -23,7 +23,7 @@
   }
   function render(){
     const m=current(),total=tour?.modules?.length||0,pct=total?Math.round((Math.min(index,total))*100/total):0;
-    window.LIAM_TABLET?.show({type:'progress',title:m?`${m.title} · ${index+1} de ${total}`:'Recorrido ELIAN',value:pct,label:`${pct} %`});
+    window.LIAM_TABLET?.show({type:'progress',title:m?`${m.title} · ${index+1} de ${total}`:'Recorrido LIAM',value:pct,label:`${pct} %`});
     const label=document.getElementById('elian-tour-status');if(label)label.textContent=m?`Módulo ${index+1} de ${total}: ${m.title} · ${pct} %`:'Recorrido finalizado';
   }
   async function waitReady(module){

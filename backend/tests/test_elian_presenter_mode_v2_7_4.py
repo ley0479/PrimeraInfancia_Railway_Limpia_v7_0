@@ -34,7 +34,7 @@ assert "pointer-events: none" in styles
 assert ".liam-panel { width: min(380px" in styles
 assert '.liam-shell[data-mode="presenter"] > .liam-panel' in styles
 assert "elian-presenter.css?v=2.7.4-presenter-1" in index
-assert "liam-controller.js?v=2.7.4-presenter-1" in index
+assert "liam-controller.js?v=2.7.4-development-credit-1" in index
 assert "Esta plataforma fue diseñada por" in tour
 assert "fue creada el" in tour
 assert "Su versión actual es" in tour

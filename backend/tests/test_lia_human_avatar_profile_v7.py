@@ -8,9 +8,9 @@ from modules.asistente_capacitacion.platform_profile import get_platform_profile
 from modules.asistente_capacitacion.assistant_service import respond
 
 os.environ.pop('LIA_PLATFORM_DESIGNER',None);os.environ.pop('LIA_PLATFORM_CREATED_DATE',None)
-assert get_platform_profile()['identity_confirmed'] is False
+assert get_platform_profile()['identity_confirmed'] is True
 answer=respond(question='¿Quién diseñó y en qué fecha se creó?',module='dashboard',role='SUPERADMIN')
-assert answer['confidence']=='insufficient' and 'no debo inventarlas' in answer['message']
+assert answer['confidence']=='confirmed' and 'Leison Palacios Blandón' in answer['message']
 assert (ROOT/'frontend/assets/lia/lia-human-v1.png').stat().st_size>100_000
 avatar=(ROOT/'frontend/js/lia-assistant/avatar-controller.js').read_text(encoding='utf-8')
 for state in ('idle','listening','thinking','speaking','guiding','success','warning','error'):
