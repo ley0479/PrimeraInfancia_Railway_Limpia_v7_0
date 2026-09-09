@@ -55,7 +55,9 @@ def main():
     require("LIAM_SAFE_ZONES?.placement" in movement, "El movimiento no valida una zona segura")
     require("ian-tour-avatar" in movement and "pointer-events:none" in css, "El avatar del recorrido puede bloquear clics")
     require("LIAM_MOVEMENT?.moveToControl" in tour, "El recorrido automático no está conectado al movimiento")
-    require("querySelector('.ian-avatar-svg')" in orchestrator, "Los estados aún buscan la fotografía antigua")
+    require(".ian-avatar-visual, .ian-avatar-svg" in orchestrator, "Los estados no alcanzan la imagen principal y el respaldo SVG")
+    for motion in ("ian-image-breathe", "ian-image-greeting", "ian-image-thinking", "ian-image-speaking"):
+        require(motion in css, f"Falta movimiento humanizado para imagen: {motion}")
     for event in ("start", "audio-ready", "play", "pause", "resume", "end", "error", "boundary"):
         require(f"'{event}'" in speech, f"Falta evento de voz: {event}")
     require("LIAM_LIP_SYNC?.pause" in speech and "LIAM_LIP_SYNC?.resume" in speech, "Pausa y reanudación no controlan la boca")
