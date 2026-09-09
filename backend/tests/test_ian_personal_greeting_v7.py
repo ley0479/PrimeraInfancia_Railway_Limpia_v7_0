@@ -25,4 +25,6 @@ for contract in (
 
 assert controller.index("await announceAsync(greeting)") < controller.index("await announceAsync(identity)") < controller.index("await presentation()")
 assert "Comencemos. Esta es" in tour
+for contract in ("stop('listen')", "Escuchando tu pregunta", "await ask(text)", "🎙 Hablar"):
+    assert contract in controller, f"Falta contrato de conversación voz a voz: {contract}"
 print("IAN_PERSONAL_GREETING_V7_PASS")
