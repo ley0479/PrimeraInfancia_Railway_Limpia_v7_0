@@ -88,6 +88,21 @@ def manual_for_role(role: str, *, module_id: str = "", screen_id: str = "", help
     }
 
 
+def manual_for_question(role: str, *, module_id: str = "", screen_id: str = "", help_id: str = "") -> dict:
+    """Combina el contexto visible con todo el Manual Operativo autorizado del rol."""
+    complete = manual_for_role(role)
+    contextual = manual_for_role(role, module_id=module_id, screen_id=screen_id, help_id=help_id)
+    return {
+        **complete,
+        "current_module_id": module_id,
+        "current_screen_id": screen_id,
+        "active_control": contextual.get("active_control"),
+        "context_modules": contextual.get("modules", []),
+        "context_workflows": contextual.get("workflows", []),
+        "manual_scope": "all_authorized_modules",
+    }
+
+
 def _pdf_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 

@@ -13,7 +13,7 @@ from .platform_profile import get_platform_profile
 from .tool_registry import ALLOWED_TOOLS, execute
 from .rate_limit import allow
 from .provider_adapter import OpenAIResponsesProvider, ProviderUnavailable, provider_status
-from .knowledge_base import manual_for_role, build_manual_pdf
+from .knowledge_base import manual_for_role, manual_for_question, build_manual_pdf
 from .privacy_service import redact
 import json, uuid
 
@@ -197,7 +197,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         allowed = set(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''), []))
         if allowed and module not in allowed:
             return jsonify({'error':'Módulo no autorizado para el rol actual.'}), 403
-        knowledge=manual_for_role(str(ctx.get('rol') or ''),module_id=module,screen_id=str(data.get('screen_id') or ''),help_id=str(data.get('help_id') or ''))
+        knowledge=manual_for_question(str(ctx.get('rol') or ''),module_id=module,screen_id=str(data.get('screen_id') or ''),help_id=str(data.get('help_id') or ''))
         result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed),knowledge=knowledge)
         if flags['ai_enabled'] and provider_status()['ready']:
             try:

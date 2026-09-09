@@ -25,8 +25,9 @@ def respond(*,question:str,module:str,role:str,allowed_modules=None,knowledge=No
     guide=dict(GUIDES.get(module,DEFAULT_GUIDE));q=_plain(question);actions=[];confidence="confirmed";evidence=[]
     profile=get_platform_profile();allowed_modules=list(allowed_modules or []);knowledge=knowledge or {}
     names=[GUIDES[x]["titulo"] for x in allowed_modules if x in GUIDES];control=knowledge.get("active_control")
-    errors=knowledge.get("errors",[]);workflows=knowledge.get("workflows",[]);modules=knowledge.get("modules",[])
-    error=next((x for x in errors if _plain(x.get("code")) in q),None);workflow,ws=_best(question,workflows);record,ms=_best(question,modules)
+    errors=knowledge.get("errors",[]);workflows=knowledge.get("workflows",[]);modules=knowledge.get("modules",[]);controls=knowledge.get("controls",[])
+    exact_error=next((x for x in errors if _plain(x.get("code")) in q),None);fuzzy_error,es=_best(question,errors);error=exact_error or (fuzzy_error if es>=2 and any(x in q for x in ("error","fallo","problema","no puedo")) else None)
+    workflow,ws=_best(question,workflows);record,ms=_best(question,modules);matched_control,cs=_best(question,controls)
     if any(x in q for x in ("hola","buenos dias","buenas tardes","buenas noches")) and len(_tokens(q))<=3:
         message="¡Hola! Soy LIAM. Puedo explicarte esta pantalla, guiarte paso a paso o ayudarte a entender un error de la plataforma."
     elif any(x in q for x in ("que es esta plataforma","para que sirve")):
@@ -48,6 +49,10 @@ def respond(*,question:str,module:str,role:str,allowed_modules=None,knowledge=No
     elif control and any(x in q for x in ("como","paso","que hago","pantalla","boton","clic")):
         message=f'{control["title"]}: {control["purpose"]}\n{_steps(control.get("process",[]))}\nSiguiente paso: {control.get("next_step","Confirma el resultado.")}'
         target=control.get("help_id");actions=[{"type":"scroll_to","target":target},{"type":"highlight","target":target}] if target else [];evidence=[{"kind":"control","id":target}]
+    elif matched_control and cs>=2:
+        message=f'{matched_control["title"]}: {matched_control["purpose"]}\n{_steps(matched_control.get("process",[]))}\nSiguiente paso: {matched_control.get("next_step","Confirma el resultado en pantalla.")}'
+        target=matched_control.get("help_id");evidence=[{"kind":"control","id":target}]
+        if matched_control.get("module_id")==module and target:actions=[{"type":"scroll_to","target":target},{"type":"highlight","target":target}]
     elif workflow and ws>=2:
         message=f'{workflow["title"]}:\n{_steps(workflow.get("steps",[]))}\nResultado esperado: {workflow.get("result","Confirma el resultado en pantalla.")}';evidence=[{"kind":"workflow","id":workflow.get("workflow_id")}]
     elif record and ms>=2:
