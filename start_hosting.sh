@@ -34,6 +34,9 @@ fi
 # volumen y arranca Gunicorn; nunca ejecuta DDL durante imports o requests.
 export APP_SCHEMA_MIGRATION_MODE=0
 export SKIP_RUNTIME_SCHEMA_DDL=1
+# La primera descarga puede tardar varios minutos. Se ejecuta en segundo plano
+# para que el healthcheck web no dependa de la velocidad del servidor de modelos.
+python backend/tools/ensure_vosk_model.py &
 python backend/runtime_prepare.py
 echo "[STARTUP] Iniciando Gunicorn en 0.0.0.0:${PORT}"
 

@@ -15,7 +15,8 @@ from .rate_limit import allow
 from .provider_adapter import OpenAIResponsesProvider, ProviderUnavailable, provider_status
 from .knowledge_base import manual_for_role, manual_for_question, build_manual_pdf
 from .privacy_service import redact
-import json, uuid
+from .local_speech import enabled as local_speech_enabled, transcribe_wav
+import json, uuid, os, tempfile
 
 
 def register_asistente_capacitacion(app, database_path: str) -> None:
@@ -213,6 +214,32 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 app.logger.warning('LIAM usa recuperación local por indisponibilidad del proveedor: %s',str(exc))
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
         return jsonify(result), 200
+
+    @bp.post('/voice/transcribe')
+    def voice_transcribe():
+        flags = public_flags()
+        if not flags['enabled'] or not flags['voice_enabled'] or not local_speech_enabled():
+            return jsonify({'error':'El reconocimiento local de voz no está disponible.'}),503
+        ctx = get_request_user_context()
+        if limited(ctx): return jsonify({'error':'Demasiadas solicitudes de voz. Espera un momento.'}),429
+        uploaded = request.files.get('audio')
+        if not uploaded: return jsonify({'error':'No se recibió audio para transcribir.'}),400
+        payload = uploaded.read(1_100_000)
+        if not payload or len(payload) > 1_000_000: return jsonify({'error':'El fragmento de voz supera el límite permitido.'}),413
+        if payload[:4] != b'RIFF' or payload[8:12] != b'WAVE': return jsonify({'error':'El formato de audio no es WAV válido.'}),415
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(prefix='liam_voice_',suffix='.wav',delete=False) as output:
+                output.write(payload);temporary=output.name
+            text=transcribe_wav(temporary)
+            audit_lia(ctx,'VOICE_TRANSCRIBED_LOCAL',module=str(request.form.get('module') or 'dashboard'),metadata={'bytes':len(payload),'characters':len(text)})
+            return jsonify({'text':text,'provider':'vosk-local','language':'es'}),200
+        except (ValueError,RuntimeError) as exc:
+            return jsonify({'error':str(exc)}),422
+        finally:
+            if temporary:
+                try: os.unlink(temporary)
+                except OSError: pass
 
     @bp.get('/health')
     def health():

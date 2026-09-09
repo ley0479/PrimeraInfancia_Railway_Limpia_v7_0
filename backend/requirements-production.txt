@@ -29,3 +29,4 @@ gunicorn>=22,<24
 waitress>=3,<4
 CairoSVG>=2.7,<3.0
 psycopg[binary]>=3.2,<4.0
+vosk==0.3.45

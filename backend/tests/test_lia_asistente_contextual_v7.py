@@ -11,6 +11,7 @@ speech = (ROOT / 'frontend/js/lia-assistant/speech-controller.js').read_text(enc
 assert 'SpeechRecognition' in speech and 'webkitSpeechRecognition' in speech
 assert 'interimResults=true' in speech and 'continuous=true' in speech
 assert 'listen-transcript' in speech and 'stopListening' in speech
+assert 'listenLocal' in speech and 'audio/wav' in speech
 assert 'La transcripción está lista' in frontend
 assert 'tools/get_pending_activities_summary' in frontend
 assert 'showWhere' in frontend and 'lia-target' in styles
