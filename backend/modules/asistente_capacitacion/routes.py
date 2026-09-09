@@ -15,7 +15,7 @@ from .rate_limit import allow
 from .provider_adapter import OpenAIResponsesProvider, ProviderUnavailable, provider_status
 from .knowledge_base import manual_for_role, manual_for_question, build_manual_pdf
 from .privacy_service import redact
-from .local_speech import enabled as local_speech_enabled, transcribe_wav
+from .local_speech import enabled as local_speech_enabled, status as local_speech_status, transcribe_wav
 import json, uuid, os, tempfile
 
 
@@ -245,10 +245,12 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def health():
         flags = public_flags()
         provider=provider_status()
+        local_voice=local_speech_status()
         mode='provider' if provider['ready'] else 'institutional_static'
         return jsonify({'status':'ok','enabled':flags['enabled'],'mode':mode,'provider_ready':provider['ready'],
             'components':{'text':flags['text_enabled'],'context':flags['context_help_enabled'],
                 'tours':flags['guided_tours_enabled'],'voice':flags['voice_enabled'],
+                'local_voice':local_voice,
                 'generative_ai':flags['ai_enabled'] and provider['ready'],
                 'realtime_voice':flags['realtime_enabled']},
             'operational':flags['enabled'] and flags['text_enabled'],

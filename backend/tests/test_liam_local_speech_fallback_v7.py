@@ -16,6 +16,7 @@ assert "local_stt_enabled" in controller and "Activando reconocimiento local seg
 assert "@bp.post('/voice/transcribe')" in routes and "get_request_user_context()" in routes
 assert "1_000_000" in routes and "VOICE_TRANSCRIBED_LOCAL" in routes
 assert "KaldiRecognizer" in local and "wave.open" in local
+assert '"ready": ready' in local and "local_speech_status()" in routes
 assert "python backend/tools/ensure_vosk_model.py" in startup
 assert "vosk==0.3.45" in requirements
 print("LIAM_LOCAL_SPEECH_FALLBACK_V7_PASS")

@@ -17,6 +17,11 @@ def model_path() -> Path:
     return Path(os.getenv("LIAM_VOSK_MODEL_PATH") or Path(os.getenv("DATA_DIR", "/data")) / "models" / "vosk-model-small-es-0.42")
 
 
+def status() -> dict:
+    ready = (model_path() / "conf" / "model.conf").exists()
+    return {"enabled": enabled(), "ready": ready, "provider": "vosk-local" if ready else None}
+
+
 def _load_model():
     global _model
     if _model is None:
