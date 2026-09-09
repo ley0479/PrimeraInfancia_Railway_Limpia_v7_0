@@ -56,6 +56,9 @@ def main():
     require("ian-tour-avatar" in movement and "pointer-events:none" in css, "El avatar del recorrido puede bloquear clics")
     require("LIAM_MOVEMENT?.moveToControl" in tour, "El recorrido automático no está conectado al movimiento")
     require(".ian-avatar-visual, .ian-avatar-svg" in orchestrator, "Los estados no alcanzan la imagen principal y el respaldo SVG")
+    for frame in ("liam-rig-base-female-v2.png", "liam-rig-speaking-female-v2.png", "liam-rig-greeting-female-v2.png", "liam-rig-pointing-left-female-v2.png"):
+        require(frame in renderer, f"Falta cuadro articulado: {frame}")
+    require("rigFrames" in orchestrator and "frames.speaking" in orchestrator and "frames.greeting" in orchestrator and "frames.guiding" in orchestrator, "Los estados no seleccionan los cuadros articulados")
     for motion in ("ian-image-breathe", "ian-image-greeting", "ian-image-thinking", "ian-image-speaking"):
         require(motion in css, f"Falta movimiento humanizado para imagen: {motion}")
     for event in ("start", "audio-ready", "play", "pause", "resume", "end", "error", "boundary"):
