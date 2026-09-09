@@ -25,6 +25,7 @@ for contract in (
 
 assert controller.index("await announceAsync(greeting)") < controller.index("await announceAsync(identity)") < controller.index("await presentation()")
 assert "Comencemos. Esta es" in tour
-for contract in ("stop('listen')", "Escuchando tu pregunta", "await ask(text)", "🎙 Hablar"):
+for contract in ("stop('listen')", "Transcribiendo:", "stopListening", "onInterim", "🎙 Hablar"):
     assert contract in controller, f"Falta contrato de conversación voz a voz: {contract}"
+assert "await ask(text)" not in controller[controller.index("async function listen()"):controller.index("function handle(action)")], "La voz no debe enviarse sin revisión del usuario"
 print("IAN_PERSONAL_GREETING_V7_PASS")
