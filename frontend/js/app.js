@@ -2196,12 +2196,14 @@ async function descargarBienestarinaAlpha62(unidad) {
     });
 }
 
-async function descargarRppCategoria(unidad, grupo) {
+async function descargarRppCategoria(unidad, grupo, periodoSolicitado = null) {
     if (!unidad || !grupo) {
         alert('Debe seleccionar una unidad y un grupo etario para descargar RPP.');
         return;
     }
-    const periodo = periodoFormatosSeleccionado();
+    const periodo = periodoSolicitado && Number(periodoSolicitado.mes) >= 1 && Number(periodoSolicitado.mes) <= 12
+        ? { mes: Number(periodoSolicitado.mes), anio: Number(periodoSolicitado.anio) }
+        : periodoFormatosSeleccionado();
     const url = `${backendUrl}/api/rpp/descargar?unidad=${encodeURIComponent(unidad)}&grupo=${encodeURIComponent(grupo)}&mes=${encodeURIComponent(periodo.mes)}&anio=${encodeURIComponent(periodo.anio)}`;
     if (typeof mostrarMensaje === 'function') {
         mostrarMensaje('message-box', `Generando RPP ${grupo} para ${unidad}...`, 'success');

@@ -16,6 +16,7 @@ from .provider_adapter import OpenAIResponsesProvider, ProviderUnavailable, prov
 from .knowledge_base import manual_for_role, manual_for_question, build_manual_pdf
 from .privacy_service import redact
 from .local_speech import enabled as local_speech_enabled, status as local_speech_status, transcribe_wav
+from .action_intents import propose_action
 import json, uuid, os, tempfile
 
 
@@ -199,11 +200,23 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if allowed and module not in allowed:
             return jsonify({'error':'Módulo no autorizado para el rol actual.'}), 403
         knowledge=manual_for_question(str(ctx.get('rol') or ''),module_id=module,screen_id=str(data.get('screen_id') or ''),help_id=str(data.get('help_id') or ''))
-        result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed),knowledge=knowledge)
+        history=[]
+        for item in (data.get('history') or [])[-6:]:
+            if not isinstance(item,dict) or item.get('role') not in {'user','assistant'}: continue
+            content=redact(str(item.get('content') or '').strip())[:1200]
+            if content: history.append({'role':item['role'],'content':content})
+        screen_context=data.get('screen_context') if isinstance(data.get('screen_context'),dict) else {}
+        proposal=propose_action(question,screen_context=screen_context)
+        result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed),knowledge=knowledge,history=history)
+        if proposal:
+            if proposal['missing']:
+                result.update({'message':proposal['summary']+' Antes de hacerlo necesito: '+', '.join(proposal['missing'])+'.','speech_text':proposal['summary']+' Antes de hacerlo necesito '+', '.join(proposal['missing'])+'.','confidence':'needs_input','confirmation_required':False,'action_proposal':proposal})
+            else:
+                result.update({'message':proposal['summary']+' Revisa los datos y confirma para continuar.','speech_text':proposal['summary']+' Revisa los datos y confirma para continuar.','confirmation_required':True,'action_proposal':proposal})
         if flags['ai_enabled'] and provider_status()['ready']:
             try:
-                generated=OpenAIResponsesProvider().respond(messages=[{'role':'user','content':redact(question)}],context={
-                    'role':str(ctx.get('rol') or ''),'module':module,'manual':knowledge,
+                generated=OpenAIResponsesProvider().respond(messages=[*history,{'role':'user','content':redact(question)}],context={
+                    'role':str(ctx.get('rol') or ''),'module':module,'screen':screen_context,'manual':knowledge,
                     'verified_draft':result['message'],'required_confidence':result['confidence'],
                 },tools=[])
                 safe_generated=redact(generated['message'])
