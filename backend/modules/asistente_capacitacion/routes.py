@@ -18,6 +18,7 @@ from .privacy_service import redact
 from .local_speech import enabled as local_speech_enabled, status as local_speech_status, transcribe_wav
 from .action_intents import propose_action
 from .error_center import record as record_incident, get as get_incident, list_recent as list_incidents
+from .credit_agent import parse_credit_request, query as query_credits, create_proposal as create_credit_proposal, confirm as confirm_credit_proposal
 import json, uuid, os, tempfile, re
 
 
@@ -208,6 +209,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             if content: history.append({'role':item['role'],'content':content})
         screen_context=data.get('screen_context') if isinstance(data.get('screen_context'),dict) else {}
         proposal=propose_action(question,screen_context=screen_context)
+        credit_request=parse_credit_request(question)
         result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed),knowledge=knowledge,history=history)
         incident_match=re.search(r'\bINC-\d{8}-\d{6}-[A-Z0-9]{6}\b',question.upper())
         if incident_match:
@@ -217,6 +219,17 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 result.update({'message':diagnostic_message,'speech_text':diagnostic_message,'diagnostic':incident,'confidence':'confirmed','confirmation_required':False,'actions':[]})
             else:
                 result.update({'message':'No encontré ese incidente dentro de tu fundación o no tienes autorización para consultarlo.','speech_text':'No encontré ese incidente dentro de tu fundación o no tienes autorización para consultarlo.','confidence':'insufficient','confirmation_required':False,'actions':[]})
+            proposal=None
+        if credit_request:
+            try:
+                if credit_request['kind']=='query':
+                    credit_result=query_credits(database_path,credit_request,str(ctx.get('rol') or ''),int(ctx.get('fundacion_id') or 1));message=credit_result['message'];result.update({'message':message,'speech_text':message,'tool_result':credit_result,'confidence':'confirmed','confirmation_required':False,'actions':[]});audit_lia(ctx,'TOOL_COMPLETED',module='facturacion',tool='consultar_creditos',request_id=result['request_id'],metadata={'scope':credit_result['scope']})
+                elif str(ctx.get('rol') or '')!='SUPERADMIN':
+                    result.update({'message':'Solo SUPERADMIN puede modificar créditos o suscripciones mediante Lian.','speech_text':'Solo SUPERADMIN puede modificar créditos o suscripciones mediante Lian.','confidence':'forbidden','confirmation_required':False,'actions':[]})
+                else:
+                    credit_proposal=create_credit_proposal(database_path,credit_request,int(ctx.get('usuario_id') or 0));result.update({'message':credit_proposal['summary']+' ¿Confirmas?','speech_text':credit_proposal['summary']+' ¿Confirmas?','confidence':'confirmed','confirmation_required':True,'action_proposal':credit_proposal,'actions':[]})
+            except (PermissionError,LookupError,ValueError) as exc:
+                result.update({'message':str(exc),'speech_text':str(exc),'confidence':'needs_input','confirmation_required':False,'actions':[]})
             proposal=None
         if proposal:
             target_module=str((proposal.get('arguments') or {}).get('module') or '')
@@ -263,6 +276,16 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if status not in {'completed','failed','cancelled'}: return jsonify({'error':'Estado de acción no válido.'}),422
         audit_lia(ctx,'CLIENT_ACTION_'+status.upper(),module=str(data.get('module') or '')[:80],tool=action,success=status=='completed',request_id=str(data.get('request_id') or '')[:64],metadata={'detail':redact(str(data.get('detail') or ''))[:160]})
         return jsonify({'ok':True}),200
+
+    @bp.post('/actions/confirm/<string:proposal_id>')
+    def confirm_server_action(proposal_id):
+        ctx=get_request_user_context()
+        try:result=confirm_credit_proposal(database_path,proposal_id,int(ctx.get('usuario_id') or 0),str(ctx.get('rol') or ''))
+        except PermissionError as exc:return jsonify({'error':str(exc)}),403
+        except LookupError as exc:return jsonify({'error':str(exc)}),404
+        except ValueError as exc:return jsonify({'error':str(exc)}),422
+        audit_lia(ctx,'CREDIT_ACTION_COMPLETED',module='facturacion',tool='credit_subscription_update',request_id=proposal_id,metadata={'confirmed':True})
+        return jsonify(result),200
 
     @bp.post('/voice/transcribe')
     def voice_transcribe():

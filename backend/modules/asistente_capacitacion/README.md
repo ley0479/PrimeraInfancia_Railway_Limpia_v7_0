@@ -23,6 +23,8 @@ los permisos siempre se revalidan en Flask.
 - `liam-error-observer.js`: observa respuestas API fallidas sin consumirlas y
   entrega a LIAM una causa y solución estructuradas.
 - `GET /api/asistente-capacitacion/errors`: centro de diagnóstico autorizado.
+- `credit_agent.py`: consultas deterministas de crédito y propuestas financieras
+  de cinco minutos, confirmables únicamente por el mismo `SUPERADMIN`.
 
 El asistente documental `/api/asistente-icbf` continúa separado como búsqueda
 en fuentes institucionales. El asistente contextual no inventa reglas ni usa un
