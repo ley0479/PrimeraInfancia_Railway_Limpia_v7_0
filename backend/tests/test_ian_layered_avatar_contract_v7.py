@@ -22,11 +22,12 @@ def main():
     lips = (ROOT / "frontend/js/liam/liam-lip-sync.js").read_text(encoding="utf-8")
     guard = (ROOT / "frontend/js/liam/ian-visibility-guard.js").read_text(encoding="utf-8")
 
-    require("mountIan();const r=await fetch" in controller, "El arranque no invoca directamente el montaje corregido de IAN")
-    require("if(!authToken)throw new Error('AUTH_PENDING');mountIan();const r=await fetch" in controller, "IAN todavía espera al endpoint antes de hacerse visible")
+    require("mountIan();state.booted=true" in controller, "El arranque no invoca directamente el montaje corregido de IAN")
+    require("if(!authToken)throw new Error('AUTH_PENDING');const r=await fetch" in controller, "IAN no valida la sesión antes de consultar su configuración")
+    require("const d=await r.json();state.flags=d.elian||(d.liam||{});state.profile=d.platform_profile||{};if(!state.flags.enabled){document.getElementById('liam-shell')?.remove();return}mountIan();state.booted=true" in controller, "IAN se monta antes de validar una sesión y configuración activas")
     require("bootIan" in controller and "cache:'no-store'" in controller, "Falta el arranque resistente a caché")
     require("headers:headers()" in controller, "La configuración protegida de IAN se consulta sin autenticación")
-    require("AUTH_PENDING" in controller and "setTimeout(()=>{state.booting=false;bootIan()}" in controller, "IAN no reintenta después del inicio de sesión")
+    require("AUTH_PENDING" in controller and "setTimeout(bootIan,1800)" in controller, "IAN no reintenta después del inicio de sesión")
     require("[sessionStorage,localStorage]" in controller, "IAN no busca la sesión en los dos almacenamientos usados por la plataforma")
     for key in ("authToken", "accessToken", "primeraInfanciaToken", "primeraInfanciaAuthToken"):
         require(key in controller, f"IAN no reconoce la clave de sesión compatible: {key}")
