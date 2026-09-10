@@ -330,13 +330,19 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if allowed and module not in allowed:module='dashboard'
         manual=manual_for_role(str(ctx.get('rol') or ''),module_id=module)
         safe_context=json.dumps({'rol':ctx.get('rol'),'modulo':module,'manual_operativo':manual},ensure_ascii=False,default=str)[:18_000]
+        realtime_tools=[
+            {'type':'function','name':'get_pending_activities_summary','description':'Consulta las actividades pendientes autorizadas del usuario actual.','parameters':{'type':'object','properties':{},'additionalProperties':False}},
+            {'type':'function','name':'get_structured_error','description':'Explica un código de error de la plataforma.','parameters':{'type':'object','properties':{'code':{'type':'string'}},'required':['code'],'additionalProperties':False}},
+            {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
+            {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},
+        ]
         session={'type':'realtime','model':model,'instructions':(
             'Eres LIAN, asistente virtual femenina de la plataforma Primera Infancia. Habla en español colombiano, '
             'con calidez, claridad y respuestas breves. Ayuda únicamente con la plataforma y su manual operativo. '
             'No inventes datos, no solicites información personal de niños y no afirmes haber ejecutado acciones. '
             'Si una operación requiere modificar datos, indica que debe confirmarse mediante la interfaz autorizada. '
             f'Contexto institucional autorizado: {safe_context}'
-        ),'output_modalities':['audio'],'audio':{
+        ),'output_modalities':['audio'],'tools':realtime_tools,'tool_choice':'auto','audio':{
             'input':{'transcription':{'model':'gpt-4o-mini-transcribe','language':'es'},'turn_detection':{'type':'server_vad','create_response':True,'interrupt_response':True}},
             'output':{'voice':'marin'},
         }}
@@ -353,6 +359,14 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             return jsonify({'error':detail or 'El proveedor rechazó la sesión de voz.'}),upstream.status_code
         audit_lia(ctx,'REALTIME_VOICE_STARTED',module=module,metadata={'model':model})
         return Response(upstream.text,200,{'Content-Type':'application/sdp','Cache-Control':'no-store'})
+
+    @bp.post('/voice/realtime/event')
+    def realtime_voice_event():
+        ctx=get_request_user_context();data=request.get_json(silent=True) or {};event=str(data.get('event') or '')
+        if event not in {'ended','failed'}:return jsonify({'error':'Evento de voz no válido.'}),422
+        duration=max(0,min(600,int(data.get('duration') or 0)));reason=str(data.get('reason') or '')[:60]
+        audit_lia(ctx,'REALTIME_VOICE_'+event.upper(),module=str(data.get('module') or 'dashboard')[:80],success=event=='ended',metadata={'duration_seconds':duration,'reason':reason})
+        return jsonify({'ok':True}),200
 
     @bp.get('/health')
     def health():

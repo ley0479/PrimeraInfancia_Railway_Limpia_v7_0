@@ -16,7 +16,12 @@ assert "RTCPeerConnection" in runtime and "getUserMedia" in runtime
 assert "Content-Type':'application/sdp'" in runtime
 assert "conversation.item.input_audio_transcription.completed" in runtime
 assert "interrupt_response':True" in routes
+assert "@bp.post('/voice/realtime/event')" in routes
+assert "'tools':realtime_tools" in routes
 assert "data-action=\"realtime\"" in controller
 assert "liam-realtime-webrtc" in controller
-assert "liam-controller.js?v=2.7.5-realtime-webrtc-1" in index
+assert "conversation.item.input_audio_transcription.delta" in runtime
+assert "sendToolResult" in runtime and "IDLE_MS=90000" in runtime and "MAX_MS=300000" in runtime
+assert "liam-controller.js?v=2.7.5-realtime-complete-1" in index
+assert "liam-realtime.css?v=2.7.5-realtime-complete-1" in index
 print('LIAM_REALTIME_WEBRTC_V7_PASS')

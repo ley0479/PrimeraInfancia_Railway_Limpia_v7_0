@@ -1,0 +1,9 @@
+.liam-composer{position:sticky;bottom:-14px;z-index:4;grid-template-columns:minmax(120px,1fr) auto auto auto auto!important;margin:10px -14px -14px!important;padding:10px 14px 14px;background:linear-gradient(180deg,#061527ee,#020617)}
+.liam-composer [data-action=realtime]{border-color:#22d3ee;background:#0e7490;color:#fff;font-weight:800;white-space:nowrap}
+.liam-composer [data-action=realtime][aria-pressed=true]{border-color:#f87171;background:#7f1d1d;box-shadow:0 0 0 3px #ef444433}
+.liam-composer [data-action=voice]{white-space:nowrap}
+.liam-avatar-wrap[data-state=speaking] .ian-avatar-rig .ian-arm-left{animation:liam-natural-gesture-left 2.4s ease-in-out infinite}
+.liam-avatar-wrap[data-state=speaking] .ian-avatar-rig .ian-arm-right{animation:liam-natural-gesture-right 2.4s .7s ease-in-out infinite}
+@keyframes liam-natural-gesture-left{0%,100%{transform:rotate(0)}45%{transform:rotate(2.8deg) translate(-7px,-3px)}}
+@keyframes liam-natural-gesture-right{0%,100%{transform:rotate(0)}45%{transform:rotate(-3.2deg) translate(8px,-4px)}}
+@media(max-width:620px){.liam-composer{grid-template-columns:1fr 1fr 1fr!important}.liam-composer textarea{grid-column:1/-1}.liam-composer [data-action=realtime]{grid-column:span 2}}
