@@ -77,6 +77,6 @@ with tempfile.TemporaryDirectory() as folder:
             assert selected.status_code == 200
             body = selected.get_json()
             assert body['asset_ready'] is True
-            assert gender in body['configuration']['avatar_asset_path']
+        assert body['configuration']['avatar_asset_path'].startswith('./assets/lia/') and body['configuration']['avatar_asset_path'].endswith('.png')
 
 print('ELIAN_HTTP_MULTITENANT_V7_PASS')

@@ -147,7 +147,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def elian_visual_config():
         ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0)
         variants={
-            'afro_colombian_institutional':{'label':'Afrocolombiano institucional','assets':{'male':'./assets/lia/elian-afro-institutional-male-v1.png','female':'./assets/lia/elian-afro-institutional-female-v1.png'},'ready_genders':['male','female']},
+            'afro_colombian_institutional':{'label':'Afrocolombiano institucional','assets':{'male':'./assets/lia/elian-afro-institutional-male-v1.png','female':'./assets/lia/liam-afro-institutional-fullbody-v2.png'},'ready_genders':['male','female']},
             'afro_colombian_technological':{'label':'Afrocolombiano tecnológico','assets':{'male':'./assets/lia/elian-afro-technological-male-v1.png','female':'./assets/lia/elian-afro-technological-female-v1.png'},'ready_genders':['male','female']},
             'afro_colombian_educational':{'label':'Afrocolombiano educativo','assets':{'male':'./assets/lia/elian-afro-educational-male-v1.png','female':'./assets/lia/elian-afro-educational-female-v1.png'},'ready_genders':['male','female']},
         }
@@ -157,6 +157,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             conn.close();config={**defaults,**(dict(row) if row else {})}
             if str(config.get('assistant_name') or '').upper() in {'IAN','ELIAN'}:
                 config.update({'assistant_name':'LIAM','avatar_gender':'female','voice_gender':'female','motion_level':'full','walk_enabled':1,'avatar_asset_path':variants['afro_colombian_institutional']['assets']['female']})
+            if config.get('avatar_gender')=='female' and config.get('avatar_variant')=='afro_colombian_institutional':
+                config['avatar_asset_path']=variants['afro_colombian_institutional']['assets']['female']
             selected=variants.get(config['avatar_variant'],variants['afro_colombian_institutional']);ready=config['avatar_gender'] in selected['ready_genders'];return jsonify({'configuration':config,'variants':variants,'genders':['male','female'],'editable':str(ctx.get('rol') or '') in {'SUPERADMIN','GERENTE'},'fallback_active':not ready}),200
         if str(ctx.get('rol') or '') not in {'SUPERADMIN','GERENTE'}:conn.close();return jsonify({'error':'Solo un administrador autorizado puede cambiar la apariencia global.'}),403
         data=request.get_json(silent=True) or {};gender=str(data.get('avatar_gender') or defaults['avatar_gender']);variant=str(data.get('avatar_variant') or defaults['avatar_variant']);motion=str(data.get('motion_level') or defaults['motion_level'])

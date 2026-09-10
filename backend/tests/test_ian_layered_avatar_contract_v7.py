@@ -38,7 +38,7 @@ def main():
     require("rigMarkup" in renderer and "clipPath" in renderer and "mask" in renderer, "El avatar no separa cabeza, cuerpo y brazos")
     require("avatar_asset_path" in controller, "La selección visual guardada no llega al avatar 2D")
     require("liam-mouth-motion" not in controller[controller.index("function mountIan"):controller.index("function applyIanVisual")], "La interfaz activa todavía superpone una boca")
-    for layer in ("ian-head-layer", "ian-mouth-layer", "ian-arm-left", "ian-arm-right", "ian-eyes"):
+    for layer in ("ian-head-layer", "ian-mouth-layer", "ian-arm-left", "ian-arm-right", "ian-leg-left", "ian-leg-right", "ian-eyes"):
         require(layer in renderer, f"Falta capa SVG real: {layer}")
     require("ian-eyelids" in renderer, "Falta el parpadeo independiente del rostro aprobado")
     require("data-gender" in renderer and "data-variant" in renderer, "El SVG no admite género y variante")
@@ -66,6 +66,8 @@ def main():
     approved_face = ROOT / "frontend/assets/lia/elian-afro-institutional-female-v1.png"
     png = approved_face.read_bytes()
     require(png[:8] == b'\x89PNG\r\n\x1a\n' and png[25] == 6, "La identidad aprobada debe conservar transparencia RGBA real")
+    require("liam-afro-institutional-fullbody-v2.png" in renderer and "liam-afro-institutional-fullbody-v2.png" in controller, "El cuerpo completo no es el avatar institucional activo")
+    require("ian-v2-walk-leg" in css and "ian-v2-point-left" in css and "ian-v2-point-right" in css, "Faltan caminata y señalamiento articulados del cuerpo completo")
     for event in ("start", "audio-ready", "play", "pause", "resume", "end", "error", "boundary"):
         require(f"'{event}'" in speech, f"Falta evento de voz: {event}")
     require("LIAM_LIP_SYNC?.pause" in speech and "LIAM_LIP_SYNC?.resume" in speech, "Pausa y reanudación no controlan la boca")

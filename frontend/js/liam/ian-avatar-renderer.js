@@ -3,14 +3,14 @@
   const genders=new Set(['male','female']);
   const variants=new Set(['afro_colombian_institutional','afro_colombian_technological','afro_colombian_educational']);
   const assets=Object.freeze({
-    afro_colombian_institutional:{male:'./assets/lia/elian-afro-institutional-male-v1.png',female:'./assets/lia/elian-afro-institutional-female-v1.png'},
+    afro_colombian_institutional:{male:'./assets/lia/elian-afro-institutional-male-v1.png',female:'./assets/lia/liam-afro-institutional-fullbody-v2.png'},
     afro_colombian_technological:{male:'./assets/lia/elian-afro-technological-male-v1.png',female:'./assets/lia/elian-afro-technological-female-v1.png'},
     afro_colombian_educational:{male:'./assets/lia/elian-afro-educational-male-v1.png',female:'./assets/lia/elian-afro-educational-female-v1.png'}
   });
   let rigSequence=0;
   function trustedAsset(options,gender,variant){
     const requested=String(options.assetPath||'').replace(/^\//,'./');
-    const allowed=new Set(['./assets/lia/lia-human-v1.png',...Object.values(assets).flatMap(Object.values)]);
+    const allowed=new Set(['./assets/lia/lia-human-v1.png','./assets/lia/elian-afro-institutional-female-v1.png',...Object.values(assets).flatMap(Object.values)]);
     return allowed.has(requested)?requested:assets[variant][gender];
   }
   function markup(options={}){
@@ -31,16 +31,20 @@
     const id=`ian-rig-${++rigSequence}`;
     return `<svg class="ian-avatar-svg ian-avatar-visual ian-avatar-rig${compact}" data-gender="${gender}" data-variant="${variant}" viewBox="0 0 1024 1536" role="img" aria-label="LIAM, asistente virtual articulada">
       <defs>
-        <clipPath id="${id}-head"><path d="M175 0H760V530Q720 680 500 690Q260 660 175 520Z"/></clipPath>
-        <clipPath id="${id}-left-arm"><path d="M70 535L370 525L555 815L682 905L615 1075L430 1000L345 1180L75 1160Z"/></clipPath>
-        <clipPath id="${id}-right-arm"><path d="M595 570L840 570L970 1115L690 1165L600 1015L540 875Z"/></clipPath>
-        <mask id="${id}-body"><rect width="1024" height="1536" fill="white"/><path d="M175 0H760V530Q720 680 500 690Q260 660 175 520Z" fill="black"/><path d="M70 535L370 525L555 815L682 905L615 1075L430 1000L345 1180L75 1160Z" fill="black"/><path d="M595 570L840 570L970 1115L690 1165L600 1015L540 875Z" fill="black"/></mask>
+        <clipPath id="${id}-head"><path d="M285 0H735V390Q700 455 510 465Q325 450 285 385Z"/></clipPath>
+        <clipPath id="${id}-left-arm"><path d="M145 385L390 380L475 585L440 980L170 995L205 690Z"/></clipPath>
+        <clipPath id="${id}-right-arm"><path d="M575 385L790 380L845 700L825 985L610 970L570 610Z"/></clipPath>
+        <clipPath id="${id}-left-leg"><path d="M295 690L535 690L550 1536H310Z"/></clipPath>
+        <clipPath id="${id}-right-leg"><path d="M490 690L795 690L825 1536H480Z"/></clipPath>
+        <mask id="${id}-body"><rect width="1024" height="1536" fill="white"/><path d="M285 0H735V390Q700 455 510 465Q325 450 285 385Z" fill="black"/><path d="M145 385L390 380L475 585L440 980L170 995L205 690Z" fill="black"/><path d="M575 385L790 380L845 700L825 985L610 970L570 610Z" fill="black"/><path d="M295 690L535 690L550 1536H310Z" fill="black"/><path d="M490 690L795 690L825 1536H480Z" fill="black"/></mask>
       </defs>
       <g class="ian-body-layer"><image href="${asset}" width="1024" height="1536" mask="url(#${id}-body)"/></g>
       <g class="ian-head-layer"><image href="${asset}" width="1024" height="1536" clip-path="url(#${id}-head)"/></g>
-      <g class="ian-face-controls" aria-hidden="true"><g class="ian-eyelids"><path d="M405 310q39-25 78 0q-39 20-78 0M548 310q38-24 75 0q-37 20-75 0"/></g><g class="ian-mouth-layer"><ellipse class="ian-mouth-open" cx="511" cy="430" rx="42" ry="11"/></g></g>
+      <g class="ian-face-controls" aria-hidden="true"><g class="ian-eyelids"><path d="M415 218q34-18 68 0q-34 14-68 0M540 218q34-18 68 0q-34 14-68 0"/></g><g class="ian-mouth-layer"><ellipse class="ian-mouth-open" cx="511" cy="304" rx="34" ry="8"/></g></g>
       <g class="ian-arm ian-arm-left"><image href="${asset}" width="1024" height="1536" clip-path="url(#${id}-left-arm)"/></g>
       <g class="ian-arm ian-arm-right"><image href="${asset}" width="1024" height="1536" clip-path="url(#${id}-right-arm)"/></g>
+      <g class="ian-leg ian-leg-left"><image href="${asset}" width="1024" height="1536" clip-path="url(#${id}-left-leg)"/></g>
+      <g class="ian-leg ian-leg-right"><image href="${asset}" width="1024" height="1536" clip-path="url(#${id}-right-leg)"/></g>
     </svg>`;
   }
   function render(target,options={}){
