@@ -9,7 +9,7 @@ assert ALLOWED_TOOLS==frozenset({'get_pending_activities_summary','get_document_
 try: execute('run_sql',args={},database_path='none',tenant_id=1,user={})
 except PermissionError: pass
 else: raise AssertionError('Una herramienta fuera de lista fue aceptada.')
-error=execute('get_structured_error',args={'code':'PARTICIPANTES_REQUERIDOS'},database_path='none',tenant_id=1,user={})
+error=execute('get_structured_error',args={'code':'PARTICIPANTES_REQUERIDOS'},database_path='none',tenant_id=1,user={'id':1,'rol':'DOCENTE'})
 assert error['confidence']=='confirmed' and error['severity']=='error'
 
 with tempfile.TemporaryDirectory() as tmp:
@@ -19,9 +19,9 @@ with tempfile.TemporaryDirectory() as tmp:
     conn.execute("INSERT INTO mp_plantillas VALUES(1,'RAM',1)");conn.execute("INSERT INTO mp_plantillas VALUES(2,'RPP',2)")
     conn.execute("INSERT INTO mp_pruebas VALUES(10,1,'GENERADO',20,NULL,'ram.xlsx','2026-08-25')")
     conn.execute("INSERT INTO mp_pruebas VALUES(20,2,'GENERADO',30,NULL,'rpp.xlsx','2026-08-25')");conn.commit();conn.close()
-    own=execute('get_format_generation_status',args={'test_id':10},database_path=db,tenant_id=1,user={'id':1})
+    own=execute('get_format_generation_status',args={'test_id':10},database_path=db,tenant_id=1,user={'id':1,'rol':'DOCENTE'})
     assert own['download_ready'] is True and own['format_type']=='RAM'
-    try: execute('get_format_generation_status',args={'test_id':20},database_path=db,tenant_id=1,user={'id':1})
+    try: execute('get_format_generation_status',args={'test_id':20},database_path=db,tenant_id=1,user={'id':1,'rol':'DOCENTE'})
     except LookupError: pass
     else: raise AssertionError('Se cruzó una generación de otro tenant.')
 print('LIA_TOOL_REGISTRY_V7_PASS')

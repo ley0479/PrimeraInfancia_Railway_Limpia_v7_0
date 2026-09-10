@@ -19,6 +19,7 @@ from .local_speech import enabled as local_speech_enabled, status as local_speec
 from .action_intents import propose_action
 from .error_center import record as record_incident, get as get_incident, list_recent as list_incidents
 from .credit_agent import parse_credit_request, query as query_credits, create_proposal as create_credit_proposal, confirm as confirm_credit_proposal
+from .action_policy import decision as action_decision, public_policy
 import json, uuid, os, tempfile, re, hashlib, requests
 
 
@@ -227,10 +228,17 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 elif str(ctx.get('rol') or '')!='SUPERADMIN':
                     result.update({'message':'Solo SUPERADMIN puede modificar créditos o suscripciones mediante Lian.','speech_text':'Solo SUPERADMIN puede modificar créditos o suscripciones mediante Lian.','confidence':'forbidden','confirmation_required':False,'actions':[]})
                 else:
-                    credit_proposal=create_credit_proposal(database_path,credit_request,int(ctx.get('usuario_id') or 0));result.update({'message':credit_proposal['summary']+' ¿Confirmas?','speech_text':credit_proposal['summary']+' ¿Confirmas?','confidence':'confirmed','confirmation_required':True,'action_proposal':credit_proposal,'actions':[]})
+                    credit_proposal=create_credit_proposal(database_path,credit_request,int(ctx.get('usuario_id') or 0),str(ctx.get('rol') or ''));result.update({'message':credit_proposal['summary']+' ¿Confirmas?','speech_text':credit_proposal['summary']+' ¿Confirmas?','confidence':'confirmed','confirmation_required':True,'action_proposal':credit_proposal,'actions':[]})
             except (PermissionError,LookupError,ValueError) as exc:
                 result.update({'message':str(exc),'speech_text':str(exc),'confidence':'needs_input','confirmation_required':False,'actions':[]})
             proposal=None
+        if proposal:
+            policy=action_decision(proposal.get('id'),str(ctx.get('rol') or ''))
+            if not policy.get('allowed'):
+                proposal=None
+                result.update({'message':policy.get('reason'),'speech_text':policy.get('reason'),'confidence':'forbidden','confirmation_required':False,'actions':[]})
+            else:
+                proposal.update({'risk':policy['risk'],'confirmation_type':policy['confirmation']})
         if proposal:
             target_module=str((proposal.get('arguments') or {}).get('module') or '')
             if target_module and allowed and target_module not in allowed:
@@ -276,6 +284,11 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if status not in {'completed','failed','cancelled'}: return jsonify({'error':'Estado de acción no válido.'}),422
         audit_lia(ctx,'CLIENT_ACTION_'+status.upper(),module=str(data.get('module') or '')[:80],tool=action,success=status=='completed',request_id=str(data.get('request_id') or '')[:64],metadata={'detail':redact(str(data.get('detail') or ''))[:160]})
         return jsonify({'ok':True}),200
+
+    @bp.get('/actions/policy')
+    def actions_policy():
+        ctx=get_request_user_context()
+        return jsonify({'role':str(ctx.get('rol') or ''),'actions':public_policy(str(ctx.get('rol') or ''))}),200
 
     @bp.post('/actions/confirm/<string:proposal_id>')
     def confirm_server_action(proposal_id):
@@ -336,11 +349,13 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
             {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},
         ]
+        voice_policy='; '.join(f"{item['action']}={item['risk']}/{item['confirmation']}" for item in public_policy(str(ctx.get('rol') or '')) if item.get('allowed') and item.get('connected'))
         session={'type':'realtime','model':model,'instructions':(
             'Eres LIAN, asistente virtual femenina de la plataforma Primera Infancia. Habla en español colombiano, '
             'con calidez, claridad y respuestas breves. Ayuda únicamente con la plataforma y su manual operativo. '
             'No inventes datos, no solicites información personal de niños y no afirmes haber ejecutado acciones. '
-            'Si una operación requiere modificar datos, indica que debe confirmarse mediante la interfaz autorizada. '
+            'No ejecutes ni afirmes haber ejecutado herramientas que no estén disponibles. Las modificaciones requieren confirmación mediante la interfaz autorizada. '
+            f'Política de acciones del rol actual: {voice_policy}. '
             f'Contexto institucional autorizado: {safe_context}'
         ),'output_modalities':['audio'],'tools':realtime_tools,'tool_choice':'auto','audio':{
             'input':{'transcription':{'model':'gpt-4o-mini-transcribe','language':'es'},'turn_detection':{'type':'server_vad','create_response':True,'interrupt_response':True}},
