@@ -363,6 +363,31 @@ def register_seguridad(app, database_path: str) -> None:
                 })
                 return jsonify({'error': 'La fundación está suspendida o vencida.', 'code': 'FOUNDATION_INACTIVE'}), 403
 
+            # Una credencial correcta no crea sesión si la organización ya no
+            # tiene servicio pagado o saldo. SUPERADMIN conserva acceso para
+            # regularizar la cuenta sin quedar bloqueado por la misma regla.
+            subscription = {}
+            if usuario['rol'] != 'SUPERADMIN' and current_app.config.get('ENFORCE_LOGIN_BILLING', False):
+                g.error_context['stage'] = 'validate_subscription_before_session'
+                try:
+                    from modules.facturacion_suscripcion.repository import BillingRepository
+                    from modules.facturacion_suscripcion.services import BillingService
+                    billing_service = BillingService(BillingRepository(database_path))
+                    subscription = billing_service.get_subscription_snapshot(int(usuario['fundacion_id']), trusted_internal=True)
+                except Exception as billing_exc:
+                    _safe_warning('No se pudo validar facturación antes del login usuario_id=%s: %s', usuario['id'], type(billing_exc).__name__)
+                    return jsonify({'error':'No fue posible validar el estado de facturación. Intenta nuevamente.','code':'BILLING_VALIDATION_UNAVAILABLE'}),503
+                if not subscription:
+                    audit(database_path,'LOGIN_SIN_SUSCRIPCION',despues={'usuario_id':usuario['id'],'fundacion_id':usuario['fundacion_id']})
+                    return jsonify({'error':'Acceso bloqueado: la fundación no tiene una suscripción configurada.','code':'SUBSCRIPTION_MISSING'}),402
+                subscription_state = str(subscription.get('estado') or '').upper()
+                if subscription_state in {'VENCIDA','SUSPENDIDA','CANCELADA'}:
+                    audit(database_path,'LOGIN_BLOQUEADO_PAGO',despues={'usuario_id':usuario['id'],'fundacion_id':usuario['fundacion_id'],'estado':subscription_state})
+                    return jsonify({'error':'Acceso bloqueado por falta de pago o suscripción vencida. Comunícate con el administrador.','code':'SUBSCRIPTION_PAYMENT_REQUIRED'}),402
+                if int(subscription.get('creditos_disponibles') or 0) <= 0:
+                    audit(database_path,'LOGIN_BLOQUEADO_CREDITOS',despues={'usuario_id':usuario['id'],'fundacion_id':usuario['fundacion_id']})
+                    return jsonify({'error':'Acceso bloqueado: la fundación agotó sus créditos. Solicita una recarga para ingresar.','code':'CREDITS_EXHAUSTED'}),402
+
             g.error_context['stage'] = 'create_session_atomic'
             token, user_payload, session_meta = create_login_session_atomic(
                 database_path,
@@ -388,7 +413,9 @@ def register_seguridad(app, database_path: str) -> None:
                 from modules.facturacion_suscripcion.repository import BillingRepository
                 from modules.facturacion_suscripcion.services import BillingService
                 billing_service = BillingService(BillingRepository(database_path))
-                if user_payload.get('fundacion_id'):
+                if subscription:
+                    user_payload['suscripcion'] = subscription
+                elif user_payload.get('fundacion_id'):
                     subscription = billing_service.get_subscription_snapshot(int(user_payload['fundacion_id']), trusted_internal=True)
                     if subscription:
                         user_payload['suscripcion'] = subscription

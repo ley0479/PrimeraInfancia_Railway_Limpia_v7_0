@@ -375,6 +375,11 @@ class BillingService:
                 (fid, plan_id, estado, inicio, venc, dias_gracia, creditos, int(plan.get('creditos_incluidos') or 0), modules_json, data.get('observaciones'), now_iso(), now_iso()),
             )
         self.repo.execute_update("UPDATE fundaciones SET plan_id=?, suscripcion_estado=?, creditos_disponibles=?, fecha_actualizacion=? WHERE id=?", (plan_id, estado, creditos, now_iso(), fid))
+        if creditos <= 0 or estado in {'VENCIDA', 'SUSPENDIDA', 'CANCELADA'}:
+            self.repo.execute_update(
+                "UPDATE sesiones_usuario SET activa=0, fecha_cierre=? WHERE fundacion_id=? AND activa=1",
+                (now_iso(), fid),
+            )
         after = self.get_subscription(fid)
         self.repo.execute(
             """
@@ -509,6 +514,12 @@ class BillingService:
                         fecha_actualizacion=:fecha WHERE id=:fid'''),
                 {'saldo': new_balance, 'fecha': timestamp, 'fid': fundacion_id},
             )
+            if movement_type == 'CONSUMO' and new_balance <= 0:
+                conn.execute(
+                    text('''UPDATE sesiones_usuario SET activa=0, fecha_cierre=:fecha
+                            WHERE fundacion_id=:fid AND activa=1'''),
+                    {'fecha': timestamp, 'fid': fundacion_id},
+                )
             mov = dict(conn.execute(
                 text('SELECT * FROM movimientos_credito WHERE id=:id'), {'id': int(inserted)}
             ).mappings().one())
@@ -737,6 +748,9 @@ def register_billing_middleware(app, database_path: str, upload_folder: str | No
         if request.path.startswith('/api/facturacion') or request.path.startswith('/api/panel-comercial'):
             g.billing_subscription = sub
             return None
+
+        if app.config.get('ENFORCE_LOGIN_BILLING', False) and int(sub.get('creditos_disponibles') or 0) <= 0:
+            return _json_error('Acceso bloqueado: la fundación agotó sus créditos. Registra una recarga para continuar.', 402)
 
         module = service.module_for_path(request.path)
         if module:

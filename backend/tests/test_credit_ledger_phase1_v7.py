@@ -20,7 +20,7 @@ from modules.facturacion_suscripcion.services import BillingService
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory(prefix="pi_credit_ledger_") as raw:
+    with tempfile.TemporaryDirectory(prefix="pi_credit_ledger_", ignore_cleanup_errors=True) as raw:
         db_path = Path(raw) / "credits.sqlite3"
         app = Flask(__name__)
         app.config.update(
@@ -36,6 +36,9 @@ def main() -> None:
                     fecha_inicio TEXT, fecha_vencimiento TEXT, plan_id INTEGER,
                     suscripcion_estado TEXT, creditos_disponibles INTEGER DEFAULT 0,
                     fecha_actualizacion TEXT)"""))
+                conn.execute(text("""CREATE TABLE sesiones_usuario (
+                    id INTEGER PRIMARY KEY, usuario_id INTEGER, fundacion_id INTEGER,
+                    activa INTEGER DEFAULT 1, fecha_cierre TEXT)"""))
                 conn.execute(text("""INSERT INTO fundaciones
                     (id,nombre,fecha_inicio,fecha_vencimiento,creditos_disponibles)
                     VALUES (1,'Fundación Prueba','2026-08-01','2026-09-01',150)"""))
@@ -90,6 +93,7 @@ def main() -> None:
             assert 'ENABLE_CREDIT_ENFORCEMENT", False' in config_source
             assert "Idempotency-Key" in middleware_source
             assert "automatic_charge_failed" in middleware_source
+            assert "UPDATE sesiones_usuario SET activa=0" in middleware_source
             assert int(repo.fetch_one(
                 "SELECT COUNT(*) AS total FROM movimientos_credito WHERE fundacion_id=? AND idempotency_key=?",
                 (1, "test-consumption-1"),
@@ -99,6 +103,7 @@ def main() -> None:
                 "SELECT saldo_nuevo FROM movimientos_credito WHERE fundacion_id=? ORDER BY id DESC LIMIT 1", (1,)
             )
             assert int(last["saldo_nuevo"]) == int(final["creditos_disponibles"])
+            database.dispose()
 
     print("Libro mayor créditos y resumen visual: migración x2, idempotencia, métricas y reconciliación PASS")
 
