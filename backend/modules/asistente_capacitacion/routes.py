@@ -19,7 +19,7 @@ from .local_speech import enabled as local_speech_enabled, status as local_speec
 from .action_intents import propose_action
 from .error_center import record as record_incident, get as get_incident, list_recent as list_incidents
 from .credit_agent import parse_credit_request, query as query_credits, create_proposal as create_credit_proposal, confirm as confirm_credit_proposal
-import json, uuid, os, tempfile, re
+import json, uuid, os, tempfile, re, hashlib, requests
 
 
 def register_asistente_capacitacion(app, database_path: str) -> None:
@@ -313,6 +313,47 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 try: os.unlink(temporary)
                 except OSError: pass
 
+    @bp.post('/voice/realtime/call')
+    def realtime_voice_call():
+        flags=public_flags();liam_flags=public_liam_flags()
+        if not flags['enabled'] or not flags['voice_enabled'] or not liam_flags['realtime_voice_enabled']:
+            return jsonify({'error':'La conversación de voz en tiempo real está desactivada.'}),503
+        ctx=get_request_user_context()
+        if limited(ctx):return jsonify({'error':'Demasiadas solicitudes de voz. Espera un momento.'}),429
+        api_key=os.getenv('OPENAI_API_KEY','').strip();model=(os.getenv('LIAM_REALTIME_MODEL') or os.getenv('LIA_REALTIME_MODEL') or '').strip()
+        if not api_key or not model:return jsonify({'error':'El proveedor de voz en tiempo real no está configurado.'}),503
+        sdp=request.get_data(cache=False,as_text=True)
+        if not sdp or len(sdp)>64_000 or not sdp.startswith('v=0'):
+            return jsonify({'error':'La oferta WebRTC no es válida.'}),400
+        module=str(request.headers.get('X-Liam-Module') or 'dashboard').strip()[:80]
+        allowed=set(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''),[]))
+        if allowed and module not in allowed:module='dashboard'
+        manual=manual_for_role(str(ctx.get('rol') or ''),module_id=module)
+        safe_context=json.dumps({'rol':ctx.get('rol'),'modulo':module,'manual_operativo':manual},ensure_ascii=False,default=str)[:18_000]
+        session={'type':'realtime','model':model,'instructions':(
+            'Eres LIAN, asistente virtual femenina de la plataforma Primera Infancia. Habla en español colombiano, '
+            'con calidez, claridad y respuestas breves. Ayuda únicamente con la plataforma y su manual operativo. '
+            'No inventes datos, no solicites información personal de niños y no afirmes haber ejecutado acciones. '
+            'Si una operación requiere modificar datos, indica que debe confirmarse mediante la interfaz autorizada. '
+            f'Contexto institucional autorizado: {safe_context}'
+        ),'output_modalities':['audio'],'audio':{
+            'input':{'transcription':{'model':'gpt-4o-mini-transcribe','language':'es'},'turn_detection':{'type':'server_vad','create_response':True,'interrupt_response':True}},
+            'output':{'voice':'marin'},
+        }}
+        safety_id=hashlib.sha256(f"liam:{ctx.get('fundacion_id')}:{ctx.get('usuario_id')}".encode()).hexdigest()
+        try:
+            upstream=requests.post('https://api.openai.com/v1/realtime/calls',headers={'Authorization':f'Bearer {api_key}','OpenAI-Safety-Identifier':safety_id},files={'sdp':(None,sdp),'session':(None,json.dumps(session,ensure_ascii=False))},timeout=(8,30))
+        except requests.RequestException as exc:
+            app.logger.warning('LIAN Realtime no pudo iniciar: %s',type(exc).__name__)
+            return jsonify({'error':'No fue posible conectar la conversación de voz con el proveedor.'}),503
+        if not upstream.ok:
+            try:detail=(upstream.json().get('error') or {}).get('message')
+            except ValueError:detail=None
+            app.logger.warning('LIAN Realtime rechazado: status=%s',upstream.status_code)
+            return jsonify({'error':detail or 'El proveedor rechazó la sesión de voz.'}),upstream.status_code
+        audit_lia(ctx,'REALTIME_VOICE_STARTED',module=module,metadata={'model':model})
+        return Response(upstream.text,200,{'Content-Type':'application/sdp','Cache-Control':'no-store'})
+
     @bp.get('/health')
     def health():
         flags = public_flags()
@@ -324,7 +365,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 'tours':flags['guided_tours_enabled'],'voice':flags['voice_enabled'],
                 'local_voice':local_voice,
                 'generative_ai':flags['ai_enabled'] and provider['ready'],
-                'realtime_voice':flags['realtime_enabled']},
+                'realtime_voice':public_liam_flags()['realtime_voice_enabled'] and bool((os.getenv('LIAM_REALTIME_MODEL') or os.getenv('LIA_REALTIME_MODEL') or '').strip())},
             'operational':flags['enabled'] and flags['text_enabled'],
             'degraded_reasons':([] if flags['enabled'] else ['assistant_disabled'])+
                 ([] if flags['text_enabled'] else ['text_disabled'])+
