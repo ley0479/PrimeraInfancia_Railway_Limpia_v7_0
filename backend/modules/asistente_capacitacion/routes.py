@@ -209,11 +209,27 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         proposal=propose_action(question,screen_context=screen_context)
         result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed),knowledge=knowledge,history=history)
         if proposal:
-            if proposal['missing']:
+            target_module=str((proposal.get('arguments') or {}).get('module') or '')
+            if target_module and allowed and target_module not in allowed:
+                proposal=None
+                result.update({'message':'Tu rol no tiene permiso para abrir o consultar ese módulo.','speech_text':'Tu rol no tiene permiso para abrir o consultar ese módulo.','confidence':'forbidden','confirmation_required':False,'actions':[]})
+            elif proposal.get('server_tool'):
+                try:
+                    user=dict(getattr(g,'current_user',None) or {}) or {'id':ctx.get('usuario_id'),'rol':ctx.get('rol')}
+                    tool_result=execute(proposal['server_tool'],args=proposal.get('arguments') or {},database_path=database_path,tenant_id=int(ctx.get('fundacion_id') or 1),user=user)
+                    total=int(tool_result.get('total') or 0); overdue=int(tool_result.get('overdue') or 0); today=int(tool_result.get('due_today') or 0)
+                    message=f'Tienes {total} actividades pendientes: {overdue} vencidas, {today} para hoy y {max(0,total-overdue-today)} próximas.'
+                    result.update({'message':message,'speech_text':message,'confidence':'confirmed','confirmation_required':False,'tool_result':tool_result,'actions':[{'type':'navigate','module':'calendario-inteligente'}]})
+                    audit_lia(ctx,'TOOL_COMPLETED',module=module,tool=proposal['server_tool'],request_id=result['request_id'],metadata={'read_only':True,'total':total})
+                except (PermissionError,LookupError,ValueError) as exc:
+                    result.update({'message':str(exc),'speech_text':str(exc),'confidence':'insufficient','confirmation_required':False})
+            elif proposal['missing']:
                 result.update({'message':proposal['summary']+' Antes de hacerlo necesito: '+', '.join(proposal['missing'])+'.','speech_text':proposal['summary']+' Antes de hacerlo necesito '+', '.join(proposal['missing'])+'.','confidence':'needs_input','confirmation_required':False,'action_proposal':proposal})
+            elif not proposal.get('confirmation_required'):
+                result.update({'message':proposal['summary'],'speech_text':proposal['summary'],'confidence':'confirmed','confirmation_required':False,'actions':[{'type':proposal['client_handler'],**proposal['arguments']}]})
             else:
                 result.update({'message':proposal['summary']+' Revisa los datos y confirma para continuar.','speech_text':proposal['summary']+' Revisa los datos y confirma para continuar.','confirmation_required':True,'action_proposal':proposal})
-        if flags['ai_enabled'] and provider_status()['ready']:
+        if not proposal and flags['ai_enabled'] and provider_status()['ready']:
             try:
                 generated=OpenAIResponsesProvider().respond(messages=[*history,{'role':'user','content':redact(question)}],context={
                     'role':str(ctx.get('rol') or ''),'module':module,'screen':screen_context,'manual':knowledge,
@@ -227,6 +243,16 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 app.logger.warning('LIAM usa recuperación local por indisponibilidad del proveedor: %s',str(exc))
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
         return jsonify(result), 200
+
+    @bp.post('/actions/client-event')
+    def client_action_event():
+        ctx=get_request_user_context();data=request.get_json(silent=True) or {}
+        action=str(data.get('action') or '')
+        if action not in {'open_module','search_beneficiary','download_rpp'}: return jsonify({'error':'Acción de cliente no registrada.'}),422
+        status=str(data.get('status') or '')
+        if status not in {'completed','failed','cancelled'}: return jsonify({'error':'Estado de acción no válido.'}),422
+        audit_lia(ctx,'CLIENT_ACTION_'+status.upper(),module=str(data.get('module') or '')[:80],tool=action,success=status=='completed',request_id=str(data.get('request_id') or '')[:64],metadata={'detail':redact(str(data.get('detail') or ''))[:160]})
+        return jsonify({'ok':True}),200
 
     @bp.post('/voice/transcribe')
     def voice_transcribe():

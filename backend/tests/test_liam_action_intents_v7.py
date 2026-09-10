@@ -19,3 +19,11 @@ def test_complete_rpp_action_is_still_confirmation_required():
 
 def test_non_action_does_not_create_proposal():
     assert propose_action('Explícame qué es el RPP') is None
+
+
+def test_navigation_and_read_only_intents_are_closed_actions():
+    assert propose_action('Lian, abre el calendario')['arguments']['module'] == 'calendario-inteligente'
+    assert propose_action('Muéstrame mis entregables pendientes')['server_tool'] == 'get_pending_activities_summary'
+    search = propose_action('Busca el niño con documento 1077456789')
+    assert search['client_handler'] == 'search_beneficiary'
+    assert search['arguments']['query'] == '1077456789'

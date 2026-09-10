@@ -19,6 +19,17 @@ GROUPS = (
     (('1 a 2', '1-2'), '1_2_ANOS', '1 a 2 años'),
     (('3 a 5', '3-5'), '3_5_ANOS', '3 a 5 años'),
 )
+MODULE_ALIASES = (
+    (('calendario', 'agenda'), 'calendario-inteligente', 'Calendario Inteligente'),
+    (('rpp', 'formato', 'formatos'), 'formatos', 'Formatos ICBF'),
+    (('bienestarina',), 'formatos', 'Formatos ICBF'),
+    (('base maestra',), 'base-maestra', 'Base Maestra'),
+    (('beneficiario', 'beneficiarios', 'nino', 'nina'), 'buscador-beneficiarios', 'Buscador de beneficiarios'),
+    (('talento humano', 'docentes'), 'talento', 'Talento Humano'),
+    (('salud', 'nutricion'), 'salud-nutricion', 'Salud y Nutrición'),
+    (('manual',), 'manual-operativo', 'Manual Operativo'),
+    (('dashboard', 'inicio'), 'dashboard', 'Inicio'),
+)
 
 
 def _plain(value: object) -> str:
@@ -34,9 +45,18 @@ def _clean_unit(value: object) -> str:
 def propose_action(question: str, *, screen_context: dict | None = None) -> dict | None:
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
-    if 'rpp' not in q or not any(word in q for word in ('genera', 'generar', 'descarga', 'descargar')):
-        return None
     context = screen_context if isinstance(screen_context, dict) else {}
+    if any(word in q for word in ('abre', 'abrir', 'llevame', 'ir a', 've a')):
+        for aliases, module, label in MODULE_ALIASES:
+            if any(alias in q for alias in aliases):
+                return {'id':'open_module','label':f'Abrir {label}','summary':f'Abriré {label}.','arguments':{'module':module},'missing':[],'confirmation_required':False,'client_handler':'open_module'}
+    if any(word in q for word in ('pendiente', 'pendientes', 'por entregar', 'vencimiento')) and any(word in q for word in ('entrega', 'entregable', 'actividad', 'calendario', 'tengo', 'muestra', 'dime')):
+        return {'id':'get_pending_activities_summary','label':'Consultar pendientes','summary':'Consultaré tus actividades pendientes autorizadas.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_pending_activities_summary'}
+    document_match=re.search(r'\b(?:documento|cedula|identificacion|nui)\s*(?:numero|nro|no)?\s*[:#-]?\s*(\d{5,15})\b',q)
+    if document_match and any(word in q for word in ('busca', 'buscar', 'muestra', 'consulta', 'consultar')):
+        return {'id':'search_beneficiary','label':'Buscar beneficiario','summary':'Abriré la búsqueda autorizada del beneficiario.','arguments':{'query':document_match.group(1),'module':'buscador-beneficiarios'},'missing':[],'confirmation_required':False,'client_handler':'search_beneficiary'}
+    if 'rpp' not in q or not any(word in q for word in ('genera', 'generar', 'descarga', 'descargar', 'saca', 'sacame')):
+        return None
     month = next((number for name, number in MONTHS.items() if re.search(rf'\b{name}\b', q)), None)
     try:
         year = int(re.search(r'\b(20\d{2}|2100)\b', q).group(1))
