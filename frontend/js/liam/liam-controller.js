@@ -14,7 +14,7 @@
   }
   const headers=()=>({'Content-Type':'application/json',Authorization:`Bearer ${token()}`});
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const runtime=['liam-control-registry','liam-anchor-registry','liam-safe-zone-engine','liam-animation-orchestrator','liam-tablet-controller','liam-movement-controller','liam-tour-engine','elian-platform-tour','liam-lip-sync','liam-context-collector'];
+  const runtime=['liam-control-registry','liam-anchor-registry','liam-safe-zone-engine','liam-animation-orchestrator','liam-tablet-controller','liam-movement-controller','liam-tour-engine','elian-platform-tour','liam-lip-sync','liam-context-collector','liam-error-observer'];
   async function loadRuntime(){for(const name of runtime){if(document.querySelector(`script[data-liam-runtime="${name}"]`))continue;await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=`./js/liam/${name}.js?v=2.7.5-liam-actions-1`;script.dataset.liamRuntime=name;script.onload=resolve;script.onerror=()=>reject(new Error(`No se pudo cargar ${name}.`));document.head.appendChild(script)})}}
   function moduleNow(){return location.hash.replace(/^#/,'')||'dashboard'}
   function authenticatedUser(){
@@ -73,6 +73,7 @@
   }
   document.addEventListener('elian:tour-completed',()=>setTimeout(()=>exitPresenter(),1400));
   document.addEventListener('elian:tour-failed',()=>{if(state.presenter)document.getElementById('elian-presenter')?.classList.add('has-error')});
+  document.addEventListener('liam:platform-error',event=>{const d=event.detail||{},diag=d.diagnostic||{};const message=`Incidente ${d.incident_id}. ${diag.cause||d.message} Solución: ${diag.solution||'Conserva el identificador para revisión.'}`;document.getElementById('liam-shell')?.setAttribute('data-has-incident','true');add('liam',message);remember('assistant',message);window.LIAM_STATE?.set('warning');window.LIAM_TABLET?.show({type:'warning',title:d.incident_id||'Diagnóstico',value:diag.solution||d.message});if(state.flags.voice_enabled&&!state.muted)window.LIA_SPEECH?.speak(message)});
   window.LIAM=Object.freeze({open,close,ask,presentation,showWhere,refreshContext,announce,applyVisual,enterPresenter,exitPresenter});
   window.IAN_BOOT=bootIan;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bootIan);else bootIan();

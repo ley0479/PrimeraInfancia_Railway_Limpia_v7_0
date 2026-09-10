@@ -17,7 +17,8 @@ from .knowledge_base import manual_for_role, manual_for_question, build_manual_p
 from .privacy_service import redact
 from .local_speech import enabled as local_speech_enabled, status as local_speech_status, transcribe_wav
 from .action_intents import propose_action
-import json, uuid, os, tempfile
+from .error_center import record as record_incident, get as get_incident, list_recent as list_incidents
+import json, uuid, os, tempfile, re
 
 
 def register_asistente_capacitacion(app, database_path: str) -> None:
@@ -208,6 +209,15 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         screen_context=data.get('screen_context') if isinstance(data.get('screen_context'),dict) else {}
         proposal=propose_action(question,screen_context=screen_context)
         result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed),knowledge=knowledge,history=history)
+        incident_match=re.search(r'\bINC-\d{8}-\d{6}-[A-Z0-9]{6}\b',question.upper())
+        if incident_match:
+            incident=get_incident(database_path,incident_match.group(0),int(ctx.get('fundacion_id') or 1))
+            if incident:
+                diagnostic_message=f"El incidente {incident['incident_id']} corresponde a {incident['error_type'].replace('_',' ')}. Causa: {incident['cause']} Solución: {incident['solution']}"
+                result.update({'message':diagnostic_message,'speech_text':diagnostic_message,'diagnostic':incident,'confidence':'confirmed','confirmation_required':False,'actions':[]})
+            else:
+                result.update({'message':'No encontré ese incidente dentro de tu fundación o no tienes autorización para consultarlo.','speech_text':'No encontré ese incidente dentro de tu fundación o no tienes autorización para consultarlo.','confidence':'insufficient','confirmation_required':False,'actions':[]})
+            proposal=None
         if proposal:
             target_module=str((proposal.get('arguments') or {}).get('module') or '')
             if target_module and allowed and target_module not in allowed:
@@ -297,6 +307,18 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 ([] if flags['text_enabled'] else ['text_disabled'])+
                 ([] if not flags['ai_enabled'] or provider['ready'] else ['provider_not_ready'])}), 200
 
+    @bp.get('/errors/<string:incident_id>')
+    def error_diagnosis(incident_id):
+        ctx=get_request_user_context();item=get_incident(database_path,incident_id,int(ctx.get('fundacion_id') or 1))
+        if not item:return jsonify({'error':'Incidente no encontrado o no autorizado.'}),404
+        return jsonify({'incident':item}),200
+
+    @bp.get('/errors')
+    def error_center_list():
+        ctx=get_request_user_context()
+        if str(ctx.get('rol') or '') not in {'SUPERADMIN','GERENTE','COORDINADOR'}:return jsonify({'error':'No tienes permiso para consultar el centro de diagnóstico.'}),403
+        return jsonify({'incidents':list_incidents(database_path,int(ctx.get('fundacion_id') or 1),request.args.get('limit',50,type=int))}),200
+
     @bp.get('/tools')
     def tools_available():
         if not public_flags()['enabled']: return jsonify({'error':'LÍA está desactivada.'}),404
@@ -344,3 +366,21 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         return jsonify({'message':'Gracias. Registramos tu valoración sin guardar datos personales de la conversación.'}),201
 
     app.register_blueprint(bp)
+
+    @app.after_request
+    def liam_error_center(response):
+        try:
+            user=dict(getattr(g,'current_user',None) or {})
+            if not user or not request.path.startswith('/api/') or request.path.startswith('/api/asistente-capacitacion/errors') or response.status_code<400 or response.status_code in {401}:
+                return response
+            payload=response.get_json(silent=True) if response.is_json else None
+            if not isinstance(payload,dict):return response
+            message=str(payload.get('error') or payload.get('mensaje') or payload.get('message') or '')
+            code=str(payload.get('code') or payload.get('codigo') or f'HTTP_{response.status_code}')
+            module=request.path.split('/')[2] if len(request.path.split('/'))>2 else 'plataforma'
+            incident=record_incident(database_path,tenant_id=user.get('fundacion_id'),user_id=user.get('id'),module=module,action=request.endpoint or request.path,status=response.status_code,code=code,message=message,request_id=payload.get('request_id') or payload.get('trace_id'),context={'method':request.method})
+            payload['incident_id']=incident['incident_id'];payload['diagnostic']={k:incident[k] for k in ('type','cause','solution','severity','safe_retry','auto_correctable')}
+            response.set_data(json.dumps(payload,ensure_ascii=False));response.headers['Content-Type']='application/json; charset=utf-8';response.headers['X-Liam-Incident-ID']=incident['incident_id']
+        except Exception as exc:
+            app.logger.warning('Centro de errores LIAM continuó sin registrar: %s',type(exc).__name__)
+        return response
