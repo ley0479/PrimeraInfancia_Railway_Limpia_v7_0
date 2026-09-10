@@ -22,6 +22,6 @@ assert "data-action=\"realtime\"" in controller
 assert "liam-realtime-webrtc" in controller
 assert "conversation.item.input_audio_transcription.delta" in runtime
 assert "sendToolResult" in runtime and "IDLE_MS=90000" in runtime and "MAX_MS=300000" in runtime
-assert "liam-controller.js?v=2.7.5-action-policy-1" in index
+assert "liam-controller.js?v=2.7.5-safe-motors-1" in index
 assert "liam-realtime.css?v=2.7.5-action-policy-1" in index
 print('LIAM_REALTIME_WEBRTC_V7_PASS')

@@ -39,10 +39,22 @@ def test_disconnected_write_operations_fail_closed():
         raise AssertionError('Una operación no conectada no puede ejecutarse.')
 
 
+def test_validated_motors_are_connected_with_role_limits():
+    assert decision('download_ram','DOCENTE')['allowed'] is True
+    assert decision('publish_master_database','GERENTE')['allowed'] is True
+    assert decision('update_user','GERENTE')['allowed'] is False
+    assert decision('update_user','SUPERADMIN')['allowed'] is True
+    assert decision('update_foundation','SUPERADMIN')['allowed'] is True
+    assert decision('create_user','SUPERADMIN')['allowed'] is True
+    assert decision('create_foundation','GERENTE')['allowed'] is False
+    assert decision('consolidate_master_database','NUTRICIONISTA')['allowed'] is True
+
+
 if __name__=='__main__':
     test_unknown_actions_are_denied()
     test_read_and_navigation_do_not_require_confirmation()
     test_generation_requires_explicit_confirmation()
     test_credit_mutations_are_superadmin_only()
     test_disconnected_write_operations_fail_closed()
+    test_validated_motors_are_connected_with_role_limits()
     print('PASS: política central de acciones LIAN')

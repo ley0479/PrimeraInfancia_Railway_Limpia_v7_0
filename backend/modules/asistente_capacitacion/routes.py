@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request, g, Response
 from modules.dbapi_compat import sqlite3
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS, get_request_user_context
@@ -239,6 +239,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 result.update({'message':policy.get('reason'),'speech_text':policy.get('reason'),'confidence':'forbidden','confirmation_required':False,'actions':[]})
             else:
                 proposal.update({'risk':policy['risk'],'confirmation_type':policy['confirmation']})
+                if proposal.get('confirmation_required'):
+                    proposal.setdefault('expires_at',(datetime.now()+timedelta(seconds=60)).isoformat(timespec='seconds'))
         if proposal:
             target_module=str((proposal.get('arguments') or {}).get('module') or '')
             if target_module and allowed and target_module not in allowed:
@@ -279,7 +281,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def client_action_event():
         ctx=get_request_user_context();data=request.get_json(silent=True) or {}
         action=str(data.get('action') or '')
-        if action not in {'open_module','search_beneficiary','download_rpp'}: return jsonify({'error':'Acción de cliente no registrada.'}),422
+        if action not in {'open_module','search_beneficiary','download_rpp','download_ram','publish_master_database','consolidate_master_database','create_user','update_user','create_foundation','update_foundation'}: return jsonify({'error':'Acción de cliente no registrada.'}),422
         status=str(data.get('status') or '')
         if status not in {'completed','failed','cancelled'}: return jsonify({'error':'Estado de acción no válido.'}),422
         audit_lia(ctx,'CLIENT_ACTION_'+status.upper(),module=str(data.get('module') or '')[:80],tool=action,success=status=='completed',request_id=str(data.get('request_id') or '')[:64],metadata={'detail':redact(str(data.get('detail') or ''))[:160]})
@@ -344,6 +346,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         manual=manual_for_role(str(ctx.get('rol') or ''),module_id=module)
         safe_context=json.dumps({'rol':ctx.get('rol'),'modulo':module,'manual_operativo':manual},ensure_ascii=False,default=str)[:18_000]
         realtime_tools=[
+            {'type':'function','name':'propose_platform_action','description':'Prepara, sin ejecutar, una acción solicitada por voz: RAM, RPP, consolidar/publicar Base Maestra, crear/suspender/reactivar usuarios o fundaciones. Siempre muestra confirmación en la interfaz.','parameters':{'type':'object','properties':{'command':{'type':'string','description':'Orden completa pronunciada por el usuario.'}},'required':['command'],'additionalProperties':False}},
             {'type':'function','name':'get_pending_activities_summary','description':'Consulta las actividades pendientes autorizadas del usuario actual.','parameters':{'type':'object','properties':{},'additionalProperties':False}},
             {'type':'function','name':'get_structured_error','description':'Explica un código de error de la plataforma.','parameters':{'type':'object','properties':{'code':{'type':'string'}},'required':['code'],'additionalProperties':False}},
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
@@ -416,7 +419,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def tools_available():
         if not public_flags()['enabled']: return jsonify({'error':'LÍA está desactivada.'}),404
         get_request_user_context()
-        return jsonify({'tools':sorted(ALLOWED_TOOLS),'write_tools':[]}),200
+        return jsonify({'tools':sorted(ALLOWED_TOOLS),'write_tools':[],'proposal_tools':['propose_platform_action']}),200
 
     @bp.post('/tools/<string:tool_name>')
     def run_tool(tool_name: str):
@@ -430,7 +433,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         except PermissionError as exc: audit_lia(ctx,'TOOL_REJECTED',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),403
         except LookupError as exc: audit_lia(ctx,'TOOL_NOT_FOUND',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),404
         except ValueError as exc: audit_lia(ctx,'TOOL_INVALID_ARGUMENT',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),422
-        audit_lia(ctx,'TOOL_COMPLETED',tool=tool_name,request_id=request_id,metadata={'read_only':True})
+        audit_lia(ctx,'TOOL_COMPLETED',tool=tool_name,request_id=request_id,metadata={'read_only':tool_name!='propose_platform_action','proposal_only':tool_name=='propose_platform_action'})
         return jsonify({'tool':tool_name,'result':result,'read_only':True,'request_id':request_id}),200
 
     @bp.route('/preferences',methods=['GET','PUT'])

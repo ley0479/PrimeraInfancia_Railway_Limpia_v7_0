@@ -1,13 +1,16 @@
 """Registro cerrado de herramientas de lectura de LÍA."""
 from __future__ import annotations
-from datetime import date
+from datetime import date, datetime, timedelta
 from modules.dbapi_compat import sqlite3
 from modules.calendario_inteligente.repository import CalendarioInteligenteRepository
 from modules.idp_documental.repository import IDPRepository
 from .error_catalog import explain
 from .action_policy import require as require_action
+from .action_policy import decision as action_decision
+from .action_intents import propose_action
+from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_document_processing_status','get_format_generation_status','get_structured_error'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 def _int_arg(args, name, minimum=1):
     try: value=int(args.get(name))
@@ -18,6 +21,21 @@ def _int_arg(args, name, minimum=1):
 def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, user: dict) -> dict:
     if tool_name not in ALLOWED_TOOLS: raise PermissionError('Herramienta no autorizada para LÍA.')
     require_action(tool_name, str(user.get('rol') or ''))
+    if tool_name=='propose_platform_action':
+        command=str(args.get('command') or '').strip()
+        if not command or len(command)>1000:raise ValueError('La orden de plataforma no es válida.')
+        proposal=propose_action(command,screen_context=args.get('screen_context') if isinstance(args.get('screen_context'),dict) else {})
+        if not proposal:raise ValueError('No identifiqué una operación segura y completa. Reformula la orden con los datos necesarios.')
+        policy=action_decision(proposal.get('id'),str(user.get('rol') or ''))
+        if not policy.get('allowed'):raise PermissionError(policy.get('reason'))
+        target=str((proposal.get('arguments') or {}).get('module') or '')
+        allowed=set(ROLE_MENU_PERMISSIONS.get(str(user.get('rol') or ''),[]))
+        if target and allowed and target not in allowed:raise PermissionError('Tu rol no tiene permiso para operar ese módulo.')
+        proposal.update({'risk':policy['risk'],'confirmation_type':policy['confirmation']})
+        if proposal.get('confirmation_required'):
+            proposal.setdefault('expires_at',(datetime.now()+timedelta(seconds=60)).isoformat(timespec='seconds'))
+        message=proposal['summary']+(' Antes de continuar necesito: '+', '.join(proposal['missing'])+'.' if proposal.get('missing') else ' Revisa los datos y confirma desde la interfaz.')
+        return {'proposal_only':True,'message':message,'action_proposal':proposal}
     if tool_name=='get_structured_error': return explain(str(args.get('code') or ''))
     if tool_name=='get_pending_activities_summary':
         rows=CalendarioInteligenteRepository(database_path).list_mis_pendientes(user,limit=100)

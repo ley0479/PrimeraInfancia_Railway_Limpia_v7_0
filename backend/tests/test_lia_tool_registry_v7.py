@@ -5,12 +5,14 @@ BACKEND=Path(__file__).resolve().parents[1];sys.path.insert(0,str(BACKEND))
 from modules.dbapi_compat import sqlite3
 from modules.asistente_capacitacion.tool_registry import ALLOWED_TOOLS,execute
 
-assert ALLOWED_TOOLS==frozenset({'get_pending_activities_summary','get_document_processing_status','get_format_generation_status','get_structured_error'})
+assert ALLOWED_TOOLS==frozenset({'get_pending_activities_summary','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 try: execute('run_sql',args={},database_path='none',tenant_id=1,user={})
 except PermissionError: pass
 else: raise AssertionError('Una herramienta fuera de lista fue aceptada.')
 error=execute('get_structured_error',args={'code':'PARTICIPANTES_REQUERIDOS'},database_path='none',tenant_id=1,user={'id':1,'rol':'DOCENTE'})
 assert error['confidence']=='confirmed' and error['severity']=='error'
+voice=execute('propose_platform_action',args={'command':'Genera el RAM de Bajo Pacurita para septiembre de 2026'},database_path='none',tenant_id=1,user={'id':1,'rol':'DOCENTE'})
+assert voice['proposal_only'] is True and voice['action_proposal']['id']=='download_ram' and voice['action_proposal']['expires_at']
 
 with tempfile.TemporaryDirectory() as tmp:
     db=str(Path(tmp)/'lia.db');conn=sqlite3.connect(db)
