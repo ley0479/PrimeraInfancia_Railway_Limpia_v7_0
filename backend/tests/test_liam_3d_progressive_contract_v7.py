@@ -27,8 +27,11 @@ assert engine.is_file() and engine.stat().st_size < 1200 * 1024
 renderer = read("frontend/js/liam/liam-3d-renderer.js")
 controller = read("frontend/js/liam/liam-controller.js")
 index = read("frontend/index.html")
+backend_app = read("backend/app.py")
 assert "LIAM_AVATAR_3D_ENABLED=false" in read(".env.example")
 assert "liam-3d-renderer.js" in index
+assert "@app.route('/vendor/<path:filename>')" in backend_app
+assert "_project_path('frontend', 'vendor')" in backend_app
 assert "avatar_3d_enabled" in controller
 assert "loadEngine" in renderer and "document.createElement('script')" in renderer
 assert "liam-3d-ready" in renderer and "IAN_AVATAR" in read("frontend/js/liam/ian-avatar-renderer.js")

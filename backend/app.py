@@ -12128,6 +12128,12 @@ def servir_assets(filename):
     return send_from_directory(_project_path('frontend', 'assets'), filename)
 
 
+@app.route('/vendor/<path:filename>')
+def servir_frontend_vendor(filename):
+    """Sirve dependencias frontend versionadas y locales, como model-viewer."""
+    return send_from_directory(_project_path('frontend', 'vendor'), filename)
+
+
 @app.route('/<path:client_path>', methods=['GET'])
 def servir_ruta_frontend(client_path):
     """Fallback de navegación para enlaces directos de la interfaz web.
