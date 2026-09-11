@@ -58,6 +58,7 @@ def public_liam_flags() -> dict:
         'voice_enabled': enabled and _bool('LIAM_VOICE_ENABLED', False),
         'local_stt_enabled': enabled and _bool('LIAM_LOCAL_STT_ENABLED', False),
         'animation_enabled': enabled and _bool('LIAM_ANIMATION_ENABLED', True),
+        'avatar_3d_enabled': enabled and _bool('LIAM_AVATAR_3D_ENABLED', False),
         'walk_enabled': enabled and _bool('LIAM_WALK_ENABLED', False),
         'teleport_enabled': enabled and _bool('LIAM_TELEPORT_ENABLED', True),
         'lip_sync_enabled': enabled and _bool('LIAM_LIP_SYNC_ENABLED', False),
