@@ -91,18 +91,22 @@ test('la voz existente sigue siendo única y detener la cancela (audio simulado)
   expect(await page.evaluate(()=>window.__speechTest.state)).toBe('idle');
 });
 
-test('el recorrido desplaza un proxy del avatar nuevo sin otro WebGL',async({page})=>{
+test('el recorrido reutiliza el unico visor 3D y lo devuelve al panel',async({page})=>{
   await page.goto('http://127.0.0.1:8765/theme-lab/index.html');
   await page.evaluate(()=>{
-    document.body.innerHTML='<div id="liam-avatar-wrap" class="liam-lector-ready" data-liam-lector-poster="./assets/lia/3d/liam-lector-frontal.png"></div><button id="target">Destino</button>';
+    document.body.innerHTML='<div id="liam-avatar-wrap" class="liam-lector-ready" data-liam-lector-poster="./assets/lia/3d/liam-lector-frontal.png"><model-viewer class="liam-model-viewer"></model-viewer></div><button id="target">Destino</button>';
     window.LIAM_CONTROLS={resolve:()=>document.getElementById('target')};
     window.LIAM_SAFE_ZONES={placement:()=>({side:'right',left:20,top:20})};
     window.LIAM_ANIMATION={highlight:()=>true};window.LIAM_STATE={set:()=>{}};
   });
   await page.addScriptTag({url:'http://127.0.0.1:8765/js/liam/liam-movement-controller.js'});
   await page.evaluate(()=>window.LIAM_MOVEMENT.moveToControl('destino',{mode:'teleport',walk_enabled:false}));
-  await expect(page.locator('#ian-tour-avatar .liam-lector-motion-proxy')).toHaveCount(1);
-  await expect(page.locator('#ian-tour-avatar model-viewer')).toHaveCount(0);
+  await expect(page.locator('#ian-tour-avatar model-viewer')).toHaveCount(1);
+  await expect(page.locator('model-viewer')).toHaveCount(1);
+  await expect(page.locator('#liam-avatar-wrap model-viewer')).toHaveCount(0);
+  await page.evaluate(()=>window.LIAM_MOVEMENT.remove());
+  await expect(page.locator('#liam-avatar-wrap model-viewer')).toHaveCount(1);
+  await expect(page.locator('#ian-tour-avatar')).toHaveCount(0);
 });
 
 test.skip('el panel real abre, cierra y reabre sin duplicar asistente ni controles',async({page})=>{

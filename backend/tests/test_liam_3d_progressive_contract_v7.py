@@ -68,7 +68,7 @@ assert "selectedSource" in renderer and "camera-target" in renderer
 assert "availableAnimations" not in renderer and "viewer.play" not in renderer
 assert "LIAM_STATE?.subscribe?.(animate)" in renderer
 assert "showPoster" in renderer and "liam-lector-ready" in renderer
-assert "liam-lector-motion-proxy" in movement and "moveToControl" in movement
+assert "movedViewer" in movement and "viewerHome" in movement and "moveToControl" in movement
 assert "liam-lector-voice-pulse" in avatar_css and "pointer-events:none" in avatar_css
 assert "window.LIA_SPEECH?.speak(d.speech_text)" in controller
 assert "window.LIA_SPEECH?.stop()" in controller

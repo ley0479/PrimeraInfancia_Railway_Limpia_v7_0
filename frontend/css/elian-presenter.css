@@ -1,4 +1,4 @@
-/* Modo presentador: mantiene visible la plataforma y conserva el avatar 2D institucional. */
+/* Modo presentador: mantiene visible la plataforma y reutiliza el visor 3D de LIAM. */
 .liam-panel { width: min(380px, calc(100vw - 18px)); }
 .elian-presenter { position: fixed; inset: 0; z-index: 10043; pointer-events: none; }
 .elian-presenter[hidden] { display: none; }
@@ -26,6 +26,10 @@
 .liam-shell[data-mode="presenter"] > .liam-panel { display: none !important; }
 .elian-presenter-active .pi-a11y-widget { opacity: .75; }
 .elian-presenter.has-error .elian-presenter-caption { border-color: #fb7185; }
+.ian-tour-avatar > .liam-model-viewer {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 1; transform: none; pointer-events: none; background: transparent;
+}
 @media (max-width: 768px) {
   .elian-presenter-caption { bottom: 112px; max-height: 32vh; overflow: auto; }
   .elian-presenter-controls { bottom: 10px; width: calc(100vw - 20px); overflow-x: auto; justify-content: flex-start; }
