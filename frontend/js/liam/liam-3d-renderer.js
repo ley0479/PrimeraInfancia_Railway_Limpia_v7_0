@@ -2,8 +2,8 @@
   'use strict';
   const ENGINE='./vendor/model-viewer/model-viewer-4.3.1.min.js';
   const MODELS=Object.freeze({
-    female:'./assets/lia/3d/liam-mujer-v1.glb?v=texture-pbr-2',
-    male:'./assets/lia/3d/iam-hombre-v1.glb?v=texture-pbr-2'
+    female:'./assets/lia/3d/liam-produccion-v1.glb?v=texture-pbr-animada-1',
+    male:'./assets/lia/3d/iam-hombre-v1.glb?v=texture-webgl-3'
   });
   const animationByState={
     idle:'Idle',sleeping:'Idle',greeting:'Wave',guiding:'Point',
@@ -41,7 +41,7 @@
   function frame(){
     if(!viewer)return;const compact=frameQuery?.matches;
     viewer.setAttribute('camera-target','auto auto auto');
-    viewer.setAttribute('camera-orbit',compact?'6deg 82deg 2.45m':'8deg 82deg 2.75m');
+    viewer.setAttribute('camera-orbit',compact?'6deg 82deg 4.8m':'8deg 82deg 4.3m');
     viewer.setAttribute('field-of-view',compact?'31deg':'30deg');
   }
   async function mount(target,options={}){
@@ -59,9 +59,9 @@
     frame();
     viewer.setAttribute('interaction-prompt','none');viewer.setAttribute('shadow-intensity','0');
     viewer.setAttribute('environment-image','neutral');viewer.setAttribute('exposure','1.25');viewer.setAttribute('disable-zoom','');
-    viewer.addEventListener('load',()=>{viewer.pause?.();host.classList.add('liam-3d-ready')},{once:true});
+    viewer.addEventListener('load',()=>{host.classList.add('liam-3d-ready');animate(window.LIAM_STATE?.get?.()||'idle')},{once:true});
     viewer.addEventListener('error',()=>{host.classList.remove('liam-3d-ready');viewer?.remove();viewer=null},{once:true});
-    host.appendChild(viewer);unsubscribe?.();unsubscribe=null;
+    host.appendChild(viewer);unsubscribe?.();unsubscribe=window.LIAM_STATE?.subscribe?.(animate)||null;
     return true;
   }
   function unmount(){unsubscribe?.();unsubscribe=null;frameQuery?.removeEventListener?.('change',frameListener);frameQuery=null;frameListener=null;viewer?.pause?.();viewer?.remove();viewer=null;const host=document.querySelector('#liam-avatar-wrap');host?.classList.remove('liam-3d-ready','liam-3d-static');if(host)host.dataset.liam3d='released'}

@@ -20,7 +20,7 @@ os.environ["LIAM_AVATAR_3D_ENABLED"] = "true"
 assert public_liam_flags()["avatar_3d_enabled"] is True
 
 male_model = ROOT / "frontend/assets/lia/3d/iam-hombre-v1.glb"
-female_static_model = ROOT / "frontend/assets/lia/3d/liam-mujer-v1.glb"
+female_static_model = ROOT / "frontend/assets/lia/3d/liam-produccion-v1.glb"
 engine = ROOT / "frontend/vendor/model-viewer/model-viewer-4.3.1.min.js"
 assert male_model.is_file() and male_model.stat().st_size < 10 * 1024 * 1024
 assert female_static_model.is_file() and female_static_model.stat().st_size < 10 * 1024 * 1024
@@ -38,10 +38,11 @@ assert "_project_path('frontend', 'vendor')" in backend_app
 assert "avatar_3d_enabled" in controller
 assert "loadEngine" in renderer and "document.createElement('script')" in renderer
 assert "liam-3d-ready" in renderer and "IAN_AVATAR" in read("frontend/js/liam/ian-avatar-renderer.js")
-assert "liam-mujer-v1.glb" in renderer and "iam-hombre-v1.glb" in renderer
-assert "texture-pbr-2" in renderer
+assert "liam-produccion-v1.glb" in renderer and "iam-hombre-v1.glb" in renderer
+assert "texture-pbr-animada-1" in renderer
 assert "gender:state.visual?.avatar_gender" in controller
-assert "shadow-intensity','0" in renderer and "viewer.pause" in renderer
+assert "shadow-intensity','0" in renderer and "viewer?.pause" in renderer
+assert "LIAM_STATE?.subscribe?.(animate)" in renderer
 assert "liam-3d-static" in renderer and "background:transparent" in avatar_css
 for guard in ("saveData", "deviceMemory", "hardwareConcurrency", "webgl2", "prefers-reduced-motion"):
     assert guard in renderer
@@ -49,5 +50,6 @@ assert "LIAM_3D?.unmount" in controller
 for clip in ("Idle", "Walk", "Wave", "Point", "Talk", "Listen", "Think"):
     assert clip in renderer
 assert "camera-target" in renderer and "max-width: 768px" in renderer
+assert "4.8m" in renderer and "4.3m" in renderer
 
 print("LIAM_3D_PROGRESSIVE_CONTRACT_V7_PASS")

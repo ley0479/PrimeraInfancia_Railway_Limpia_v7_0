@@ -2,8 +2,9 @@
 
 ## Estado de entrega
 
-LIAM utiliza un modelo semirrealista riggeado con siete animaciones corporales y
-faciales. La integración es progresiva: el avatar 2D institucional se dibuja
+LIAM utiliza `liam-produccion-v1.glb`, un modelo semirrealista riggeado con siete
+animaciones y siete mapas de textura PBR embebidos. Incluye piel, rostro, afro,
+tejido azul, blusa, calzado y acento cian. La integración es progresiva: el avatar 2D institucional se dibuja
 primero y solo se sustituye cuando el visor 3D termina de cargar correctamente.
 
 ## Activación segura
@@ -12,7 +13,7 @@ La función está apagada por defecto. Para un despliegue controlado:
 
 1. Configurar `LIAM_AVATAR_3D_ENABLED=true` en el entorno del servicio.
 2. Mantener `ENABLE_LIAM_ASSISTANT=true`.
-3. Desplegar y comprobar `/assets/lia/3d/liam-semireal-v5.glb` con estado HTTP 200.
+3. Desplegar y comprobar `/assets/lia/3d/liam-produccion-v1.glb` con estado HTTP 200.
 4. Abrir LIAM en escritorio y móvil y ejecutar Saludar, Señalar y Hablar.
 5. Confirmar que voz, cierre del panel y cambio de orientación no dejan audio ni
    recursos gráficos activos.
@@ -43,7 +44,8 @@ node --check frontend/js/liam/liam-3d-renderer.js
 La verificación profunda del GLB se ejecuta con Blender:
 
 ```powershell
-& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background --python tools/liam_3d/validate_liam_glb.py -- frontend/assets/lia/3d/liam-semireal-v5.glb
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --factory-startup --background --python tools/liam_3d/validate_liam_glb.py -- frontend/assets/lia/3d/liam-produccion-v1.glb
+npx.cmd playwright test "tools/liam_3d/liam-production.spec.js" --workers=1
 ```
 
 El laboratorio manual está en `frontend/theme-lab/liam-3d.html`.

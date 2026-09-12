@@ -175,6 +175,7 @@ $env:PROJECT_INSTANCE_ID = $ProjectInstanceId
 $env:FLASK_HOST = '127.0.0.1'
 $env:FLASK_PORT = [string]$Port
 $env:PORT = [string]$Port
+$env:LIAM_AVATAR_3D_ENABLED = if ($TunnelMode) { 'false' } else { 'true' }
 $env:FRONTEND_PORT = [string]$Port
 $env:DATA_DIR = $DataDir
 $env:DATABASE_PATH = $DatabasePath
