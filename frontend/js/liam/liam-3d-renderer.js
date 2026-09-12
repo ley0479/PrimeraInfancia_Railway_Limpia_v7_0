@@ -2,8 +2,8 @@
   'use strict';
   const ENGINE='./vendor/model-viewer/model-viewer-4.3.1.min.js';
   const MODELS=Object.freeze({
-    female:'./assets/lia/3d/liam-mujer-v1.glb',
-    male:'./assets/lia/3d/iam-hombre-v1.glb'
+    female:'./assets/lia/3d/liam-mujer-v1.glb?v=texture-pbr-2',
+    male:'./assets/lia/3d/iam-hombre-v1.glb?v=texture-pbr-2'
   });
   const animationByState={
     idle:'Idle',sleeping:'Idle',greeting:'Wave',guiding:'Point',

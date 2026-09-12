@@ -39,6 +39,7 @@ assert "avatar_3d_enabled" in controller
 assert "loadEngine" in renderer and "document.createElement('script')" in renderer
 assert "liam-3d-ready" in renderer and "IAN_AVATAR" in read("frontend/js/liam/ian-avatar-renderer.js")
 assert "liam-mujer-v1.glb" in renderer and "iam-hombre-v1.glb" in renderer
+assert "texture-pbr-2" in renderer
 assert "gender:state.visual?.avatar_gender" in controller
 assert "shadow-intensity','0" in renderer and "viewer.pause" in renderer
 assert "liam-3d-static" in renderer and "background:transparent" in avatar_css
