@@ -1,14 +1,17 @@
 (function(){
   'use strict';
   const ENGINE='./vendor/model-viewer/model-viewer-4.3.1.min.js';
-  const MODEL='./assets/lia/3d/liam-semireal-v5.glb';
+  const MODELS=Object.freeze({
+    female:'./assets/lia/3d/liam-mujer-v1.glb',
+    male:'./assets/lia/3d/iam-hombre-v1.glb'
+  });
   const animationByState={
     idle:'Idle',sleeping:'Idle',greeting:'Wave',guiding:'Point',
     pointing_left:'Point',pointing_right:'Point',pointing_up:'Point',pointing_down:'Point',
     speaking:'Talk',listening:'Listen',thinking:'Think',walking_left:'Walk',walking_right:'Walk',
     walking_up:'Walk',walking_down:'Walk',success:'Wave',goodbye:'Wave'
   };
-  let enginePromise=null,viewer=null,unsubscribe=null,frameQuery=null,frameListener=null,lastDecision={allowed:false,reason:'not_evaluated'};
+  let enginePromise=null,viewer=null,unsubscribe=null,frameQuery=null,frameListener=null,currentGender='female',lastDecision={allowed:false,reason:'not_evaluated'};
   function capability(enabled){
     if(!enabled)return {allowed:false,reason:'disabled'};
     if(matchMedia('(prefers-reduced-motion: reduce)').matches)return {allowed:false,reason:'reduced_motion'};
@@ -31,33 +34,36 @@
   }
   function animate(state){
     if(!viewer)return;const clip=animationByState[state]||'Idle';
+    if(!viewer.availableAnimations?.includes?.(clip))return;
     if(viewer.animationName!==clip)viewer.animationName=clip;
     viewer.play?.({repetitions:clip==='Wave'||clip==='Point'?2:Infinity}).catch?.(()=>{});
   }
   function frame(){
     if(!viewer)return;const compact=frameQuery?.matches;
-    viewer.setAttribute('camera-target',compact?'0m 1.48m 0m':'auto auto auto');
-    viewer.setAttribute('camera-orbit',compact?'8deg 82deg 2.55m':'12deg 82deg 3.9m');
-    viewer.setAttribute('field-of-view',compact?'25deg':'28deg');
+    viewer.setAttribute('camera-target','auto auto auto');
+    viewer.setAttribute('camera-orbit',compact?'6deg 82deg 1.45m':'8deg 82deg 1.65m');
+    viewer.setAttribute('field-of-view',compact?'29deg':'27deg');
   }
   async function mount(target,options={}){
     const host=typeof target==='string'?document.querySelector(target):target;
+    const gender=options.gender==='male'?'male':'female';
     lastDecision=capability(Boolean(options.enabled));
     if(host)host.dataset.liam3d=lastDecision.reason;
-    if(!host||!lastDecision.allowed)return false;
-    if(viewer?.isConnected)return true;
+    if(!host||!lastDecision.allowed){if(viewer?.isConnected)unmount();return false}
+    if(viewer?.isConnected&&currentGender===gender)return true;
+    if(viewer?.isConnected)unmount();
     try{await loadEngine()}catch(_){return false}
     viewer=document.createElement('model-viewer');
-    viewer.className='liam-model-viewer';viewer.src=MODEL;viewer.alt='LIAM, asistente virtual 3D';
+    currentGender=gender;host.classList.add('liam-3d-static');viewer.className='liam-model-viewer';viewer.src=MODELS[gender];viewer.alt=gender==='male'?'LIAM hombre, asistente virtual 3D estático':'LIAM mujer, asistente virtual 3D estática';
     frameQuery=matchMedia('(max-width: 768px)');frameListener=()=>frame();frameQuery.addEventListener?.('change',frameListener);
     frame();
-    viewer.setAttribute('interaction-prompt','none');viewer.setAttribute('shadow-intensity','0.75');
-    viewer.setAttribute('environment-image','neutral');viewer.setAttribute('autoplay','');
-    viewer.addEventListener('load',()=>{host.classList.add('liam-3d-ready');animate(window.LIAM_STATE?.get?.()||'Idle')},{once:true});
+    viewer.setAttribute('interaction-prompt','none');viewer.setAttribute('shadow-intensity','0');
+    viewer.setAttribute('environment-image','neutral');viewer.setAttribute('exposure','1.12');viewer.setAttribute('disable-zoom','');
+    viewer.addEventListener('load',()=>{viewer.pause?.();host.classList.add('liam-3d-ready')},{once:true});
     viewer.addEventListener('error',()=>{host.classList.remove('liam-3d-ready');viewer?.remove();viewer=null},{once:true});
-    host.appendChild(viewer);unsubscribe?.();unsubscribe=window.LIAM_STATE?.subscribe?.(animate)||null;
+    host.appendChild(viewer);unsubscribe?.();unsubscribe=null;
     return true;
   }
-  function unmount(){unsubscribe?.();unsubscribe=null;frameQuery?.removeEventListener?.('change',frameListener);frameQuery=null;frameListener=null;viewer?.pause?.();viewer?.remove();viewer=null;const host=document.querySelector('#liam-avatar-wrap');host?.classList.remove('liam-3d-ready');if(host)host.dataset.liam3d='released'}
+  function unmount(){unsubscribe?.();unsubscribe=null;frameQuery?.removeEventListener?.('change',frameListener);frameQuery=null;frameListener=null;viewer?.pause?.();viewer?.remove();viewer=null;const host=document.querySelector('#liam-avatar-wrap');host?.classList.remove('liam-3d-ready','liam-3d-static');if(host)host.dataset.liam3d='released'}
   window.LIAM_3D=Object.freeze({mount,unmount,animate,capability,status:()=>({...lastDecision})});
 })();

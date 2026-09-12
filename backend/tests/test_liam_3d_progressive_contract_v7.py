@@ -19,12 +19,15 @@ assert public_liam_flags()["avatar_3d_enabled"] is False
 os.environ["LIAM_AVATAR_3D_ENABLED"] = "true"
 assert public_liam_flags()["avatar_3d_enabled"] is True
 
-model = ROOT / "frontend/assets/lia/3d/liam-semireal-v5.glb"
+male_model = ROOT / "frontend/assets/lia/3d/iam-hombre-v1.glb"
+female_static_model = ROOT / "frontend/assets/lia/3d/liam-mujer-v1.glb"
 engine = ROOT / "frontend/vendor/model-viewer/model-viewer-4.3.1.min.js"
-assert model.is_file() and model.stat().st_size < 3 * 1024 * 1024
+assert male_model.is_file() and male_model.stat().st_size < 10 * 1024 * 1024
+assert female_static_model.is_file() and female_static_model.stat().st_size < 10 * 1024 * 1024
 assert engine.is_file() and engine.stat().st_size < 1200 * 1024
 
 renderer = read("frontend/js/liam/liam-3d-renderer.js")
+avatar_css = read("frontend/css/ian-avatar.css")
 controller = read("frontend/js/liam/liam-controller.js")
 index = read("frontend/index.html")
 backend_app = read("backend/app.py")
@@ -35,6 +38,10 @@ assert "_project_path('frontend', 'vendor')" in backend_app
 assert "avatar_3d_enabled" in controller
 assert "loadEngine" in renderer and "document.createElement('script')" in renderer
 assert "liam-3d-ready" in renderer and "IAN_AVATAR" in read("frontend/js/liam/ian-avatar-renderer.js")
+assert "liam-mujer-v1.glb" in renderer and "iam-hombre-v1.glb" in renderer
+assert "gender:state.visual?.avatar_gender" in controller
+assert "shadow-intensity','0" in renderer and "viewer.pause" in renderer
+assert "liam-3d-static" in renderer and "background:transparent" in avatar_css
 for guard in ("saveData", "deviceMemory", "hardwareConcurrency", "webgl2", "prefers-reduced-motion"):
     assert guard in renderer
 assert "LIAM_3D?.unmount" in controller
