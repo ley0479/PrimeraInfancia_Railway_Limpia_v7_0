@@ -34,7 +34,7 @@
   function applyIanVisual(config={}){
     state.visual=config;const gender=config.avatar_gender||'female';const variant=config.avatar_variant||'afro_colombian_institutional';const name=config.assistant_name||'LIAM';
     window.LIAM_3D?.unmount?.();
-    const assetPath=config.avatar_asset_path||'./assets/lia/lia-human-v1.png';window.IAN_AVATAR?.render('#ian-launcher-avatar',{gender,variant,compact:true,assetPath});window.IAN_AVATAR?.render('#liam-avatar-wrap',{gender,variant,assetPath});
+    const assetPath=config.avatar_asset_path||'./assets/lia/lia-human-v1.png';const readerAsset=gender==='female'&&state.flags.avatar_3d_enabled?'./assets/lia/3d/liam-lector-frontal.png?v=lector-estatico-1':assetPath;window.IAN_AVATAR?.render('#ian-launcher-avatar',{gender,variant,compact:true,assetPath:readerAsset});window.IAN_AVATAR?.render('#liam-avatar-wrap',{gender,variant,assetPath:readerAsset});
     document.querySelectorAll('#liam-panel header b').forEach(el=>el.textContent=name);const tab=document.getElementById('liam-tab');if(tab){tab.setAttribute('aria-label',`Abrir asistente ${name}`);tab.title=`Abrir asistente ${name}`}
     const set=(id,value)=>{const field=document.getElementById(id);if(field&&value)field.value=value};set('elian-inline-gender',gender);set('elian-inline-variant',variant);set('elian-inline-voice',config.voice_gender);set('elian-inline-motion',config.motion_level);
     window.LIA_SPEECH?.setVoiceGender?.(config.voice_gender||gender);window.LIA_SPEECH?.setRate?.(config.voice_speed||.95);
