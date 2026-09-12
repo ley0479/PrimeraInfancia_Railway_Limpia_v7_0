@@ -41,8 +41,8 @@
   function frame(){
     if(!viewer)return;const compact=frameQuery?.matches;
     viewer.setAttribute('camera-target','auto auto auto');
-    viewer.setAttribute('camera-orbit',compact?'6deg 82deg 1.45m':'8deg 82deg 1.65m');
-    viewer.setAttribute('field-of-view',compact?'29deg':'27deg');
+    viewer.setAttribute('camera-orbit',compact?'6deg 82deg 2.45m':'8deg 82deg 2.75m');
+    viewer.setAttribute('field-of-view',compact?'31deg':'30deg');
   }
   async function mount(target,options={}){
     const host=typeof target==='string'?document.querySelector(target):target;
@@ -58,7 +58,7 @@
     frameQuery=matchMedia('(max-width: 768px)');frameListener=()=>frame();frameQuery.addEventListener?.('change',frameListener);
     frame();
     viewer.setAttribute('interaction-prompt','none');viewer.setAttribute('shadow-intensity','0');
-    viewer.setAttribute('environment-image','neutral');viewer.setAttribute('exposure','1.12');viewer.setAttribute('disable-zoom','');
+    viewer.setAttribute('environment-image','neutral');viewer.setAttribute('exposure','1.25');viewer.setAttribute('disable-zoom','');
     viewer.addEventListener('load',()=>{viewer.pause?.();host.classList.add('liam-3d-ready')},{once:true});
     viewer.addEventListener('error',()=>{host.classList.remove('liam-3d-ready');viewer?.remove();viewer=null},{once:true});
     host.appendChild(viewer);unsubscribe?.();unsubscribe=null;
