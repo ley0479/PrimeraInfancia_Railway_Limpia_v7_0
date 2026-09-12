@@ -1,17 +1,22 @@
 (function(){
   'use strict';
   const ENGINE='./vendor/model-viewer/model-viewer-4.3.1.min.js';
-  const MODELS=Object.freeze({
-    female:'./assets/lia/3d/liam-produccion-v1.glb?v=texture-pbr-animada-1',
-    male:'./assets/lia/3d/iam-hombre-v1.glb?v=texture-webgl-3'
+  const ASSETS=Object.freeze({
+    female:Object.freeze({
+      desktop:'./assets/lia/3d/liam-lector.glb?v=lector-estatico-1',
+      mobile:'./assets/lia/3d/liam-lector-movil.glb?v=lector-estatico-1',
+      poster:'./assets/lia/3d/liam-lector-frontal.png?v=lector-estatico-1',
+      static:true
+    }),
+    male:Object.freeze({
+      desktop:'./assets/lia/3d/iam-hombre-v1.glb?v=texture-webgl-3',
+      mobile:'./assets/lia/3d/iam-hombre-v1.glb?v=texture-webgl-3',
+      poster:'',
+      static:true
+    })
   });
-  const animationByState={
-    idle:'Idle',sleeping:'Idle',greeting:'Wave',guiding:'Point',
-    pointing_left:'Point',pointing_right:'Point',pointing_up:'Point',pointing_down:'Point',
-    speaking:'Talk',listening:'Listen',thinking:'Think',walking_left:'Walk',walking_right:'Walk',
-    walking_up:'Walk',walking_down:'Walk',success:'Wave',goodbye:'Wave'
-  };
-  let enginePromise=null,viewer=null,unsubscribe=null,frameQuery=null,frameListener=null,currentGender='female',lastDecision={allowed:false,reason:'not_evaluated'};
+  let enginePromise=null,viewer=null,poster=null,unsubscribe=null,loadTimer=null,currentGender='female';
+  let frameQuery=null,frameListener=null,lastDecision={allowed:false,reason:'not_evaluated'};
   function capability(enabled){
     if(!enabled)return {allowed:false,reason:'disabled'};
     if(matchMedia('(prefers-reduced-motion: reduce)').matches)return {allowed:false,reason:'reduced_motion'};
@@ -32,38 +37,58 @@
     });
     return enginePromise;
   }
+  function selectedSource(assets){
+    const compact=matchMedia('(max-width: 768px)').matches;
+    return compact||navigator.connection?.saveData?assets.mobile:assets.desktop;
+  }
   function animate(state){
-    if(!viewer)return;const clip=animationByState[state]||'Idle';
-    if(!viewer.availableAnimations?.includes?.(clip))return;
-    if(viewer.animationName!==clip)viewer.animationName=clip;
-    viewer.play?.({repetitions:clip==='Wave'||clip==='Point'?2:Infinity}).catch?.(()=>{});
+    const host=document.getElementById('liam-avatar-wrap');
+    if(host)host.dataset.liamLectorState=String(state||'idle');
+    // El lector es estático: el estado se comunica mediante el indicador visual.
+    // El movimiento espacial continúa a cargo de LIAM_MOVEMENT sobre el contenedor.
   }
   function frame(){
     if(!viewer)return;const compact=frameQuery?.matches;
-    viewer.setAttribute('camera-target','auto auto auto');
-    viewer.setAttribute('camera-orbit',compact?'6deg 82deg 4.8m':'8deg 82deg 4.3m');
-    viewer.setAttribute('field-of-view',compact?'31deg':'30deg');
+    viewer.setAttribute('camera-target','0m 0.42m 0m');
+    viewer.setAttribute('camera-orbit',compact?'0deg 90deg 1.9m':'0deg 90deg 1.7m');
+    viewer.setAttribute('field-of-view','36deg');
+  }
+  function showPoster(host,assets){
+    clearTimeout(loadTimer);loadTimer=null;
+    viewer?.remove();viewer=null;
+    if(!assets.poster)return false;
+    if(poster?.isConnected)return true;
+    host.querySelectorAll(':scope > .liam-lector-poster').forEach(node=>node.remove());
+    poster=document.createElement('img');poster.className='liam-lector-poster';poster.src=assets.poster;
+    poster.alt='LIAM, vista frontal de respaldo del avatar lector';poster.decoding='async';
+    host.appendChild(poster);host.classList.add('liam-3d-ready','liam-3d-static','liam-lector-ready');
+    host.dataset.liam3d='poster';return true;
   }
   async function mount(target,options={}){
     const host=typeof target==='string'?document.querySelector(target):target;
-    const gender=options.gender==='male'?'male':'female';
+    const gender=options.gender==='male'?'male':'female',assets=ASSETS[gender];
     lastDecision=capability(Boolean(options.enabled));
     if(host)host.dataset.liam3d=lastDecision.reason;
-    if(!host||!lastDecision.allowed){if(viewer?.isConnected)unmount();return false}
-    if(viewer?.isConnected&&currentGender===gender)return true;
-    if(viewer?.isConnected)unmount();
-    try{await loadEngine()}catch(_){return false}
-    viewer=document.createElement('model-viewer');
-    currentGender=gender;host.classList.add('liam-3d-static');viewer.className='liam-model-viewer';viewer.src=MODELS[gender];viewer.alt=gender==='male'?'LIAM hombre, asistente virtual 3D estático':'LIAM mujer, asistente virtual 3D estática';
-    frameQuery=matchMedia('(max-width: 768px)');frameListener=()=>frame();frameQuery.addEventListener?.('change',frameListener);
-    frame();
-    viewer.setAttribute('interaction-prompt','none');viewer.setAttribute('shadow-intensity','0');
-    viewer.setAttribute('environment-image','neutral');viewer.setAttribute('exposure','1.25');viewer.setAttribute('disable-zoom','');
-    viewer.addEventListener('load',()=>{host.classList.add('liam-3d-ready');animate(window.LIAM_STATE?.get?.()||'idle')},{once:true});
-    viewer.addEventListener('error',()=>{host.classList.remove('liam-3d-ready');viewer?.remove();viewer=null},{once:true});
-    host.appendChild(viewer);unsubscribe?.();unsubscribe=window.LIAM_STATE?.subscribe?.(animate)||null;
+    if(!host||!lastDecision.allowed){if(viewer?.isConnected||poster?.isConnected)unmount();return false}
+    if((viewer?.isConnected||poster?.isConnected)&&currentGender===gender)return true;
+    if(viewer?.isConnected||poster?.isConnected)unmount();
+    try{await loadEngine()}catch(_){return gender==='female'&&showPoster(host,assets)}
+    viewer=document.createElement('model-viewer');currentGender=gender;
+    host.classList.add('liam-3d-static');host.dataset.liamLectorPoster=assets.poster;
+    viewer.className='liam-model-viewer';viewer.src=selectedSource(assets);viewer.alt=gender==='female'?'LIAM, avatar lector 3D estático':'LIAM hombre, asistente virtual 3D';
+    if(assets.poster)viewer.poster=assets.poster;
+    frameQuery=matchMedia('(max-width: 768px)');frameListener=()=>frame();frameQuery.addEventListener?.('change',frameListener);frame();
+    viewer.setAttribute('interaction-prompt','none');viewer.setAttribute('shadow-intensity','0');viewer.setAttribute('environment-image','neutral');viewer.setAttribute('exposure','1');viewer.setAttribute('disable-pan','');viewer.setAttribute('disable-zoom','');viewer.setAttribute('camera-controls','');
+    viewer.addEventListener('load',()=>{clearTimeout(loadTimer);loadTimer=null;host.classList.add('liam-3d-ready');if(gender==='female')host.classList.add('liam-lector-ready');host.dataset.liam3d='model';animate(window.LIAM_STATE?.get?.()||'idle')},{once:true});
+    viewer.addEventListener('error',()=>{host.classList.remove('liam-3d-ready');if(gender==='female')showPoster(host,assets);else{viewer?.remove();viewer=null}},{once:true});
+    host.appendChild(viewer);loadTimer=setTimeout(()=>{if(viewer&&!viewer.loaded){if(gender==='female')showPoster(host,assets);else{viewer.remove();viewer=null}}},25000);unsubscribe?.();unsubscribe=window.LIAM_STATE?.subscribe?.(animate)||null;
     return true;
   }
-  function unmount(){unsubscribe?.();unsubscribe=null;frameQuery?.removeEventListener?.('change',frameListener);frameQuery=null;frameListener=null;viewer?.pause?.();viewer?.remove();viewer=null;const host=document.querySelector('#liam-avatar-wrap');host?.classList.remove('liam-3d-ready','liam-3d-static');if(host)host.dataset.liam3d='released'}
+  function unmount(){
+    unsubscribe?.();unsubscribe=null;clearTimeout(loadTimer);loadTimer=null;frameQuery?.removeEventListener?.('change',frameListener);frameQuery=null;frameListener=null;
+    viewer?.pause?.();viewer?.remove();viewer=null;poster?.remove();poster=null;
+    const host=document.querySelector('#liam-avatar-wrap');host?.classList.remove('liam-3d-ready','liam-3d-static','liam-lector-ready');
+    if(host){delete host.dataset.liamLectorPoster;delete host.dataset.liamLectorState;host.dataset.liam3d='released'}
+  }
   window.LIAM_3D=Object.freeze({mount,unmount,animate,capability,status:()=>({...lastDecision})});
 })();

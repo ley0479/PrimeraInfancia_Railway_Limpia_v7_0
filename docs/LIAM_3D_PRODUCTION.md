@@ -1,51 +1,78 @@
-# LIAM 3D: operación y despliegue
+# LIAM lector: integración visual
 
-## Estado de entrega
+## Alcance
 
-LIAM utiliza `liam-produccion-v1.glb`, un modelo semirrealista riggeado con siete
-animaciones y siete mapas de textura PBR embebidos. Incluye piel, rostro, afro,
-tejido azul, blusa, calzado y acento cian. La integración es progresiva: el avatar 2D institucional se dibuja
-primero y solo se sustituye cuando el visor 3D termina de cargar correctamente.
+Esta entrega cambia solamente el perfil visual femenino del asistente LIAM por
+el busto estático entregado en LIAM_Lector_Listo.zip. No incorpora el panel
+liam-lector, speech-core.mjs, textos de demostración ni otro sintetizador.
+El perfil masculino y todos los recursos visuales anteriores permanecen
+disponibles.
 
-## Activación segura
+El modelo no tiene esqueleto, clips ni morph targets. Por ello no se anuncian
+Idle, Walk, Talk, sincronización labial ni movimiento de extremidades.
 
-La función está apagada por defecto. Para un despliegue controlado:
+## Funcionamiento conservado
 
-1. Configurar `LIAM_AVATAR_3D_ENABLED=true` en el entorno del servicio.
-2. Mantener `ENABLE_LIAM_ASSISTANT=true`.
-3. Desplegar y comprobar `/assets/lia/3d/liam-produccion-v1.glb` con estado HTTP 200.
-4. Abrir LIAM en escritorio y móvil y ejecutar Saludar, Señalar y Hablar.
-5. Confirmar que voz, cierre del panel y cambio de orientación no dejan audio ni
-   recursos gráficos activos.
+- liam-controller.js mantiene el botón, panel, chat, historial, accesos,
+  selección de personaje/voz, explicación de pantalla y detección de módulo.
+- speech-controller.js (window.LIA_SPEECH) sigue siendo la única autoridad de
+  lectura, pausa, continuación, detención, voz elegida y velocidad.
+- liam-state-machine.js comunica estados como speaking y listening; el avatar
+  estático los representa mediante un indicador discreto.
+- liam-movement-controller.js conserva posiciones, recorridos, límites y
+  resaltados. Durante un recorrido mueve un PNG del mismo avatar; no crea otro
+  contexto WebGL ni simula que el busto camina o señala.
+- Cerrar el panel detiene voz, escucha, Realtime y recorridos, y libera el visor.
+- La selección masculina continúa usando iam-hombre-v1.glb.
 
-## Selección adaptativa
+No se modificaron autenticación, sesiones, roles, aislamiento, créditos,
+suscripciones, herramientas, Base Maestra ni lógica de negocio.
 
-El 3D no se inicia cuando hay reducción de movimiento, ahorro de datos, menos de
-4 GB de memoria informada, menos de cuatro procesadores lógicos o ausencia de
-WebGL. Cerrar el panel pausa y elimina el visor, liberando su modelo de la página.
-En cualquier fallo de carga permanece visible el avatar 2D.
+## Recursos y rutas reales
 
-En pantallas de hasta 768 px el encuadre prioriza torso y rostro; en escritorio
-se presenta el cuerpo completo. El GLB no se descarga hasta abrir el panel.
+Flask sirve frontend mediante las rutas existentes de la aplicación. El
+renderizador solicita solo una variante:
 
-## Reversión
+- Escritorio: /assets/lia/3d/liam-lector.glb (2.999.160 bytes).
+- Móvil: /assets/lia/3d/liam-lector-movil.glb (1.262.084 bytes).
+- Respaldo: /assets/lia/3d/liam-lector-frontal.png.
+- Visor existente: /vendor/model-viewer/model-viewer-4.3.1.min.js.
 
-Cambiar `LIAM_AVATAR_3D_ENABLED=false` y reiniciar el servicio. No requiere borrar
-activos ni cambiar datos: LIAM continúa funcionando con el respaldo 2D y voz.
+No se añadió una segunda copia de model-viewer.
+
+## Carga, encuadre y respaldo
+
+La función sigue siendo progresiva y depende de LIAM_AVATAR_3D_ENABLED.
+El modelo se carga al abrir el asistente, sin descargar simultáneamente las dos
+variantes. La cámara usa el encuadre documentado por el paquete para el busto,
+fondo transparente y luz neutral.
+
+Si WebGL no está disponible se conserva la representación anterior. Si el GLB,
+el motor o su render tardan más de 25 segundos, se muestra la imagen frontal
+del paquete. El chat y la voz no dependen del resultado visual.
 
 ## Verificación
 
-```powershell
-py -3 backend/tests/test_liam_3d_progressive_contract_v7.py
-node tools/liam_3d/test_renderer_capability.js
-node --check frontend/js/liam/liam-3d-renderer.js
-```
+    python backend/tests/test_liam_3d_progressive_contract_v7.py
+    node tools/liam_3d/test_renderer_capability.js
+    node --check frontend/js/liam/liam-3d-renderer.js
+    node --check frontend/js/liam/liam-movement-controller.js
+    npx.cmd playwright test "tools/liam_3d/liam-production.spec.js" --workers=1
 
-La verificación profunda del GLB se ejecuta con Blender:
+Las pruebas automatizadas comprueban estructura estática de ambos GLB, selección
+escritorio/móvil, un único visor, estados visuales, liberación al cerrar, perfil
+masculino, respaldo por error, movimiento mediante proxy y una sola llamada al
+motor de voz existente. La voz de esas pruebas es simulada.
 
-```powershell
-& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --factory-startup --background --python tools/liam_3d/validate_liam_glb.py -- frontend/assets/lia/3d/liam-produccion-v1.glb
-npx.cmd playwright test "tools/liam_3d/liam-production.spec.js" --workers=1
-```
+Pendiente antes de producción: confirmar audio audible con una voz real de
+Windows, render WebGL interactivo en el equipo objetivo, teléfono físico y
+prueba autenticada completa. No se realizó despliegue.
 
-El laboratorio manual está en `frontend/theme-lab/liam-3d.html`.
+## Reversión
+
+No es necesario borrar activos. Para volver al avatar anterior, cambiar en
+frontend/js/liam/liam-3d-renderer.js las rutas female.desktop y female.mobile a
+liam-produccion-v1.glb, retirar la clase específica liam-lector-ready y restaurar
+la versión de caché del script. Como reversión operativa inmediata también puede
+configurarse LIAM_AVATAR_3D_ENABLED=false; LIAM continuará con su representación
+2D, chat y voz.
