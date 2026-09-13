@@ -113,9 +113,14 @@
       if (!data.ok) throw new Error(data.error || 'No se pudo buscar');
       lastResults = data.resultados || [];
       renderResultados(lastResults);
+      if (/^\d+$/.test(String(q).trim()) && lastResults.length === 1) {
+        await abrirDetalle(lastResults[0]);
+      }
+      return lastResults;
     } catch (err) {
       resultsBox.style.display = 'block';
       resultsBox.innerHTML = `<div class="a70-meta a70-warn" style="padding:10px;border-radius:12px">${htmlEscape(err.message || err)}</div>`;
+      throw err;
     }
   }
 
@@ -143,6 +148,7 @@
       if (!data.ok) throw new Error(data.error || 'No se pudo cargar ficha');
       renderFicha(data.ficha || data);
       if (resultsBox) resultsBox.style.display = 'none';
+      return data.ficha || data;
     } catch (err) {
       renderFicha({ beneficiario: item, alertas: [{ mensaje: err.message || String(err) }] });
     }
