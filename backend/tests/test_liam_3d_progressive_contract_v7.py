@@ -72,6 +72,8 @@ assert "movedViewer" in movement and "viewerHome" in movement and "moveToControl
 assert "liam-lector-voice-pulse" in avatar_css and "pointer-events:none" in avatar_css
 assert "window.LIA_SPEECH?.speak(d.speech_text)" in controller
 assert "window.LIA_SPEECH?.stop()" in controller
+assert "window.LIA_SPEECH?.setMuted?.(state.muted)" in controller
+assert "syncMutePreference()" in controller
 assert "window.LIAM_STATE?.set('speaking')" in speech
 assert "speechSynthesis.speak(current)" in speech
 assert "liam-lector.js" not in index and "speech-core.mjs" not in index
