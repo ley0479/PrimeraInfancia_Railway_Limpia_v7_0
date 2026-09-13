@@ -18,6 +18,10 @@ def test_generation_requires_explicit_confirmation():
     assert result['allowed'] is True
     assert result['risk']=='generation'
     assert result['confirmation']=='explicit'
+    bienestarina=decision('download_bienestarina','DOCENTE')
+    assert bienestarina['allowed'] is True
+    assert bienestarina['risk']=='generation'
+    assert bienestarina['confirmation']=='none'
 
 
 def test_credit_mutations_are_superadmin_only():

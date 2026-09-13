@@ -84,6 +84,15 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     if foundation_match and any(word in q for word in ('suspende','suspender','desactiva','desactivar','reactiva','reactivar')):
         activate=any(word in q for word in ('reactiva','reactivar'))
         return {'id':'update_foundation','label':'Confirmar cambio de fundación','summary':f"{'Reactivar' if activate else 'Suspender'} la fundación {foundation_match.group(1)}.",'arguments':{'foundation_id':int(foundation_match.group(1)),'active':activate,'module':'administracion'},'missing':[],'confirmation_required':True,'client_handler':'update_foundation'}
+    if 'bienestarina' in q and any(word in q for word in ('genera','generar','descarga','descargar','saca','sacame','formato')):
+        month=next((number for name,number in MONTHS.items() if re.search(rf'\b{name}\b',q)),None)
+        year_match=re.search(r'\b(20\d{2}|2100)\b',q);year=int(year_match.group(1)) if year_match else None
+        unit=_clean_unit(context.get('selected_unit'))
+        match=re.search(r'\b(?:de|para)\s+(?:la\s+)?(?:uds|unidad)\s+(.+?)(?=\s+(?:para|del|de)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2})\b|$)',question,re.I)
+        if not unit and match:unit=_clean_unit(match.group(1))
+        month=month or context.get('selected_month');year=year or context.get('selected_year')
+        missing=[name for name,value in (('unidad',unit),('mes',month),('año',year)) if not value]
+        return {'id':'download_bienestarina','label':'Generar Bienestarina','summary':f"Generar y descargar Bienestarina de {unit or 'la UDS indicada'}"+(f", periodo {int(month):02d}/{int(year)}." if month and year else '.'),'arguments':{'unit':unit or None,'month':month,'year':year,'module':'formatos'},'missing':missing,'confirmation_required':False,'client_handler':'download_bienestarina'}
     if 'ram' in q and any(word in q for word in ('genera','generar','descarga','descargar','saca','sacame')):
         month=next((number for name,number in MONTHS.items() if re.search(rf'\b{name}\b',q)),None)
         year_match=re.search(r'\b(20\d{2}|2100)\b',q);year=int(year_match.group(1)) if year_match else None

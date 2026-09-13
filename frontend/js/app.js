@@ -2132,7 +2132,7 @@ async function descargarArchivoFormatoAlpha63({ url, unidad, formato, nombreBase
                 alert(msg);
             }
             console.warn('Descarga de formato no realizada:', { unidad, formato, data });
-            return;
+            return { ok: false, error: msg };
         }
 
         const blob = await response.blob();
@@ -2159,6 +2159,7 @@ async function descargarArchivoFormatoAlpha63({ url, unidad, formato, nombreBase
         if (typeof mostrarMensaje === 'function') {
             mostrarMensaje('message-box', `${formato} descargado para ${unidad}.`, 'success');
         }
+        return { ok: true, filename, size: blob.size, unidad, formato };
     } catch (error) {
         const msg = `No se pudo descargar ${formato} para ${unidad}: ${error.message || error}`;
         if (typeof mostrarMensaje === 'function') {
@@ -2167,15 +2168,18 @@ async function descargarArchivoFormatoAlpha63({ url, unidad, formato, nombreBase
             alert(msg);
         }
         console.error('Error descargando formato:', { unidad, formato, error });
+        return { ok: false, error: error.message || String(error) };
     }
 }
 
-async function descargarBienestarinaAlpha62(unidad) {
+async function descargarBienestarinaAlpha62(unidad, periodoSolicitado = null) {
     if (!unidad) {
         alert('Debe seleccionar una UDS antes de descargar Bienestarina.');
-        return;
+        return { ok: false, error: 'Debe seleccionar una UDS antes de descargar Bienestarina.' };
     }
-    const periodo = periodoFormatosSeleccionado();
+    const periodo = periodoSolicitado && Number(periodoSolicitado.mes) >= 1 && Number(periodoSolicitado.mes) <= 12 && Number(periodoSolicitado.anio) >= 2000
+        ? { mes: Number(periodoSolicitado.mes), anio: Number(periodoSolicitado.anio) }
+        : periodoFormatosSeleccionado();
     const fechaEntrega = document.getElementById('fecha-entrega-bienestarina')?.value || '';
     const lote = document.getElementById('lote-bienestarina')?.value || '';
     const cantidad = document.getElementById('cantidad-bienestarina')?.value || '';
@@ -2195,6 +2199,7 @@ async function descargarBienestarinaAlpha62(unidad) {
         nombreBase: `BIENESTARINA_${String(unidad).replace(/[^A-Za-z0-9]+/g, '_')}.xlsx`
     });
 }
+window.descargarBienestarinaAlpha62 = descargarBienestarinaAlpha62;
 
 async function descargarRppCategoria(unidad, grupo, periodoSolicitado = null) {
     if (!unidad || !grupo) {

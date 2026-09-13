@@ -17,6 +17,20 @@ def test_complete_rpp_action_is_still_confirmation_required():
     assert value['confirmation_required'] is True
 
 
+def test_bienestarina_uses_exact_spoken_unit_and_valid_period_context():
+    value = propose_action('Ian, necesito el formato de Bienestarina de la unidad 15', screen_context={'selected_month': 9, 'selected_year': 2026})
+    assert value['id'] == 'download_bienestarina'
+    assert value['arguments'] == {'unit': '15', 'month': 9, 'year': 2026, 'module': 'formatos'}
+    assert value['missing'] == []
+    assert value['confirmation_required'] is False
+
+
+def test_bienestarina_requests_missing_period_instead_of_inventing_it():
+    value = propose_action('Sácame Bienestarina de la unidad 15')
+    assert value['arguments']['unit'] == '15'
+    assert value['missing'] == ['mes', 'año']
+
+
 def test_non_action_does_not_create_proposal():
     assert propose_action('Explícame qué es el RPP') is None
 
@@ -49,6 +63,8 @@ def test_ram_master_user_and_foundation_proposals():
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
+    test_bienestarina_uses_exact_spoken_unit_and_valid_period_context()
+    test_bienestarina_requests_missing_period_instead_of_inventing_it()
     test_non_action_does_not_create_proposal()
     test_navigation_and_read_only_intents_are_closed_actions()
     test_ram_master_user_and_foundation_proposals()

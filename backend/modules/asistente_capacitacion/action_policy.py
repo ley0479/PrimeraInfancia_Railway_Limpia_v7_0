@@ -23,6 +23,7 @@ RULES = {
     'get_format_generation_status': ActionRule('get_format_generation_status','read',ALL_AUTHENTICATED),
     'get_structured_error': ActionRule('get_structured_error','read',ALL_AUTHENTICATED),
     'download_rpp': ActionRule('download_rpp','generation',ALL_AUTHENTICATED,'explicit'),
+    'download_bienestarina': ActionRule('download_bienestarina','generation',ALL_AUTHENTICATED),
     'download_ram': ActionRule('download_ram','generation',ALL_AUTHENTICATED,'explicit'),
     'publish_master_database': ActionRule('publish_master_database','modification',frozenset({'SUPERADMIN','GERENTE','AUXILIAR_ADMINISTRATIVO'}),'explicit'),
     'consolidate_master_database': ActionRule('consolidate_master_database','modification',frozenset({'SUPERADMIN','GERENTE','AUXILIAR_ADMINISTRATIVO','NUTRICIONISTA'}),'explicit'),
