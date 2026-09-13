@@ -92,23 +92,34 @@ test('la voz existente sigue siendo única y detener la cancela (audio simulado)
   expect(await page.evaluate(()=>window.__speechTest.state)).toBe('idle');
 });
 
-test('el recorrido recrea un solo visor 3D y lo monta de nuevo al volver',async({page})=>{
+test('el recorrido desplaza una sola copia del avatar 2D por poses',async({page})=>{
   await page.goto('http://127.0.0.1:8765/theme-lab/index.html');
   await page.evaluate(()=>{
-    document.body.innerHTML='<div id="liam-avatar-wrap" class="liam-lector-ready" data-liam3d-gender="male" data-liam-lector-poster="./assets/lia/3d/liam-lector-frontal.png"><model-viewer class="liam-model-viewer" src="./assets/lia/3d/liam-lector.glb"></model-viewer></div><button id="target">Destino</button>';
+    document.body.innerHTML='<div id="liam-avatar-wrap"><span class="ian-avatar-2d ian-avatar-visual"><img class="ian-pose ian-pose-neutral" src="./assets/lia/2d/liam-male-neutral-v1.png"></span></div><button id="target">Destino</button>';
     window.LIAM_CONTROLS={resolve:()=>document.getElementById('target')};
     window.LIAM_SAFE_ZONES={placement:()=>({side:'right',left:20,top:20})};
     window.LIAM_ANIMATION={highlight:()=>true};window.LIAM_STATE={set:()=>{}};
-    window.__remount=[];window.LIAM_3D={mount:(home,options)=>window.__remount.push([home.id,options])};
   });
   await page.addScriptTag({url:'http://127.0.0.1:8765/js/liam/liam-movement-controller.js'});
   await page.evaluate(()=>window.LIAM_MOVEMENT.moveToControl('destino',{mode:'teleport',walk_enabled:false}));
-  await expect(page.locator('#ian-tour-avatar model-viewer')).toHaveCount(1);
-  await expect(page.locator('model-viewer')).toHaveCount(1);
-  await expect(page.locator('#liam-avatar-wrap model-viewer')).toHaveCount(0);
+  await expect(page.locator('#ian-tour-avatar .ian-avatar-2d')).toHaveCount(1);
+  await expect(page.locator('.ian-avatar-2d')).toHaveCount(2);
   await page.evaluate(()=>window.LIAM_MOVEMENT.remove());
   await expect(page.locator('#ian-tour-avatar')).toHaveCount(0);
-  expect(await page.evaluate(()=>window.__remount)).toEqual([['liam-avatar-wrap',{enabled:true,gender:'male'}]]);
+});
+
+test('LÍA 2D cambia entre reposo, lectura y señalamiento con transparencia',async({page})=>{
+  await page.goto('http://127.0.0.1:8765/theme-lab/index.html');
+  await page.addStyleTag({url:'http://127.0.0.1:8765/css/ian-avatar.css'});
+  await page.evaluate(()=>{document.head.insertAdjacentHTML('afterbegin','<base href="/">');document.body.innerHTML='<div id="liam-avatar-wrap" class="liam-avatar-wrap" data-state="idle" style="width:290px;height:302px"></div>'});
+  await page.addScriptTag({url:'http://127.0.0.1:8765/js/liam/ian-avatar-renderer.js'});
+  await page.evaluate(()=>window.IAN_AVATAR.render('#liam-avatar-wrap',{gender:'female'}));
+  await expect(page.locator('#liam-avatar-wrap .ian-pose')).toHaveCount(4);
+  await expect(page.locator('.ian-pose-neutral')).toBeVisible();
+  await page.locator('#liam-avatar-wrap').evaluate(node=>node.dataset.state='speaking');
+  await expect(page.locator('.ian-pose-reading')).toBeVisible();
+  await page.locator('#liam-avatar-wrap').evaluate(node=>node.dataset.state='pointing_left');
+  await expect(page.locator('.ian-pose-left')).toBeVisible();
 });
 
 test.skip('el panel real abre, cierra y reabre sin duplicar asistente ni controles',async({page})=>{

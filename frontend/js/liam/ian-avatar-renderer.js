@@ -7,7 +7,15 @@
     afro_colombian_technological:{male:'./assets/lia/elian-afro-technological-male-v1.png',female:'./assets/lia/elian-afro-technological-female-v1.png'},
     afro_colombian_educational:{male:'./assets/lia/elian-afro-educational-male-v1.png',female:'./assets/lia/elian-afro-educational-female-v1.png'}
   });
+  const poseAssets=Object.freeze({
+    female:Object.freeze({neutral:'./assets/lia/2d/lia-female-neutral-v1.png',reading:'./assets/lia/2d/lia-female-reading-v1.png',left:'./assets/lia/2d/lia-female-point-left-v1.png',right:'./assets/lia/2d/lia-female-point-right-v1.png'}),
+    male:Object.freeze({neutral:'./assets/lia/2d/liam-male-neutral-v1.png',reading:'./assets/lia/2d/liam-male-reading-v1.png',left:'./assets/lia/2d/liam-male-point-left-v1.png',right:'./assets/lia/2d/liam-male-point-right-v1.png'})
+  });
   let rigSequence=0;
+  function poseMarkup(options={}){
+    const gender=genders.has(options.gender)?options.gender:'female',poses=poseAssets[gender],compact=options.compact?' ian-avatar-compact':'';
+    return `<span class="ian-avatar-2d ian-avatar-visual${compact}" data-gender="${gender}" role="img" aria-label="${gender==='female'?'LÍA':'LIAM'}, asistente virtual 2D"><img class="ian-pose ian-pose-neutral" src="${poses.neutral}" alt=""><img class="ian-pose ian-pose-reading" src="${poses.reading}" alt=""><img class="ian-pose ian-pose-left" src="${poses.left}" alt=""><img class="ian-pose ian-pose-right" src="${poses.right}" alt=""></span>`;
+  }
   function trustedAsset(options,gender,variant){
     const requested=String(options.assetPath||'').replace(/^\//,'./');
     const allowed=new Set(['./assets/lia/lia-human-v1.png','./assets/lia/elian-afro-institutional-female-v1.png',...Object.values(assets).flatMap(Object.values)]);
@@ -50,10 +58,10 @@
   function render(target,options={}){
     const el=typeof target==='string'?document.querySelector(target):target;if(!el)return null;
     const gender=genders.has(options.gender)?options.gender:'female',variant=variants.has(options.variant)?options.variant:'afro_colombian_institutional';
-    el.innerHTML=rigMarkup({...options,gender,variant});
-    const rig=el.querySelector('.ian-avatar-rig');
-    rig?.querySelectorAll('image').forEach(image=>image.addEventListener('error',()=>{el.innerHTML=markup({gender,variant,compact:options.compact})},{once:true}));
-    return rig;
+    el.innerHTML=poseMarkup({...options,gender,variant});
+    const avatar=el.querySelector('.ian-avatar-2d');
+    avatar?.querySelectorAll('img').forEach(image=>image.addEventListener('error',()=>{el.innerHTML=markup({gender,variant,compact:options.compact})},{once:true}));
+    return avatar;
   }
-  window.IAN_AVATAR=Object.freeze({markup,rigMarkup,render,assets});
+  window.IAN_AVATAR=Object.freeze({markup,rigMarkup,poseMarkup,render,assets,poseAssets});
 })();
