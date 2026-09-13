@@ -122,7 +122,16 @@ test('LÍA 2D cambia entre reposo, lectura y señalamiento con transparencia',as
   await expect(page.locator('.ian-pose-left')).toBeVisible();
 });
 
-test.skip('el panel real abre, cierra y reabre sin duplicar asistente ni controles',async({page})=>{
+test('el lanzador 2D de respaldo aparece si el montaje autenticado tarda',async({page})=>{
+  await page.goto('http://127.0.0.1:8765/theme-lab/index.html');
+  await page.evaluate(()=>{document.head.insertAdjacentHTML('afterbegin','<base href="/">');document.body.innerHTML='<main id="app-shell"></main>'});
+  await page.addStyleTag({url:'http://127.0.0.1:8765/css/ian-avatar.css'});
+  await page.addScriptTag({url:'http://127.0.0.1:8765/js/liam/ian-avatar-renderer.js'});
+  await page.addScriptTag({url:'http://127.0.0.1:8765/js/liam/ian-visibility-guard.js'});
+  await expect(page.locator('#ian-visibility-fallback .ian-avatar-2d')).toBeVisible({timeout:4000});
+});
+
+test('el panel real abre, cierra y reabre sin duplicar asistente ni controles',async({page})=>{
   await page.route(/^https:\/\//,route=>route.abort());
   await page.addInitScript(()=>sessionStorage.setItem('primeraInfanciaAuthToken','token-prueba-visual'));
   await page.route('**/api/asistente-capacitacion/config',route=>route.fulfill({json:{elian:{enabled:true,avatar_3d_enabled:true,voice_enabled:false,hologram_enabled:false,platform_tour_enabled:false,tours_enabled:true,walk_enabled:true},platform_profile:{}}}));
@@ -133,12 +142,11 @@ test.skip('el panel real abre, cierra y reabre sin duplicar asistente ni control
   await expect(page.locator('#liam-panel')).toBeVisible();
   await expect(page.locator('#liam-conversation')).toHaveCount(1);
   await expect(page.locator('[data-action="stop"]')).toHaveCount(1);
-  await expect.poll(()=>page.locator('#liam-avatar-wrap').getAttribute('data-liam3d'),{timeout:35000}).toMatch(/model|poster/);
-  expect(await page.locator('#liam-avatar-wrap model-viewer, #liam-avatar-wrap .liam-lector-poster').count()).toBe(1);
+  await expect(page.locator('#liam-avatar-wrap .ian-avatar-2d')).toHaveCount(1);
+  await expect(page.locator('#liam-avatar-wrap .ian-pose-neutral')).toHaveAttribute('src',/lia-female-neutral-v1\.png/);
   await page.locator('#liam-close').click();await expect(page.locator('#liam-panel')).toBeHidden();
-  await expect(page.locator('#liam-avatar-wrap model-viewer, #liam-avatar-wrap .liam-lector-poster')).toHaveCount(0);
+  await expect(page.locator('#liam-avatar-wrap .ian-avatar-2d')).toHaveCount(1);
   await tab.click();await expect(page.locator('#liam-panel')).toBeVisible();
-  await expect.poll(()=>page.locator('#liam-avatar-wrap').getAttribute('data-liam3d'),{timeout:35000}).toMatch(/model|poster/);
   expect(await page.locator('#liam-shell')).toHaveCount(1);
-  expect(await page.locator('#liam-avatar-wrap model-viewer, #liam-avatar-wrap .liam-lector-poster').count()).toBe(1);
+  expect(await page.locator('#liam-avatar-wrap .ian-avatar-2d').count()).toBe(1);
 });

@@ -12,7 +12,7 @@
   function ensure(){
     const shell=document.getElementById('liam-shell');if(shell){removeFallback();shell.style.setProperty('display','block','important');shell.style.setProperty('visibility','visible','important');shell.style.setProperty('opacity','1','important');const tab=document.getElementById('liam-tab');if(tab&&!shell.dataset.open){tab.style.setProperty('display','grid','important')}return}
     if(!hasSession()){timer=setTimeout(ensure,1400);return}
-    window.IAN_BOOT?.();attempts+=1;if(attempts>=2)showFallback();timer=setTimeout(ensure,1800);
+    showFallback();window.IAN_BOOT?.();attempts+=1;timer=setTimeout(ensure,1800);
   }
   window.IAN_VISIBILITY_GUARD=Object.freeze({ensure,showFallback});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(ensure,800));else setTimeout(ensure,800);
