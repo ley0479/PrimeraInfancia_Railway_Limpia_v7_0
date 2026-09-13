@@ -33,11 +33,11 @@ assert public_liam_flags()["avatar_3d_enabled"] is True
 desktop_path = "frontend/assets/lia/3d/liam-lector.glb"
 mobile_path = "frontend/assets/lia/3d/liam-lector-movil.glb"
 poster_path = "frontend/assets/lia/3d/liam-lector-frontal.png"
-male_path = ROOT / "frontend/assets/lia/3d/iam-hombre-v1.glb"
+female_path = ROOT / "frontend/assets/lia/3d/liam-mujer-v1.glb"
 engine_path = ROOT / "frontend/vendor/model-viewer/model-viewer-4.3.1.min.js"
 assert 1_000_000 < (ROOT / desktop_path).stat().st_size < 4_000_000
 assert 500_000 < (ROOT / mobile_path).stat().st_size < 2_000_000
-assert (ROOT / poster_path).is_file() and male_path.is_file()
+assert (ROOT / poster_path).is_file() and female_path.is_file()
 assert engine_path.is_file() and engine_path.stat().st_size < 1200 * 1024
 
 for model_path in (desktop_path, mobile_path):
@@ -63,7 +63,7 @@ assert "_project_path('frontend', 'vendor')" in backend_app
 assert "avatar_3d_enabled" in controller and "gender:state.visual?.avatar_gender" in controller
 assert "loadEngine" in renderer and "document.createElement('script')" in renderer
 assert "liam-lector.glb" in renderer and "liam-lector-movil.glb" in renderer
-assert "liam-lector-frontal.png" in renderer and "iam-hombre-v1.glb" in renderer
+assert "liam-lector-frontal.png" in renderer and "liam-mujer-v1.glb" in renderer
 assert "selectedSource" in renderer and "camera-target" in renderer
 assert "availableAnimations" not in renderer and "viewer.play" not in renderer
 assert "LIAM_STATE?.subscribe?.(animate)" in renderer

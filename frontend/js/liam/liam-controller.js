@@ -15,7 +15,7 @@
   const headers=()=>({'Content-Type':'application/json',Authorization:`Bearer ${token()}`});
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const runtime=['liam-control-registry','liam-anchor-registry','liam-safe-zone-engine','liam-animation-orchestrator','liam-tablet-controller','liam-movement-controller','liam-tour-engine','elian-platform-tour','liam-lip-sync','liam-context-collector','liam-error-observer','liam-realtime-webrtc'];
-  async function loadRuntime(){for(const name of runtime){if(document.querySelector(`script[data-liam-runtime="${name}"]`))continue;await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=`./js/liam/${name}.js?v=2.7.5-liam-3d-presenter-1`;script.dataset.liamRuntime=name;script.onload=resolve;script.onerror=()=>reject(new Error(`No se pudo cargar ${name}.`));document.head.appendChild(script)})}}
+  async function loadRuntime(){for(const name of runtime){if(document.querySelector(`script[data-liam-runtime="${name}"]`))continue;await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=`./js/liam/${name}.js?v=2.7.5-liam-3d-presenter-2`;script.dataset.liamRuntime=name;script.onload=resolve;script.onerror=()=>reject(new Error(`No se pudo cargar ${name}.`));document.head.appendChild(script)})}}
   function moduleNow(){return location.hash.replace(/^#/,'')||'dashboard'}
   function authenticatedUser(){
     try{const current=window.authUser?.();if(current)return current}catch(_){}
@@ -34,7 +34,7 @@
   function applyIanVisual(config={}){
     state.visual=config;const gender=config.avatar_gender||'female';const variant=config.avatar_variant||'afro_colombian_institutional';const name=config.assistant_name||'LIAM';
     window.LIAM_3D?.unmount?.();
-    const assetPath=config.avatar_asset_path||'./assets/lia/lia-human-v1.png';const readerAsset=gender==='female'&&state.flags.avatar_3d_enabled?'./assets/lia/3d/liam-lector-frontal.png?v=lector-estatico-1':assetPath;window.IAN_AVATAR?.render('#ian-launcher-avatar',{gender,variant,compact:true,assetPath:readerAsset});window.IAN_AVATAR?.render('#liam-avatar-wrap',{gender,variant,assetPath:readerAsset});
+    const assetPath=config.avatar_asset_path||'./assets/lia/lia-human-v1.png';const readerAsset=gender==='male'&&state.flags.avatar_3d_enabled?'./assets/lia/3d/liam-lector-frontal.png?v=lector-estatico-1':assetPath;window.IAN_AVATAR?.render('#ian-launcher-avatar',{gender,variant,compact:true,assetPath:readerAsset});window.IAN_AVATAR?.render('#liam-avatar-wrap',{gender,variant,assetPath:readerAsset});
     document.querySelectorAll('#liam-panel header b').forEach(el=>el.textContent=name);const tab=document.getElementById('liam-tab');if(tab){tab.setAttribute('aria-label',`Abrir asistente ${name}`);tab.title=`Abrir asistente ${name}`}
     const set=(id,value)=>{const field=document.getElementById(id);if(field&&value)field.value=value};set('elian-inline-gender',gender);set('elian-inline-variant',variant);set('elian-inline-voice',config.voice_gender);set('elian-inline-motion',config.motion_level);
     window.LIA_SPEECH?.setVoiceGender?.(config.voice_gender||gender);window.LIA_SPEECH?.setRate?.(config.voice_speed||.95);

@@ -33,7 +33,7 @@ for(const device of [
     expect(requests.filter(url=>/liam-lector(?:-movil)?\.glb/.test(url))).toHaveLength(1);
 
     await installRenderer(page);
-    await page.evaluate(()=>window.LIAM_3D.mount('#liam-avatar-wrap',{enabled:true,gender:'female'}));
+    await page.evaluate(()=>window.LIAM_3D.mount('#liam-avatar-wrap',{enabled:true,gender:'male'}));
     await expect.poll(()=>page.locator('#liam-avatar-wrap').getAttribute('data-liam3d'),{timeout:35000}).toMatch(/model|poster/);
     const visualCount=await page.locator('#liam-avatar-wrap model-viewer, #liam-avatar-wrap .liam-lector-poster').count();
     expect(visualCount).toBe(1);
@@ -41,20 +41,21 @@ for(const device of [
     if(loaded==='model')expect(await page.locator('#liam-avatar-wrap model-viewer').evaluate(element=>[...element.availableAnimations])).toEqual([]);
     await page.evaluate(()=>window.LIAM_STATE.set('speaking'));
     await expect(page.locator('#liam-avatar-wrap')).toHaveAttribute('data-liam-lector-state','speaking');
-    await page.evaluate(()=>window.LIAM_3D.mount('#liam-avatar-wrap',{enabled:true,gender:'female'}));
+    await page.evaluate(()=>window.LIAM_3D.mount('#liam-avatar-wrap',{enabled:true,gender:'male'}));
     expect(await page.locator('#liam-avatar-wrap model-viewer, #liam-avatar-wrap .liam-lector-poster').count()).toBe(1);
     await page.evaluate(()=>window.LIAM_3D.unmount());
     await expect(page.locator('#liam-avatar-wrap model-viewer, #liam-avatar-wrap .liam-lector-poster')).toHaveCount(0);
   });
 }
 
-test('LIAM lector conserva el perfil masculino',async({page})=>{
+test('LIAM lector corresponde al perfil masculino y conserva el femenino',async({page})=>{
   await page.goto('http://127.0.0.1:8765/theme-lab/index.html');
   const result=await page.evaluate(async()=>({
     renderer:await (await fetch('../js/liam/liam-3d-renderer.js')).text(),
     controller:await (await fetch('../js/liam/liam-controller.js')).text()
   }));
-  expect(result.renderer).toContain('iam-hombre-v1.glb');
+  expect(result.renderer).toContain('liam-mujer-v1.glb');
+  expect(result.renderer).toContain('liam-lector.glb');
   expect(result.controller).toContain('<option value="male">Hombre</option>');
 });
 
@@ -62,7 +63,7 @@ test('LIAM lector degrada a la imagen frontal si falla el GLB',async({page})=>{
   await page.route(/liam-lector(?:-movil)?\.glb/,route=>route.abort());
   await page.goto('http://127.0.0.1:8765/theme-lab/index.html');
   await installRenderer(page);
-  await page.evaluate(()=>window.LIAM_3D.mount('#liam-avatar-wrap',{enabled:true,gender:'female'}));
+  await page.evaluate(()=>window.LIAM_3D.mount('#liam-avatar-wrap',{enabled:true,gender:'male'}));
   await expect(page.locator('#liam-avatar-wrap .liam-lector-poster')).toHaveCount(1,{timeout:30000});
   await expect(page.locator('#liam-avatar-wrap')).toHaveAttribute('data-liam3d','poster');
 });

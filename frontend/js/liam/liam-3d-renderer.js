@@ -3,15 +3,15 @@
   const ENGINE='./vendor/model-viewer/model-viewer-4.3.1.min.js';
   const ASSETS=Object.freeze({
     female:Object.freeze({
-      desktop:'./assets/lia/3d/liam-lector.glb?v=lector-estatico-1',
-      mobile:'./assets/lia/3d/liam-lector-movil.glb?v=lector-estatico-1',
-      poster:'./assets/lia/3d/liam-lector-frontal.png?v=lector-estatico-1',
+      desktop:'./assets/lia/3d/liam-mujer-v1.glb?v=texture-webgl-3',
+      mobile:'./assets/lia/3d/liam-mujer-v1.glb?v=texture-webgl-3',
+      poster:'./assets/lia/elian-afro-institutional-female-v1.png',
       static:true
     }),
     male:Object.freeze({
-      desktop:'./assets/lia/3d/iam-hombre-v1.glb?v=texture-webgl-3',
-      mobile:'./assets/lia/3d/iam-hombre-v1.glb?v=texture-webgl-3',
-      poster:'',
+      desktop:'./assets/lia/3d/liam-lector.glb?v=lector-estatico-1',
+      mobile:'./assets/lia/3d/liam-lector-movil.glb?v=lector-estatico-1',
+      poster:'./assets/lia/3d/liam-lector-frontal.png?v=lector-estatico-1',
       static:true
     })
   });
@@ -72,16 +72,16 @@
     if(!host||!lastDecision.allowed){if(viewer?.isConnected||poster?.isConnected)unmount();return false}
     if((viewer?.isConnected||poster?.isConnected)&&currentGender===gender)return true;
     if(viewer?.isConnected||poster?.isConnected)unmount();
-    try{await loadEngine()}catch(_){return gender==='female'&&showPoster(host,assets)}
+    try{await loadEngine()}catch(_){return showPoster(host,assets)}
     viewer=document.createElement('model-viewer');currentGender=gender;
     host.classList.add('liam-3d-static');host.dataset.liamLectorPoster=assets.poster;
-    viewer.className='liam-model-viewer';viewer.src=selectedSource(assets);viewer.alt=gender==='female'?'LIAM, avatar lector 3D estático':'LIAM hombre, asistente virtual 3D';
+    viewer.className='liam-model-viewer';viewer.src=selectedSource(assets);viewer.alt=gender==='male'?'LIAM, avatar lector 3D estático':'LIAM mujer, asistente virtual 3D';
     if(assets.poster)viewer.poster=assets.poster;
     frameQuery=matchMedia('(max-width: 768px)');frameListener=()=>frame();frameQuery.addEventListener?.('change',frameListener);frame();
     viewer.setAttribute('interaction-prompt','none');viewer.setAttribute('shadow-intensity','0');viewer.setAttribute('environment-image','neutral');viewer.setAttribute('exposure','1');viewer.setAttribute('disable-pan','');viewer.setAttribute('disable-zoom','');viewer.setAttribute('camera-controls','');
-    viewer.addEventListener('load',()=>{clearTimeout(loadTimer);loadTimer=null;host.classList.add('liam-3d-ready');if(gender==='female')host.classList.add('liam-lector-ready');host.dataset.liam3d='model';animate(window.LIAM_STATE?.get?.()||'idle')},{once:true});
-    viewer.addEventListener('error',()=>{host.classList.remove('liam-3d-ready');if(gender==='female')showPoster(host,assets);else{viewer?.remove();viewer=null}},{once:true});
-    host.appendChild(viewer);loadTimer=setTimeout(()=>{if(viewer&&!viewer.loaded){if(gender==='female')showPoster(host,assets);else{viewer.remove();viewer=null}}},25000);unsubscribe?.();unsubscribe=window.LIAM_STATE?.subscribe?.(animate)||null;
+    viewer.addEventListener('load',()=>{clearTimeout(loadTimer);loadTimer=null;host.classList.add('liam-3d-ready');if(gender==='male')host.classList.add('liam-lector-ready');host.dataset.liam3d='model';animate(window.LIAM_STATE?.get?.()||'idle')},{once:true});
+    viewer.addEventListener('error',()=>{host.classList.remove('liam-3d-ready');showPoster(host,assets)},{once:true});
+    host.appendChild(viewer);loadTimer=setTimeout(()=>{if(viewer&&!viewer.loaded)showPoster(host,assets)},25000);unsubscribe?.();unsubscribe=window.LIAM_STATE?.subscribe?.(animate)||null;
     return true;
   }
   function unmount(){
