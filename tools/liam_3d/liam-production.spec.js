@@ -92,13 +92,14 @@ test('la voz existente sigue siendo única y detener la cancela (audio simulado)
   expect(await page.evaluate(()=>window.__speechTest.state)).toBe('idle');
 });
 
-test('el recorrido reutiliza el unico visor 3D y lo devuelve al panel',async({page})=>{
+test('el recorrido recrea un solo visor 3D y lo monta de nuevo al volver',async({page})=>{
   await page.goto('http://127.0.0.1:8765/theme-lab/index.html');
   await page.evaluate(()=>{
-    document.body.innerHTML='<div id="liam-avatar-wrap" class="liam-lector-ready" data-liam-lector-poster="./assets/lia/3d/liam-lector-frontal.png"><model-viewer class="liam-model-viewer"></model-viewer></div><button id="target">Destino</button>';
+    document.body.innerHTML='<div id="liam-avatar-wrap" class="liam-lector-ready" data-liam3d-gender="male" data-liam-lector-poster="./assets/lia/3d/liam-lector-frontal.png"><model-viewer class="liam-model-viewer" src="./assets/lia/3d/liam-lector.glb"></model-viewer></div><button id="target">Destino</button>';
     window.LIAM_CONTROLS={resolve:()=>document.getElementById('target')};
     window.LIAM_SAFE_ZONES={placement:()=>({side:'right',left:20,top:20})};
     window.LIAM_ANIMATION={highlight:()=>true};window.LIAM_STATE={set:()=>{}};
+    window.__remount=[];window.LIAM_3D={mount:(home,options)=>window.__remount.push([home.id,options])};
   });
   await page.addScriptTag({url:'http://127.0.0.1:8765/js/liam/liam-movement-controller.js'});
   await page.evaluate(()=>window.LIAM_MOVEMENT.moveToControl('destino',{mode:'teleport',walk_enabled:false}));
@@ -106,8 +107,8 @@ test('el recorrido reutiliza el unico visor 3D y lo devuelve al panel',async({pa
   await expect(page.locator('model-viewer')).toHaveCount(1);
   await expect(page.locator('#liam-avatar-wrap model-viewer')).toHaveCount(0);
   await page.evaluate(()=>window.LIAM_MOVEMENT.remove());
-  await expect(page.locator('#liam-avatar-wrap model-viewer')).toHaveCount(1);
   await expect(page.locator('#ian-tour-avatar')).toHaveCount(0);
+  expect(await page.evaluate(()=>window.__remount)).toEqual([['liam-avatar-wrap',{enabled:true,gender:'male'}]]);
 });
 
 test.skip('el panel real abre, cierra y reabre sin duplicar asistente ni controles',async({page})=>{

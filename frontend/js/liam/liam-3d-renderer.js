@@ -68,7 +68,7 @@
     const host=typeof target==='string'?document.querySelector(target):target;
     const gender=options.gender==='male'?'male':'female',assets=ASSETS[gender];
     lastDecision=capability(Boolean(options.enabled));
-    if(host)host.dataset.liam3d=lastDecision.reason;
+    if(host){host.dataset.liam3d=lastDecision.reason;host.dataset.liam3dGender=gender}
     if(!host||!lastDecision.allowed){if(viewer?.isConnected||poster?.isConnected)unmount();return false}
     if((viewer?.isConnected||poster?.isConnected)&&currentGender===gender)return true;
     if(viewer?.isConnected||poster?.isConnected)unmount();
@@ -88,7 +88,7 @@
     unsubscribe?.();unsubscribe=null;clearTimeout(loadTimer);loadTimer=null;frameQuery?.removeEventListener?.('change',frameListener);frameQuery=null;frameListener=null;
     viewer?.pause?.();viewer?.remove();viewer=null;poster?.remove();poster=null;
     const host=document.querySelector('#liam-avatar-wrap');host?.classList.remove('liam-3d-ready','liam-3d-static','liam-lector-ready');
-    if(host){delete host.dataset.liamLectorPoster;delete host.dataset.liamLectorState;host.dataset.liam3d='released'}
+    if(host){delete host.dataset.liamLectorPoster;delete host.dataset.liamLectorState;delete host.dataset.liam3dGender;host.dataset.liam3d='released'}
   }
   window.LIAM_3D=Object.freeze({mount,unmount,animate,capability,status:()=>({...lastDecision})});
 })();
