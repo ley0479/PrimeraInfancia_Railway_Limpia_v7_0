@@ -131,6 +131,18 @@ test('el lanzador 2D de respaldo aparece si el montaje autenticado tarda',async(
   await expect(page.locator('#ian-visibility-fallback .ian-avatar-2d')).toBeVisible({timeout:4000});
 });
 
+test('la vista previa administrativa usa el mismo avatar 2D seleccionado',async({page})=>{
+  await page.route('**/api/asistente-capacitacion/elian/visual-config',route=>route.fulfill({json:{configuration:{assistant_name:'LIAM',avatar_gender:'female',avatar_variant:'afro_colombian_institutional'},editable:true}}));
+  await page.goto('http://127.0.0.1:8765/theme-lab/index.html');
+  await page.evaluate(()=>{document.head.insertAdjacentHTML('afterbegin','<base href="/">');document.body.innerHTML='<section id="elian-admin-config"><img id="elian-admin-preview"><select id="elian-config-gender"><option value="female">Mujer</option><option value="male">Hombre</option></select><select id="elian-config-variant"><option value="afro_colombian_institutional">Institucional</option></select><input id="elian-config-name"><select id="elian-config-motion"><option value="full">Completo</option></select><select id="elian-config-voice"><option value="female">Femenina</option></select><input id="elian-config-speed"><input id="elian-config-hologram" type="checkbox"><input id="elian-config-tablet" type="checkbox"><span id="elian-config-message"></span></section>'});
+  await page.addScriptTag({url:'http://127.0.0.1:8765/js/liam/ian-avatar-renderer.js'});
+  await page.addScriptTag({url:'http://127.0.0.1:8765/js/liam/elian-admin-config.js'});
+  await page.evaluate(()=>document.dispatchEvent(new Event('DOMContentLoaded')));
+  await expect(page.locator('#elian-admin-preview')).toHaveAttribute('src',/lia-female-neutral-v1\.png/);
+  await page.locator('#elian-config-gender').selectOption('male');
+  await expect(page.locator('#elian-admin-preview')).toHaveAttribute('src',/liam-male-neutral-v1\.png/);
+});
+
 test('el panel real abre, cierra y reabre sin duplicar asistente ni controles',async({page})=>{
   await page.route(/^https:\/\//,route=>route.abort());
   await page.addInitScript(()=>sessionStorage.setItem('primeraInfanciaAuthToken','token-prueba-visual'));
