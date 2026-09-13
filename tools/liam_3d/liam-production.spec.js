@@ -138,7 +138,10 @@ test('el panel real abre, cierra y reabre sin duplicar asistente ni controles',a
   await page.route('**/api/asistente-capacitacion/elian/visual-config',route=>route.fulfill({json:{configuration:{assistant_name:'LIAM',avatar_gender:'female',avatar_variant:'afro_colombian_institutional',voice_gender:'female',voice_speed:.95,motion_level:'full'},editable:true}}));
   await page.route('**/api/asistente-capacitacion/contexto**',route=>route.fulfill({json:{rol:'SUPERADMIN',guia:{titulo:'Centro de control',resumen:'Explicación autorizada.',pasos:['Revisar la pantalla.']}}}));
   await page.goto('http://127.0.0.1:8765/index.html',{waitUntil:'domcontentloaded',timeout:75000});
-  const tab=page.locator('#liam-tab');await expect(tab).toBeVisible({timeout:20000});await tab.click();
+  const tab=page.locator('#liam-tab');await expect(tab).toBeVisible({timeout:20000});
+  await expect(tab.locator('.ian-avatar-2d')).toBeVisible();
+  await expect(tab.locator('.ian-pose-neutral')).toBeVisible();
+  await tab.click();
   await expect(page.locator('#liam-panel')).toBeVisible();
   await expect(page.locator('#liam-conversation')).toHaveCount(1);
   await expect(page.locator('[data-action="stop"]')).toHaveCount(1);
