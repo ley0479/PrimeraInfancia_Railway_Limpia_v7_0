@@ -24,9 +24,9 @@
             const emerald = selected === 'light-emerald';
             button.setAttribute('aria-pressed', emerald ? 'true' : 'false');
             button.setAttribute('aria-label', emerald ? 'Cambiar a tema Slate y claro' : 'Cambiar a tema claro esmeralda');
-            button.title = emerald ? 'Tema claro esmeralda' : 'Tema Slate y claro';
+            button.title = emerald ? 'Vista clara esmeralda' : 'Vista azul pizarra';
             const label = button.querySelector('[data-theme-label]');
-            if (label) label.textContent = emerald ? 'Esmeralda' : 'Slate';
+            if (label) label.textContent = emerald ? 'Claro' : 'Azul';
             const icon = button.querySelector('[data-theme-icon]');
             if (icon) icon.setAttribute('data-lucide', emerald ? 'leaf' : 'moon-star');
             if (window.lucide) window.lucide.createIcons({ nodes: [button] });
@@ -93,7 +93,7 @@
         button.id = 'workspace-theme-toggle';
         button.type = 'button';
         button.className = 'workspace-theme-toggle';
-        button.innerHTML = '<i data-lucide="moon-star" data-theme-icon></i><span data-theme-label>Slate</span><span class="workspace-theme-switch" aria-hidden="true"><span></span></span>';
+        button.innerHTML = '<i data-lucide="moon-star" data-theme-icon></i><span data-theme-label>Azul</span><span class="workspace-theme-switch" aria-hidden="true"><span></span></span>';
         button.addEventListener('click', () => {
             const current = document.documentElement.dataset.workspaceTheme;
             applyTheme(current === 'light-emerald' ? 'slate-light' : 'light-emerald', true);
