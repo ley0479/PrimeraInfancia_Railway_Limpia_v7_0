@@ -51,7 +51,19 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
             if any(alias in q for alias in aliases):
                 return {'id':'open_module','label':f'Abrir {label}','summary':f'Abriré {label}.','arguments':{'module':module},'missing':[],'confirmation_required':False,'client_handler':'open_module'}
     if any(word in q for word in ('pendiente', 'pendientes', 'por entregar', 'vencimiento')) and any(word in q for word in ('entrega', 'entregable', 'actividad', 'calendario', 'tengo', 'muestra', 'dime')):
-        return {'id':'get_pending_activities_summary','label':'Consultar pendientes','summary':'Consultaré tus actividades pendientes autorizadas.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_pending_activities_summary'}
+        month = next((number for name, number in MONTHS.items() if re.search(rf'\b{name}\b', q)), None)
+        year_match = re.search(r'\b(20\d{2}|2100)\b', q)
+        year = int(year_match.group(1)) if year_match else None
+        if month and not year:
+            year = context.get('selected_year')
+        period = f'{int(year):04d}-{int(month):02d}' if month and year else context.get('selected_period')
+        scope = 'team' if any(text in q for text in ('mi equipo', 'mis unidades', 'unidades que coordino')) else 'self'
+        arguments = {'period': period, 'scope': scope}
+        summary = 'Consultaré los pendientes autorizados'
+        if period:
+            summary += f' del periodo {period}'
+        summary += ' de tu equipo.' if scope == 'team' else ' asignados a tu cuenta.'
+        return {'id':'get_pending_activities_summary','label':'Consultar pendientes','summary':summary,'arguments':arguments,'missing':[],'confirmation_required':False,'server_tool':'get_pending_activities_summary'}
     document_match=re.search(r'\b(?:documento|cedula|identificacion|nui)\s*(?:numero|nro|no)?\s*[:#-]?\s*(\d{5,15})\b',q)
     if document_match and any(word in q for word in ('busca', 'buscar', 'muestra', 'consulta', 'consultar')):
         return {'id':'search_beneficiary','label':'Buscar beneficiario','summary':'Abriré la búsqueda autorizada del beneficiario.','arguments':{'query':document_match.group(1),'module':'buscador-beneficiarios'},'missing':[],'confirmation_required':False,'client_handler':'search_beneficiary'}

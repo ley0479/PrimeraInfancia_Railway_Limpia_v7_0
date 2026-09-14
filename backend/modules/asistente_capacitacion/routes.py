@@ -252,9 +252,11 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 try:
                     user=dict(getattr(g,'current_user',None) or {}) or {'id':ctx.get('usuario_id'),'rol':ctx.get('rol')}
                     tool_result=execute(proposal['server_tool'],args=proposal.get('arguments') or {},database_path=database_path,tenant_id=int(ctx.get('fundacion_id') or 1),user=user)
-                    total=int(tool_result.get('total') or 0); overdue=int(tool_result.get('overdue') or 0); today=int(tool_result.get('due_today') or 0)
-                    message=f'Tienes {total} actividades pendientes: {overdue} vencidas, {today} para hoy y {max(0,total-overdue-today)} próximas.'
-                    result.update({'message':message,'speech_text':message,'confidence':'confirmed','confirmation_required':False,'tool_result':tool_result,'actions':[{'type':'navigate','module':'calendario-inteligente'}]})
+                    total=int(tool_result.get('total') or 0); overdue=int(tool_result.get('overdue') or 0); today=int(tool_result.get('due_today') or 0); upcoming=int(tool_result.get('upcoming') or 0); undated=int(tool_result.get('undated') or 0)
+                    query=tool_result.get('query') or {}; scope_label='del equipo' if query.get('scope')=='team' else 'asignadas a tu cuenta'; period_label=f" del periodo {query.get('period')}" if query.get('period') else ''
+                    message=f'Encontré {total} actividades {scope_label}{period_label}: {overdue} vencidas, {today} para hoy, {upcoming} próximas y {undated} sin fecha.'
+                    action={'type':'navigate','module':'calendario-inteligente','period':query.get('period'),'scope':query.get('scope'),'target':'calendario.pending.list'}
+                    result.update({'message':message,'speech_text':message,'confidence':'confirmed','confirmation_required':False,'tool_result':tool_result,'actions':[action]})
                     audit_lia(ctx,'TOOL_COMPLETED',module=module,tool=proposal['server_tool'],request_id=result['request_id'],metadata={'read_only':True,'total':total})
                 except (PermissionError,LookupError,ValueError) as exc:
                     result.update({'message':str(exc),'speech_text':str(exc),'confidence':'insufficient','confirmation_required':False})
@@ -349,7 +351,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         safe_context=json.dumps({'rol':ctx.get('rol'),'modulo':module,'manual_operativo':manual},ensure_ascii=False,default=str)[:18_000]
         realtime_tools=[
             {'type':'function','name':'propose_platform_action','description':'Prepara, sin ejecutar, una acción solicitada por voz: RAM, RPP, consolidar/publicar Base Maestra, crear/suspender/reactivar usuarios o fundaciones. Siempre muestra confirmación en la interfaz.','parameters':{'type':'object','properties':{'command':{'type':'string','description':'Orden completa pronunciada por el usuario.'}},'required':['command'],'additionalProperties':False}},
-            {'type':'function','name':'get_pending_activities_summary','description':'Consulta las actividades pendientes autorizadas del usuario actual.','parameters':{'type':'object','properties':{},'additionalProperties':False}},
+            {'type':'function','name':'get_pending_activities_summary','description':'Consulta actividades pendientes autorizadas por periodo y alcance personal o de equipo.','parameters':{'type':'object','properties':{'period':{'type':'string','description':'Periodo opcional en formato AAAA-MM.'},'scope':{'type':'string','enum':['self','team'],'description':'self para pendientes propios; team para equipo autorizado.'}},'additionalProperties':False}},
             {'type':'function','name':'get_structured_error','description':'Explica un código de error de la plataforma.','parameters':{'type':'object','properties':{'code':{'type':'string'}},'required':['code'],'additionalProperties':False}},
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
             {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},

@@ -721,7 +721,7 @@ class CalendarioInteligenteRepository:
                 """
                 SELECT * FROM calendario_entregables
                 WHERE fundacion_id=?
-                  AND LOWER(COALESCE(estado, 'pendiente')) NOT IN ('entregado','aprobado','cancelado','no aplica')
+                  AND LOWER(REPLACE(COALESCE(estado, 'pendiente'),' ','_')) NOT IN ('entregado','aprobado','cancelado','no_aplica','cerrado')
                   AND (
                     (? > 0 AND (responsable_id=? OR usuario_creador_id=?))
                     OR LOWER(TRIM(COALESCE(responsable_nombre,''))) IN ({})

@@ -21,6 +21,7 @@ def require(value, message: str) -> None:
 
 def run() -> None:
     frontend = (ROOT / "frontend" / "js" / "modules" / "calendario-inteligente.js").read_text(encoding="utf-8")
+    liam = (ROOT / "frontend" / "js" / "liam" / "liam-controller.js").read_text(encoding="utf-8")
     require("ci-vista-semana" in frontend and "renderSemana" in frontend, "Falta la vista semanal")
     require("ci-vista-agenda" in frontend and "renderAgenda" in frontend, "Falta la agenda")
     require("/mis-pendientes" in frontend and "renderMisPendientes" in frontend, "Falta Mis pendientes")
@@ -28,6 +29,9 @@ def run() -> None:
     index = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
     require("onclick=\"mostrarSeccion('calendario-inteligente')\"" in index, "El menú no abre el calendario mejorado")
     require("2.7.0-phase6.1" in index, "Falta invalidar la caché del calendario")
+    require("waitForElement('#ci-periodo')" in liam, "LIAM no espera la carga real del calendario")
+    require("window.ciSetPeriodo(action.period)" in liam, "LIAM no aplica el periodo consultado")
+    require("d.name==='get_pending_activities_summary'" in liam, "La voz Realtime no navega al resultado de pendientes")
 
     with tempfile.TemporaryDirectory(prefix="pi-calendar-phase1-") as temp:
         root = Path(temp)
@@ -49,6 +53,15 @@ def run() -> None:
             require(len(repo.list_mis_pendientes(bob)) == 1, "Bob no recibió su pendiente")
             repo.update_entregable(own["id"], {"estado": "entregado"})
             require(not repo.list_mis_pendientes(ana), "Un entregado apareció como pendiente")
+            repo.create_entregable({
+                "titulo": "Actividad no aplicable", "fecha_limite": "2026-08-20",
+                "responsable_id": 10, "responsable_nombre": "Ana Docente", "estado": "no_aplica",
+            })
+            repo.create_entregable({
+                "titulo": "Actividad cerrada", "fecha_limite": "2026-08-21",
+                "responsable_id": 10, "responsable_nombre": "Ana Docente", "estado": "cerrado",
+            })
+            require(not repo.list_mis_pendientes(ana), "NO_APLICA o cerrado apareció como pendiente")
 
         with tenant_context(2, role="DOCENTE", username="ana"):
             require(not repo.list_mis_pendientes(ana), "Mis pendientes cruzó el aislamiento tenant")

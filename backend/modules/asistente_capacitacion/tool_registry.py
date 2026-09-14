@@ -1,6 +1,7 @@
 """Registro cerrado de herramientas de lectura de LÍA."""
 from __future__ import annotations
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from modules.dbapi_compat import sqlite3
 from modules.calendario_inteligente.repository import CalendarioInteligenteRepository
 from modules.idp_documental.repository import IDPRepository
@@ -38,10 +39,36 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
         return {'proposal_only':True,'message':message,'action_proposal':proposal}
     if tool_name=='get_structured_error': return explain(str(args.get('code') or ''))
     if tool_name=='get_pending_activities_summary':
-        rows=CalendarioInteligenteRepository(database_path).list_mis_pendientes(user,limit=100)
-        today=date.today().isoformat(); overdue=sum(1 for x in rows if x.get('fecha_limite') and str(x['fecha_limite'])<today)
+        scope=str(args.get('scope') or 'self').strip().lower()
+        if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')
+        if scope=='team' and str(user.get('rol') or '').upper() not in {'SUPERADMIN','GERENTE','COORDINADOR'}:
+            raise PermissionError('Tu rol no puede consultar pendientes del equipo.')
+        period=str(args.get('period') or '').strip()
+        if period and (len(period)!=7 or period[4]!='-' or not period[:4].isdigit() or not period[5:].isdigit() or not 1<=int(period[5:])<=12):
+            raise ValueError('period debe tener el formato AAAA-MM.')
+        repo=CalendarioInteligenteRepository(database_path)
+        if scope=='self':
+            rows=repo.list_mis_pendientes(user,limit=500)
+        else:
+            filters={'periodo':period} if period else {}
+            if str(user.get('rol') or '').upper()=='COORDINADOR':
+                coordinator=str(user.get('nombre_completo') or user.get('nombre') or user.get('username') or '').strip()
+                if not coordinator: raise PermissionError('No fue posible validar el coordinador de la sesión.')
+                filters['coordinador']=coordinator
+            rows=repo.list_entregables(filters,limit=500)
+        if period and scope=='self': rows=[x for x in rows if str(x.get('fecha_limite') or '').startswith(period)]
+        today=datetime.now(ZoneInfo('America/Bogota')).date().isoformat()
+        inactive={'entregado','aprobado','cancelado','no_aplica','no aplica','cerrado'}
+        rows=[x for x in rows if str(x.get('estado') or 'pendiente').strip().lower() not in inactive]
+        overdue=sum(1 for x in rows if x.get('fecha_limite') and str(x['fecha_limite'])<today)
         due_today=sum(1 for x in rows if str(x.get('fecha_limite') or '')==today)
-        return {'total':len(rows),'overdue':overdue,'due_today':due_today,'upcoming':max(0,len(rows)-overdue-due_today),'items':[{'id':x.get('id'),'title':x.get('titulo'),'due_date':x.get('fecha_limite'),'status':x.get('estado'),'module':x.get('modulo')} for x in rows[:5]]}
+        undated=sum(1 for x in rows if not x.get('fecha_limite'))
+        seen=set(); duplicates=[]
+        for row in rows:
+            key=str(row.get('clave_unica') or '').strip()
+            if key and key in seen: duplicates.append(row.get('id'))
+            if key: seen.add(key)
+        return {'total':len(rows),'overdue':overdue,'due_today':due_today,'upcoming':max(0,len(rows)-overdue-due_today-undated),'undated':undated,'duplicate_candidates':len(duplicates),'query':{'period':period or None,'scope':scope,'timezone':'America/Bogota','tenant_id_source':'authenticated_session'},'diagnosis':{'filters_applied':bool(period),'missing_dates':undated,'duplicate_candidate_ids':duplicates[:20]},'items':[{'id':x.get('id'),'title':x.get('titulo'),'due_date':x.get('fecha_limite'),'status':x.get('estado'),'module':x.get('modulo'),'unit':x.get('unidad'),'responsible':x.get('responsable_nombre')} for x in rows[:20]]}
     if tool_name=='get_document_processing_status':
         item=IDPRepository(database_path).get_document(_int_arg(args,'document_id'),tenant_id)
         if not item: raise LookupError('Documento no encontrado o no autorizado.')
