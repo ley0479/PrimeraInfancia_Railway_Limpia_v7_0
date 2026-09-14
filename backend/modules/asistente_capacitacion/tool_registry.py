@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-import re
+import re,uuid
 from modules.dbapi_compat import sqlite3
 from modules.calendario_inteligente.repository import CalendarioInteligenteRepository
 from modules.idp_documental.repository import IDPRepository
@@ -11,10 +11,11 @@ from .action_policy import require as require_action
 from .action_policy import decision as action_decision
 from .action_intents import propose_action
 from .notification_providers import provider_catalog
+from .privacy_service import redact
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard','prepare_meeting_brief','prepare_meeting_followup','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard','prepare_meeting_brief','prepare_meeting_followup','prepare_dev_change_request','list_dev_change_requests','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -640,6 +641,32 @@ def _run_favorite(database_path: str, tenant_id: int, args: dict, user: dict) ->
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'favorite':{'id':row['id'],'name':row['nombre']},'resolved_action':proposal.get('id'),'executed':False,'proposal':proposal,'confirmation_required':bool(proposal.get('confirmation_required')),'read_only':True}
 
 
+def _prepare_dev_change(database_path:str,tenant_id:int,args:dict,user:dict)->dict:
+    module=re.sub(r'[^a-z0-9-]','',str(args.get('module') or '').strip().lower())[:80]
+    objective=redact(re.sub(r'\s+',' ',str(args.get('objective') or '')).strip())[:1000]
+    if not module:raise ValueError('Indica el módulo relacionado con la solicitud técnica.')
+    if len(objective)<10:raise ValueError('Describe el cambio técnico con al menos 10 caracteres.')
+    allowed=set(ROLE_MENU_PERMISSIONS.get('SUPERADMIN',[]))
+    if module not in allowed:raise ValueError('El módulo indicado no está registrado en la plataforma.')
+    uid=int(user.get('id') or user.get('usuario_id') or 0)
+    if not uid:raise PermissionError('No fue posible verificar el usuario de la sesión.')
+    request_id='DEV-'+datetime.now(ZoneInfo('America/Bogota')).strftime('%Y%m%d')+'-'+uuid.uuid4().hex[:8].upper();now=datetime.now(ZoneInfo('America/Bogota')).isoformat(timespec='seconds')
+    impact='Requiere auditoría de arquitectura, identificación de archivos, pruebas, diff, aprobación y rollback antes de cualquier implementación.'
+    conn=sqlite3.connect(database_path)
+    try:conn.execute('INSERT INTO lia_dev_change_requests(request_id,fundacion_id,usuario_id,module,objective,impact_summary,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',(request_id,tenant_id,uid,module,objective,impact,'DRAFT',now,now));conn.commit()
+    except Exception:conn.rollback();raise
+    finally:conn.close()
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'request':{'request_id':request_id,'module':module,'objective':objective,'impact_summary':impact,'status':'DRAFT','created_at':now},'workflow':['AUDITORÍA','PROPUESTA','SANDBOX','PRUEBAS','DIFF','APROBACIÓN','DESPLIEGUE MANUAL'],'code_modified':False,'tests_executed':False,'deployment_started':False,'requires_approval':True,'source':'Centro Liam ADMIN/DEV','read_only':False}
+
+
+def _list_dev_changes(database_path:str,tenant_id:int,args:dict,user:dict)->dict:
+    limit=max(1,min(int(args.get('limit') or 50),100));uid=int(user.get('id') or user.get('usuario_id') or 0)
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:rows=[dict(row) for row in conn.execute('''SELECT request_id,module,objective,impact_summary,status,created_at,updated_at FROM lia_dev_change_requests WHERE fundacion_id=? AND usuario_id=? ORDER BY id DESC LIMIT ?''',(tenant_id,uid,limit)).fetchall()]
+    finally:conn.close()
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'requests':rows,'total':len(rows),'source':'Centro Liam ADMIN/DEV','read_only':True}
+
+
 def _meeting_followup(tenant_id: int,args: dict,user: dict) -> dict:
     role=str(user.get('rol') or user.get('role') or '').upper()
     if role not in {'SUPERADMIN','GERENTE','COORDINADOR'}:raise PermissionError('Tu rol no tiene permiso para preparar seguimientos de reunión.')
@@ -788,6 +815,8 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_role_dashboard': return _role_dashboard(database_path,tenant_id,args,user)
     if tool_name=='prepare_meeting_brief': return _meeting_brief(database_path,tenant_id,args,user)
     if tool_name=='prepare_meeting_followup': return _meeting_followup(tenant_id,args,user)
+    if tool_name=='prepare_dev_change_request': return _prepare_dev_change(database_path,tenant_id,args,user)
+    if tool_name=='list_dev_change_requests': return _list_dev_changes(database_path,tenant_id,args,user)
     if tool_name=='compare_periods': return _compare_periods(database_path,tenant_id,args)
     if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)

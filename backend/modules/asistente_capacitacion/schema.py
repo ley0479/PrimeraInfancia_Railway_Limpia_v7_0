@@ -81,6 +81,20 @@ CREATE TABLE IF NOT EXISTS lia_error_incidents (id INTEGER PRIMARY KEY AUTOINCRE
 CREATE INDEX IF NOT EXISTS idx_lia_incidents_tenant_date ON lia_error_incidents(fundacion_id, created_at);
 CREATE TABLE IF NOT EXISTS lia_action_proposals (id INTEGER PRIMARY KEY AUTOINCREMENT,proposal_id TEXT NOT NULL UNIQUE,usuario_id INTEGER NOT NULL,action_name TEXT NOT NULL,target_fundacion_id INTEGER NOT NULL,arguments_json TEXT NOT NULL,before_json TEXT NOT NULL,after_json TEXT,status TEXT NOT NULL DEFAULT 'PENDING',expires_at TEXT NOT NULL,created_at TEXT NOT NULL,completed_at TEXT);
 CREATE INDEX IF NOT EXISTS idx_lia_proposals_user_status ON lia_action_proposals(usuario_id,status,expires_at);
+CREATE TABLE IF NOT EXISTS lia_dev_change_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id TEXT NOT NULL UNIQUE,
+    fundacion_id INTEGER NOT NULL,
+    usuario_id INTEGER NOT NULL,
+    module TEXT NOT NULL,
+    objective TEXT NOT NULL,
+    impact_summary TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'DRAFT',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lia_dev_change_scope
+ON lia_dev_change_requests(fundacion_id, usuario_id, status, created_at);
 CREATE TABLE IF NOT EXISTS elian_platform_tour_progress (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fundacion_id INTEGER NOT NULL,

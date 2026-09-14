@@ -19,6 +19,8 @@ CAPABILITIES = {
         Capability('get_role_dashboard','consulta','Calendario, Entregables y Notificaciones'),
         Capability('prepare_meeting_brief','analiza','Fuentes operativas autorizadas'),
         Capability('prepare_meeting_followup','ejecuta','Compromisos proporcionados por el usuario'),
+        Capability('prepare_dev_change_request','admin','Centro Liam ADMIN/DEV',True,False),
+        Capability('list_dev_change_requests','admin','Centro Liam ADMIN/DEV'),
         Capability('get_monthly_relation_summary','analiza','Base Maestra'),
         Capability('list_foundation_profiles','consulta','Usuarios'),
         Capability('search_foundation_beneficiaries','consulta','Base Maestra'),

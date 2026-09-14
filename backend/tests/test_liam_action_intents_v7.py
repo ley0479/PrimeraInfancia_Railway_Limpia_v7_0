@@ -185,6 +185,12 @@ def test_meeting_followup_extracts_only_a_draft():
     assert value['confirmation_required'] is False
 
 
+def test_admin_dev_request_is_a_draft_not_code_execution():
+    value=propose_action('Liam necesito agregar un filtro en Base Maestra')
+    assert value['server_tool']=='prepare_dev_change_request'
+    assert value['arguments']['module']=='base-maestra' and value['confirmation_required'] is False
+
+
 def test_safe_repair_requires_confirmation_but_preview_does_not():
     preview=propose_action('Liam muéstrame el plan de reparación')
     assert preview['client_handler']=='safe_repair_preview' and preview['confirmation_required'] is False
@@ -218,5 +224,6 @@ if __name__=='__main__':
     test_role_dashboard_uses_session_period_and_requested_scope()
     test_meeting_brief_uses_context_without_creating_tasks()
     test_meeting_followup_extracts_only_a_draft()
+    test_admin_dev_request_is_a_draft_not_code_execution()
     test_safe_repair_requires_confirmation_but_preview_does_not()
     print('LIAM_ACTION_INTENTS_V7_PASS')
