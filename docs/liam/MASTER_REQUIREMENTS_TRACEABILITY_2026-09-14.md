@@ -63,7 +63,7 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 | 57 | Feature flags | VERIFICADO | Flags individuales y compuertas HTTP/herramientas. |
 | 58 | Fallback | VERIFICADO | Proveedor/avatar/auditoría no derriban módulos esenciales. |
 | 59 | Observabilidad | VERIFICADO | trace_id, herramienta, duración, resultado y errores sanitizados. |
-| 60 | Rendimiento | PARCIAL | Paginación/lazy loading presentes; falta prueba cuantitativa de carga. |
+| 60 | Rendimiento | VERIFICADO | Paginación, límites visuales y presupuesto cuantitativo con 5.000 registros. |
 | 61 | Responsive | VERIFICADO | Desktop/tablet/móvil con drawer y safe zones. |
 | 62 | Accesibilidad | VERIFICADO | ARIA, teclado, contraste, reduced motion y subtítulos/transcripción. |
 | 63 | Pruebas obligatorias | VERIFICADO | Unitarias, integración, permisos, tenant, UI y regresión. |
@@ -74,12 +74,11 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 | 68 | Implementación fases | VERIFICADO | Fases independientes documentadas. |
 | 69 | Detener ante regresión | VERIFICADO | Las fallas encontradas se corrigieron antes de avanzar. |
 | 70 | Entrega por fase | VERIFICADO | Documentos de cambios, pruebas, riesgo y rollback. |
-| 71 | Éxito final | PARCIAL | Funciones principales operan; depende del cierre de 20, 21, 43, 60 y 64. |
+| 71 | Éxito final | PARCIAL | Funciones principales operan; depende del cierre de 20, 21, 43 y 64. |
 | 72 | Instrucción final | VERIFICADO | Auditoría inicial, cambios pequeños, pruebas, commits y cero despliegue automático. |
 
 ## Orden de cierre restante
 
 1. Flujo ADMIN/DEV de artefactos sandbox, pruebas y diff sin despliegue (20–21).
 2. Propuesta reforzada de restauración, todavía sin ejecución automática (43).
-3. Presupuesto y prueba cuantitativa de rendimiento (60).
-4. E2E autenticado en entorno objetivo cuando exista autorización y credenciales de prueba (64).
+3. E2E autenticado en entorno objetivo cuando exista autorización y credenciales de prueba (64).
