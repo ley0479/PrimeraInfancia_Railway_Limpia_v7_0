@@ -3,7 +3,7 @@
     'use strict';
 
     const STORAGE_KEY = 'primeraInfanciaWorkspaceThemeV1';
-    const THEMES = ['slate-light', 'light-emerald'];
+    const THEMES = ['slate-light', 'light-emerald', 'midnight-cyan'];
     let openGroup = null;
 
     function savedTheme() {
@@ -21,14 +21,18 @@
         document.documentElement.dataset.workspaceNav = 'dock';
         const button = document.getElementById('workspace-theme-toggle');
         if (button) {
-            const emerald = selected === 'light-emerald';
-            button.setAttribute('aria-pressed', emerald ? 'true' : 'false');
-            button.setAttribute('aria-label', emerald ? 'Cambiar a tema Slate y claro' : 'Cambiar a tema claro esmeralda');
-            button.title = emerald ? 'Vista clara esmeralda' : 'Vista azul pizarra';
+            const config = {
+                'slate-light': { label: 'Azul', icon: 'moon-star', next: 'Claro' },
+                'light-emerald': { label: 'Claro', icon: 'leaf', next: 'Noche' },
+                'midnight-cyan': { label: 'Noche', icon: 'sparkles', next: 'Azul' }
+            }[selected];
+            button.dataset.selectedTheme = selected;
+            button.setAttribute('aria-label', `Vista ${config.label}. Cambiar a vista ${config.next}`);
+            button.title = `Vista ${config.label}; siguiente: ${config.next}`;
             const label = button.querySelector('[data-theme-label]');
-            if (label) label.textContent = emerald ? 'Claro' : 'Azul';
+            if (label) label.textContent = config.label;
             const icon = button.querySelector('[data-theme-icon]');
-            if (icon) icon.setAttribute('data-lucide', emerald ? 'leaf' : 'moon-star');
+            if (icon) icon.setAttribute('data-lucide', config.icon);
             if (window.lucide) window.lucide.createIcons({ nodes: [button] });
         }
         if (persist) {
@@ -110,7 +114,6 @@
                 event.stopImmediatePropagation();
                 group.classList.contains('dock-flyout-open') ? closeFlyout(group) : openFlyout(group);
             }, true);
-            toggle.addEventListener('focus', () => openFlyout(group));
             configureFlyoutItems(group, flyout);
         });
     }
@@ -125,7 +128,8 @@
         button.innerHTML = '<i data-lucide="moon-star" data-theme-icon></i><span data-theme-label>Azul</span><span class="workspace-theme-switch" aria-hidden="true"><span></span></span>';
         button.addEventListener('click', () => {
             const current = document.documentElement.dataset.workspaceTheme;
-            applyTheme(current === 'light-emerald' ? 'slate-light' : 'light-emerald', true);
+            const index = THEMES.indexOf(current);
+            applyTheme(THEMES[(index + 1) % THEMES.length], true);
         });
         headerActions.prepend(button);
     }

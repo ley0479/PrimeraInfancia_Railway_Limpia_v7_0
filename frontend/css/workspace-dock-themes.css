@@ -23,6 +23,31 @@ html[data-workspace-theme="light-emerald"] {
     --workspace-header-ink: #0f172a;
 }
 
+html[data-workspace-theme="midnight-cyan"] {
+    --workspace-accent: #13e6eb;
+    --workspace-accent-strong: #08cbd5;
+    --workspace-canvas: #121a2d;
+    --workspace-surface: #151c2f;
+    --workspace-ink: #f8fafc;
+    --workspace-muted: #aab6c8;
+    --workspace-line: #334761;
+    --workspace-sidebar: #0c1323;
+    --workspace-dock: #131e30;
+    --workspace-header: #0f1a2c;
+    --workspace-header-ink: #ffffff;
+    color-scheme: dark;
+    --pi-bg: #121a2d !important;
+    --pi-surface: #151c2f !important;
+    --pi-surface-soft: #1a2940 !important;
+    --pi-border: #334761 !important;
+    --pi-text: #f8fafc !important;
+    --pi-muted: #aab6c8 !important;
+    --pi-primary: #08cbd5 !important;
+    --pi-primary-hover: #13e6eb !important;
+    --pi-accent: #13e6eb !important;
+    --pi-sidebar-bg: #0c1323 !important;
+}
+
 /* El motor heredado y los módulos consumen --pi-*. Se fijan aquí para que
    todos los tableros pertenezcan a la misma paleta aprobada. */
 html[data-workspace-theme="slate-light"],
@@ -55,10 +80,13 @@ html[data-workspace-theme="light-emerald"] {
     box-shadow: 0 4px 14px rgba(15,23,42,.07);
 }
 .workspace-theme-toggle > svg { width: 1rem; height: 1rem; color: var(--workspace-accent-strong); }
-.workspace-theme-switch { width: 1.75rem; height: 1rem; padding: .125rem; border-radius: 999px; background: #cbd5e1; }
+.workspace-theme-switch { width: 2.5rem; height: 1rem; padding: .125rem; border-radius: 999px; background: #91a4ba; }
 .workspace-theme-switch span { display: block; width: .75rem; height: .75rem; border-radius: 50%; background: white; transition: transform .2s ease; }
 html[data-workspace-theme="light-emerald"] .workspace-theme-switch { background: var(--workspace-accent); }
 html[data-workspace-theme="light-emerald"] .workspace-theme-switch span { transform: translateX(.75rem); }
+html[data-workspace-theme="midnight-cyan"] .workspace-theme-toggle { background: #151c2f; color: #fff; border-color: #3a506c; }
+html[data-workspace-theme="midnight-cyan"] .workspace-theme-switch { background: #13e6eb; }
+html[data-workspace-theme="midnight-cyan"] .workspace-theme-switch span { transform: translateX(1.5rem); }
 
 html[data-workspace-theme] #app-shell > main { background: var(--workspace-canvas); color: var(--workspace-ink); }
 html[data-workspace-theme] #app-shell > main > header {
@@ -138,6 +166,47 @@ html[data-workspace-theme="slate-light"] #app-shell > main section [class*="-tab
 html[data-workspace-theme="slate-light"] #app-shell > main section [class*="-btn-primary"] { background: #5279aa !important; color: #fff !important; }
 html[data-workspace-theme="light-emerald"] #app-shell > main section [class*="-tab"].active,
 html[data-workspace-theme="light-emerald"] #app-shell > main section [class*="-btn-primary"] { background: #059669 !important; color: #fff !important; }
+
+/* Tercera vista: azul petróleo nocturno y cian, medida desde la referencia. */
+html[data-workspace-theme="midnight-cyan"] body,
+html[data-workspace-theme="midnight-cyan"] #app-shell,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main > div { background: #121a2d !important; color: #f8fafc !important; }
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section [class*="-card"]:not([class*="badge"]),
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section [class*="-panel"],
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section [class*="-metric"],
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section [class*="-hero"],
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section .card-metrica,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section .bg-slate-950.border { background: #151c2f !important; border-color: #334761 !important; color: #f8fafc !important; box-shadow: 0 8px 24px rgba(0,0,0,.24) !important; }
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section h1,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section h2,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section h3,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section h4,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section p,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section label,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section td { color: #eef5ff; }
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section table,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section td { background: #151c2f !important; border-color: #334761 !important; color: #eef5ff !important; }
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section th,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main .ci-weekday,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main .ci-week-heading { background: #1a2940 !important; color: #dce7f5 !important; border-color: #334761 !important; }
+html[data-workspace-theme="midnight-cyan"] #app-shell > main .ci-calendar-grid { background: #334761 !important; border-color: #334761 !important; }
+html[data-workspace-theme="midnight-cyan"] #app-shell > main .ci-day,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main .ci-mini-month,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main .ci-week-column,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main .ci-checklist-card,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main .ci-agenda-item,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main .ci-personal-pending { background: #151c2f !important; color: #eef5ff !important; border-color: #334761 !important; }
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section input,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section select,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section textarea { background: #0f1a2c !important; color: #f8fafc !important; border-color: #3a506c !important; }
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section [class*="-tab"].active,
+html[data-workspace-theme="midnight-cyan"] #app-shell > main section [class*="-btn-primary"] { background: #08cbd5 !important; color: #06111e !important; }
+html[data-workspace-theme="midnight-cyan"] #liam-panel { background: rgba(15,26,44,.96) !important; color: #f8fafc !important; border-color: #13e6eb !important; }
+html[data-workspace-theme="midnight-cyan"] #liam-panel > header,
+html[data-workspace-theme="midnight-cyan"] #liam-panel .liam-actions button,
+html[data-workspace-theme="midnight-cyan"] #liam-panel .liam-conversation > div,
+html[data-workspace-theme="midnight-cyan"] #liam-panel .liam-composer textarea { background: #151c2f !important; color: #f8fafc !important; border-color: #3a506c !important; }
 
 /* LIAM conserva la tarjeta clara y translúcida de la referencia en ambas vistas. */
 html[data-workspace-theme] .liam-panel {
