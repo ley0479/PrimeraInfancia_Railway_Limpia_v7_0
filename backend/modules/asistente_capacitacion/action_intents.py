@@ -83,6 +83,8 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     if any(text in q for text in ('centro de incidencias','mis incidencias','incidencias abiertas','errores recientes')):
         status='OPEN' if 'abiert' in q else ''
         return {'id':'get_incident_center','label':'Consultar incidencias','summary':'Consultaré incidencias sanitizadas dentro de tu alcance.','arguments':{'status':status,'limit':50},'missing':[],'confirmation_required':False,'server_tool':'get_incident_center'}
+    if any(text in q for text in ('centro de notificaciones','mis notificaciones','notificaciones pendientes','que notificaciones tengo')):
+        return {'id':'get_notification_center','label':'Consultar notificaciones','summary':'Unificaré avisos pendientes de las fuentes autorizadas.','arguments':{'limit':50},'missing':[],'confirmation_required':False,'server_tool':'get_notification_center'}
     if any(text in q for text in ('entregables esperados', 'entregables recibidos', 'unidades no entregan', 'supervisa los entregables', 'supervision de entregables')):
         month = next((number for name, number in MONTHS.items() if re.search(rf'\b{name}\b', q)), None) or context.get('selected_month')
         year_match = re.search(r'\b(20\d{2}|2100)\b', q)

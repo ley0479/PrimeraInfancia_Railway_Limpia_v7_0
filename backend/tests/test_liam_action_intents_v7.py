@@ -128,6 +128,12 @@ def test_incident_center_intent_filters_open_items():
     assert value['confirmation_required'] is False
 
 
+def test_notification_center_intent_is_read_only():
+    value=propose_action('Liam qué notificaciones tengo')
+    assert value['server_tool']=='get_notification_center'
+    assert value['confirmation_required'] is False
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -145,4 +151,5 @@ if __name__=='__main__':
     test_master_quality_intent_never_requests_mutation()
     test_early_warning_intent_uses_risk_language()
     test_incident_center_intent_filters_open_items()
+    test_notification_center_intent_is_read_only()
     print('LIAM_ACTION_INTENTS_V7_PASS')

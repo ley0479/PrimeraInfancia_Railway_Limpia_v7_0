@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -538,6 +538,28 @@ def _incident_center(database_path: str, tenant_id: int, args: dict, user: dict)
     counts={key:sum(1 for row in rows if str(row.get('status') or '').upper()==key) for key in ('OPEN','IN_ANALYSIS','IN_PROGRESS','RESOLVED','CLOSED')}
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'filters':{'incident_id':incident_id or None,'status':status or None},'summary':{'total':len(rows),**{key.lower():value for key,value in counts.items()}},'incidents':rows,'role_scope':'foundation' if role in {'SUPERADMIN','GERENTE'} else 'own_user','sanitized':True,'read_only':True}
 
+
+def _notification_center(database_path: str, tenant_id: int, args: dict, user: dict) -> dict:
+    limit=max(1,min(int(args.get('limit') or 50),100));role=str(user.get('rol') or user.get('role') or '').strip().upper();uid=int(user.get('id') or user.get('usuario_id') or 0);items=[];sources=[]
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    def collect(source,sql,params,transform):
+        try:
+            rows=conn.execute(sql,params).fetchall();sources.append({'source':source,'available':True,'records':len(rows)})
+            items.extend(transform(dict(row)) for row in rows)
+        except Exception:sources.append({'source':source,'available':False,'records':0})
+    try:
+        collect('Planeación','''SELECT id,titulo,nivel,estado,fecha_programada FROM cpo_notificaciones WHERE fundacion_id=? AND COALESCE(leida,0)=0 AND (destinatario_id=? OR (destinatario_id IS NULL AND (destinatario_rol IS NULL OR UPPER(destinatario_rol)=?))) ORDER BY id DESC LIMIT ?''',(tenant_id,uid,role,limit),lambda r:{'key':f"planning:{r['id']}",'source':'Planeación','title':r.get('titulo') or 'Notificación de planeación','priority':str(r.get('nivel') or 'INFORMACION').upper(),'status':r.get('estado'),'date':r.get('fecha_programada'),'target_module':'centro-planeacion'})
+        collect('Calendario','''SELECT id,COALESCE(tipo,'VENCIMIENTO') AS titulo,nivel,estado,COALESCE(fecha_programada,fecha,created_at) AS fecha FROM calendario_alertas WHERE fundacion_id=? AND (usuario_id=? OR usuario_id IS NULL) AND UPPER(COALESCE(estado,'ACTIVA')) NOT IN ('LEIDA','CERRADA','CANCELADA') ORDER BY id DESC LIMIT ?''',(tenant_id,uid,limit),lambda r:{'key':f"calendar:{r['id']}",'source':'Calendario','title':str(r.get('titulo') or 'Alerta').replace('_',' ').title(),'priority':str(r.get('nivel') or 'ADVERTENCIA').upper(),'status':r.get('estado'),'date':r.get('fecha'),'target_module':'calendario-inteligente'})
+        user_clause='' if role in {'SUPERADMIN','GERENTE'} else ' AND usuario_id=?';incident_params=(tenant_id,limit) if not user_clause else (tenant_id,uid,limit)
+        collect('Incidencias',f'''SELECT id,incident_id,error_code,severity,status,created_at FROM lia_error_incidents WHERE fundacion_id=? AND UPPER(status) NOT IN ('RESOLVED','CLOSED') {user_clause} ORDER BY id DESC LIMIT ?''',incident_params,lambda r:{'key':f"incident:{r['id']}",'source':'Incidencias','title':f"{r.get('incident_id')} · {r.get('error_code')}",'priority':'CRITICA' if str(r.get('severity')).lower()=='high' else 'ADVERTENCIA','status':r.get('status'),'date':r.get('created_at'),'target_module':'administracion'})
+        document_clause='' if role in {'SUPERADMIN','GERENTE'} else ' AND creado_por=?';document_params=(tenant_id,limit) if not document_clause else (tenant_id,uid,limit)
+        collect('Documentos',f'''SELECT id,tipo_documento,estado,actualizado_en FROM doc_instancias WHERE fundacion_id=? AND UPPER(COALESCE(estado,'BORRADOR')) IN ('BORRADOR','DEVUELTO','RECHAZADO','INCOMPLETO') {document_clause} ORDER BY id DESC LIMIT ?''',document_params,lambda r:{'key':f"document:{r['id']}",'source':'Documentos','title':f"{r.get('tipo_documento') or 'Documento'} requiere atención",'priority':'ALTA' if str(r.get('estado')).upper() in {'DEVUELTO','RECHAZADO','INCOMPLETO'} else 'INFORMACION','status':r.get('estado'),'date':r.get('actualizado_en'),'target_module':'centro-documental'})
+        collect('Créditos','''SELECT id,estado,fecha_vencimiento,creditos_disponibles,creditos_incluidos_periodo FROM suscripciones_fundacion WHERE fundacion_id=? AND (UPPER(COALESCE(estado,'')) IN ('POR_VENCER','VENCIDA','SUSPENDIDA') OR creditos_disponibles<=0 OR (creditos_incluidos_periodo>0 AND creditos_disponibles<=creditos_incluidos_periodo*.2)) LIMIT 1''',(tenant_id,),lambda r:{'key':f"credit:{r['id']}",'source':'Créditos','title':'La suscripción o el saldo requiere revisión','priority':'CRITICA' if str(r.get('estado')).upper() in {'VENCIDA','SUSPENDIDA'} or int(r.get('creditos_disponibles') or 0)<=0 else 'ADVERTENCIA','status':r.get('estado'),'date':r.get('fecha_vencimiento'),'target_module':'facturacion'})
+    finally:conn.close()
+    rank={'CRITICA':0,'CRÍTICA':0,'URGENTE':0,'ALTA':1,'ADVERTENCIA':2,'PREVENTIVA':2,'INFORMACION':3,'INFORMACIÓN':3,'INFO':3};items.sort(key=lambda x:(rank.get(x['priority'],3),str(x.get('date') or '9999')),reverse=False);items=items[:limit]
+    counts={'critical':sum(1 for x in items if rank.get(x['priority'],3)==0),'warning':sum(1 for x in items if rank.get(x['priority'],3) in {1,2}),'information':sum(1 for x in items if rank.get(x['priority'],3)==3)}
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'summary':{'total':len(items),**counts},'notifications':items,'sources':sources,'role_scope':'foundation' if role in {'SUPERADMIN','GERENTE'} else 'own_or_role_targeted','read_only':True,'send_actions':False}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -600,6 +622,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='analyze_master_data_quality': return _master_data_quality(database_path,tenant_id,user)
     if tool_name=='get_early_warnings': return _early_warnings(database_path,tenant_id,args,user)
     if tool_name=='get_incident_center': return _incident_center(database_path,tenant_id,args,user)
+    if tool_name=='get_notification_center': return _notification_center(database_path,tenant_id,args,user)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')
