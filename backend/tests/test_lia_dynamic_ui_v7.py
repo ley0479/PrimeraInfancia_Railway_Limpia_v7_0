@@ -13,12 +13,15 @@ def test_backend_emits_structured_visual_contract():
 
 def test_frontend_renders_without_injecting_data_as_html():
     controller=(ROOT/'frontend/js/liam/liam-controller.js').read_text(encoding='utf-8')
+    routes=(ROOT/'backend/modules/asistente_capacitacion/routes.py').read_text(encoding='utf-8')
     css=(ROOT/'frontend/css/lia-dynamic-ui.css').read_text(encoding='utf-8')
     html=(ROOT/'frontend/index.html').read_text(encoding='utf-8')
     assert "function renderStructured" in controller and "function highlightElement" in controller
     assert 'td.textContent = String(value' in controller and 'value.textContent = String(item.value' in controller
     assert "lia-data-drawer" in css and "lia-spotlight" in css
     assert "lia-dynamic-ui.css?v=2.7.5-dynamic-ui-1" in html
+    assert 'renderStructured(result.ui)' in controller and '"X-Liam-Module"' in controller
+    assert "ui=visual_payload({'message':'Datos consultados por Lía.','tool_result':result},active_module)" in routes
 
 def test_master_report_phrases_force_data_cards():
     for question in ('Dame el informe de la Base Maestra','Muéstrame el registro de la Base Maestra','Explica la Base Maestra'):

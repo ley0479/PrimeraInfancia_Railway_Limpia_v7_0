@@ -1420,8 +1420,10 @@
       const args = JSON.parse(d.args || "{}"),
         result = await request(`/tools/${encodeURIComponent(d.name)}`, {
           method: "POST",
+          headers: { "X-Liam-Module": state.module || moduleNow() },
           body: JSON.stringify(args),
         });
+      renderStructured(result.ui);
       if (result.result?.action_proposal) {
         showProposal(result.result.action_proposal);
         add("liam", result.result.message);

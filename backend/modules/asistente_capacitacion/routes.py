@@ -666,7 +666,9 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         except LookupError as exc: audit_lia(ctx,'TOOL_NOT_FOUND',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),404
         except ValueError as exc: audit_lia(ctx,'TOOL_INVALID_ARGUMENT',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),422
         audit_lia(ctx,'TOOL_COMPLETED',tool=tool_name,request_id=request_id,metadata={'read_only':tool_name!='propose_platform_action','proposal_only':tool_name=='propose_platform_action'})
-        return jsonify({'tool':tool_name,'result':result,'read_only':True,'request_id':request_id}),200
+        active_module=str(request.headers.get('X-Liam-Module') or 'dashboard').strip()[:80]
+        ui=visual_payload({'message':'Datos consultados por Lía.','tool_result':result},active_module)
+        return jsonify({'tool':tool_name,'result':result,'ui':ui,'read_only':True,'request_id':request_id}),200
 
     @bp.route('/preferences',methods=['GET','PUT'])
     def preferences():

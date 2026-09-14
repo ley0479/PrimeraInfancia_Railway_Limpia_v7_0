@@ -35,7 +35,9 @@ def realtime_instructions(*, action_policy: str, authorized_context: str) -> str
     return (
         f"{LIA_SYSTEM_PROMPT}\n\n"
         "MODO DE VOZ: responde con frases breves y naturales. Puedes encadenar varias herramientas de lectura "
-        "para resolver una solicitud multitarea y consolidar los resultados. "
+        "para resolver una solicitud multitarea y consolidar los resultados. Cuando el usuario pida explicar, resumir, "
+        "contar o informar sobre la Base Maestra, beneficiarios, UDS, coordinadores o talento humano, debes invocar "
+        "get_foundation_data_summary aunque la pantalla ya indique que la base está cargada. La herramienta activa las tarjetas visuales. "
         f"Política de acciones del rol actual: {action_policy or 'sin acciones conectadas'}.\n"
         f"Contexto institucional autorizado: {authorized_context}"
     )
