@@ -13,7 +13,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard','prepare_meeting_brief','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -639,6 +639,26 @@ def _run_favorite(database_path: str, tenant_id: int, args: dict, user: dict) ->
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'favorite':{'id':row['id'],'name':row['nombre']},'resolved_action':proposal.get('id'),'executed':False,'proposal':proposal,'confirmation_required':bool(proposal.get('confirmation_required')),'read_only':True}
 
 
+def _meeting_brief(database_path: str,tenant_id: int,args: dict,user: dict) -> dict:
+    role=str(user.get('rol') or user.get('role') or '').upper()
+    if role not in {'SUPERADMIN','GERENTE','COORDINADOR'}:raise PermissionError('Tu rol no tiene permiso para preparar resúmenes de reunión.')
+    period=str(args.get('period') or '').strip() or None;sections={};availability={}
+    def collect(name,call):
+        try:sections[name]=call();availability[name]=True
+        except Exception:sections[name]={};availability[name]=False
+    collect('dashboard',lambda:_role_dashboard(database_path,tenant_id,{'period':period,'scope':'team'},user))
+    collect('warnings',lambda:_early_warnings(database_path,tenant_id,{'period':period},user))
+    collect('institution',lambda:_foundation_summary_complete(database_path,tenant_id))
+    dashboard=sections.get('dashboard',{});warnings=sections.get('warnings',{});institution=sections.get('institution',{})
+    agenda=[]
+    for metric in dashboard.get('metrics') or []:agenda.append({'topic':metric.get('label'),'value':metric.get('value'),'source':'Tablero por rol','priority':'ALTA' if 'vencid' in str(metric.get('label')).lower() and metric.get('value') not in (0,'0','NO DISPONIBLE') else 'NORMAL'})
+    for warning in (warnings.get('warnings') or [])[:10]:agenda.append({'topic':warning.get('title'),'value':warning.get('total'),'source':warning.get('source'),'priority':warning.get('level')})
+    beneficiaries=(institution.get('beneficiaries') or {}).get('total') if availability.get('institution') else 'NO DISPONIBLE';units=(institution.get('units') or {}).get('registered_active') if availability.get('institution') else 'NO DISPONIBLE'
+    agenda.extend([{'topic':'Beneficiarios','value':beneficiaries,'source':'Base Maestra','priority':'INFORMATIVA'},{'topic':'UDS activas','value':units,'source':'Base institucional','priority':'INFORMATIVA'}])
+    order={'CRITICO':0,'ALTA':1,'ALTO':1,'NORMAL':2,'INFORMATIVA':3};agenda.sort(key=lambda x:(order.get(str(x.get('priority')).upper(),4),str(x.get('topic'))))
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'title':'Resumen previo de reunión','period':period,'role':role,'agenda':agenda,'sections':sections,'availability':availability,'partial':not all(availability.values()),'sources':[name for name,enabled in availability.items() if enabled],'draft_only':True,'tasks_created':False,'requires_approval_for_follow_up':True,'read_only':True}
+
+
 def _role_dashboard(database_path: str,tenant_id: int,args: dict,user: dict) -> dict:
     role=str(user.get('rol') or user.get('role') or '').upper();sections={};availability={}
     try:period=str(args.get('period') or '').strip() or None
@@ -748,6 +768,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
         return _module_summary(database_path,tenant_id,args)
     if tool_name=='get_monthly_health_indicators': return _health_indicators(database_path,tenant_id,args)
     if tool_name=='get_role_dashboard': return _role_dashboard(database_path,tenant_id,args,user)
+    if tool_name=='prepare_meeting_brief': return _meeting_brief(database_path,tenant_id,args,user)
     if tool_name=='compare_periods': return _compare_periods(database_path,tenant_id,args)
     if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)

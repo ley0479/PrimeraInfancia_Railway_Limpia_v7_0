@@ -21,6 +21,7 @@ RULES = {
     'get_pending_activities_summary': ActionRule('get_pending_activities_summary','read',ALL_AUTHENTICATED),
     'get_foundation_data_summary': ActionRule('get_foundation_data_summary','read',ALL_AUTHENTICATED),
     'get_role_dashboard': ActionRule('get_role_dashboard','read',ALL_AUTHENTICATED),
+    'prepare_meeting_brief': ActionRule('prepare_meeting_brief','read',frozenset({'SUPERADMIN','GERENTE','COORDINADOR'})),
     'get_monthly_relation_summary': ActionRule('get_monthly_relation_summary','read',ALL_AUTHENTICATED),
     'list_foundation_profiles': ActionRule('list_foundation_profiles','read',ALL_AUTHENTICATED),
     'search_foundation_beneficiaries': ActionRule('search_foundation_beneficiaries','read',ALL_AUTHENTICATED),
