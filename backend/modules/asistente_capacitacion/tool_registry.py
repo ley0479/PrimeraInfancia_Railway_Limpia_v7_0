@@ -71,6 +71,68 @@ def _foundation_profiles(database_path: str, tenant_id: int, args: dict) -> dict
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'total':int(total['total'] or 0),'limit':limit,'offset':offset,
       'profiles':[dict(row) for row in rows],'read_only':True}
 
+
+def _foundation_summary_complete(database_path: str, tenant_id: int) -> dict:
+    """Amplía el resumen con las fuentes maestras institucionales vigentes."""
+    summary=_foundation_summary(database_path,tenant_id)
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        def query(sql,params=()):
+            try:return [dict(row) for row in conn.execute(sql,params).fetchall()]
+            except Exception:return []
+        versions=query('''SELECT id,estado,fecha_publicacion FROM master_versiones
+          WHERE fundacion_id=? AND activa=1 ORDER BY fecha_publicacion DESC,id DESC LIMIT 1''',(tenant_id,))
+        version=versions[0] if versions else {};version_id=version.get('id')
+        people=query('''SELECT nombre_completo,cargo,rol_normalizado,unidad_servicio,coordinador,estado
+          FROM master_talento_humano WHERE fundacion_id=? AND COALESCE(activo,1)=1
+          ORDER BY coordinador,nombre_completo''',(tenant_id,))
+        units=query('''SELECT nombre,codigo_unidad,coordinador,total_ninos,total_talento,modalidad
+          FROM master_unidades WHERE fundacion_id=? AND COALESCE(activo,1)=1 ORDER BY nombre''',(tenant_id,))
+        children_coords=query("""SELECT coordinador,unidad_servicio FROM master_ninos
+          WHERE fundacion_id=? AND COALESCE(activo,1)=1 AND COALESCE(TRIM(coordinador),'')<>''""",(tenant_id,))
+        app_coords=query('''SELECT COALESCE(NULLIF(TRIM(nombre_completo),''),username) AS nombre
+          FROM usuarios_app WHERE fundacion_id=? AND COALESCE(activo,1)=1 AND UPPER(TRIM(rol))='COORDINADOR' ''',(tenant_id,))
+        loads=query('''SELECT tipo_fuente,nombre_archivo_original,fecha_carga,total_registros,
+          registros_validos,registros_error,estado FROM cargas_archivos
+          WHERE fundacion_id=? ORDER BY fecha_carga DESC,id DESC''',(tenant_id,))
+        movements=query('''SELECT tipo_movimiento,COUNT(*) AS total FROM master_movimientos
+          WHERE fundacion_id=? AND version_id=? GROUP BY tipo_movimiento ORDER BY tipo_movimiento''',(tenant_id,version_id)) if version_id else []
+    finally:conn.close()
+    clean=lambda value:str(value or '').strip()
+    norm=lambda value:' '.join(clean(value).upper().split())
+    coordinators={}
+    def add(name,source,unit=''):
+        if not clean(name):return
+        item=coordinators.setdefault(norm(name),{'name':clean(name),'sources':set(),'units':set(),'team':[]})
+        item['sources'].add(source)
+        if clean(unit):item['units'].add(clean(unit))
+    for row in app_coords:add(row.get('nombre'),'usuarios_app')
+    for row in children_coords:add(row.get('coordinador'),'master_ninos',row.get('unidad_servicio'))
+    for row in units:add(row.get('coordinador'),'master_unidades',row.get('nombre'))
+    for row in people:
+        if 'COORDINADOR' in norm(row.get('rol_normalizado') or row.get('cargo')):add(row.get('nombre_completo'),'master_talento_humano',row.get('unidad_servicio'))
+        add(row.get('coordinador'),'master_talento_humano',row.get('unidad_servicio'))
+    for row in people:
+        item=coordinators.get(norm(row.get('coordinador')))
+        if item and norm(row.get('nombre_completo'))!=norm(row.get('coordinador')):
+            item['team'].append({'name':row.get('nombre_completo'),'role':row.get('rol_normalizado') or row.get('cargo'),'unit':row.get('unidad_servicio'),'status':row.get('estado')})
+    coordinator_items=[{'name':item['name'],'sources':sorted(item['sources']),'units':sorted(item['units']),'team':item['team']} for item in sorted(coordinators.values(),key=lambda x:norm(x['name']))]
+    latest_loads={}
+    for row in loads:
+        source=clean(row.get('tipo_fuente')) or 'SIN_FUENTE'
+        if source not in latest_loads:latest_loads[source]={'source':source,'file':row.get('nombre_archivo_original'),'loaded_at':row.get('fecha_carga'),'records':int(row.get('total_registros') or 0),'valid':int(row.get('registros_validos') or 0),'errors':int(row.get('registros_error') or 0),'status':row.get('estado')}
+    summary['master_version']={'id':version_id,'status':version.get('estado'),'published_at':version.get('fecha_publicacion')}
+    summary['profiles']['coordinators']=len(coordinator_items)
+    summary['profiles']['coordinator_items']=coordinator_items
+    summary['profiles']['interdisciplinary_team_total']=len(people)
+    summary['profiles']['interdisciplinary_team']=[{'name':row.get('nombre_completo'),'role':row.get('rol_normalizado') or row.get('cargo'),'unit':row.get('unidad_servicio'),'coordinator':row.get('coordinador'),'status':row.get('estado')} for row in people[:100]]
+    if units:
+        summary['units']['registered_active']=len(units)
+        summary['units']['items']=[{'unit':row.get('nombre'),'code':row.get('codigo_unidad'),'beneficiaries':int(row.get('total_ninos') or 0),'coordinator':row.get('coordinador'),'talent_total':int(row.get('total_talento') or 0),'modality':row.get('modalidad')} for row in units]
+    summary['sources']={'active_loads':list(latest_loads.values()),'total_sources':len(latest_loads)}
+    summary['movements']={'by_type':[{'type':row.get('tipo_movimiento'),'total':int(row.get('total') or 0)} for row in movements],'total':sum(int(row.get('total') or 0) for row in movements)}
+    return summary
+
 def _beneficiaries(database_path: str, tenant_id: int, args: dict) -> dict:
     limit=max(1,min(50,int(args.get('limit') or 20)));offset=max(0,int(args.get('offset') or 0))
     query=str(args.get('query') or '').strip()[:120];unit=str(args.get('unit') or '').strip()[:120]
@@ -184,7 +246,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
         message=proposal['summary']+(' Antes de continuar necesito: '+', '.join(proposal['missing'])+'.' if proposal.get('missing') else ' Revisa los datos y confirma desde la interfaz.')
         return {'proposal_only':True,'message':message,'action_proposal':proposal}
     if tool_name=='get_structured_error': return explain(str(args.get('code') or ''))
-    if tool_name=='get_foundation_data_summary': return _foundation_summary(database_path,tenant_id)
+    if tool_name=='get_foundation_data_summary': return _foundation_summary_complete(database_path,tenant_id)
     if tool_name=='list_foundation_profiles': return _foundation_profiles(database_path,tenant_id,args)
     if tool_name=='search_foundation_beneficiaries': return _beneficiaries(database_path,tenant_id,args)
     if tool_name=='get_platform_module_summary': return _module_summary(database_path,tenant_id,args)

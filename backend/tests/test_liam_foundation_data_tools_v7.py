@@ -14,7 +14,14 @@ def _database(path):
         CREATE TABLE master_ninos(id INTEGER PRIMARY KEY, documento TEXT, nombre_completo TEXT,
           fecha_nacimiento TEXT, edad_meses INTEGER, grupo_etario TEXT, sexo TEXT, unidad_servicio TEXT,
           codigo_unidad TEXT, coordinador TEXT, docente TEXT, modalidad TEXT, estado TEXT, activo INTEGER, fundacion_id INTEGER);
-        CREATE TABLE master_unidades(id INTEGER PRIMARY KEY, nombre TEXT, activo INTEGER, fundacion_id INTEGER);
+        CREATE TABLE master_unidades(id INTEGER PRIMARY KEY, nombre TEXT, codigo_unidad TEXT, coordinador TEXT,
+          total_ninos INTEGER,total_talento INTEGER,modalidad TEXT,activo INTEGER, fundacion_id INTEGER);
+        CREATE TABLE master_versiones(id INTEGER PRIMARY KEY,estado TEXT,fecha_publicacion TEXT,activa INTEGER,fundacion_id INTEGER);
+        CREATE TABLE master_talento_humano(id INTEGER PRIMARY KEY,nombre_completo TEXT,cargo TEXT,rol_normalizado TEXT,
+          unidad_servicio TEXT,coordinador TEXT,estado TEXT,activo INTEGER,fundacion_id INTEGER);
+        CREATE TABLE cargas_archivos(id INTEGER PRIMARY KEY,tipo_fuente TEXT,nombre_archivo_original TEXT,fecha_carga TEXT,
+          total_registros INTEGER,registros_validos INTEGER,registros_error INTEGER,estado TEXT,fundacion_id INTEGER);
+        CREATE TABLE master_movimientos(id INTEGER PRIMARY KEY,version_id INTEGER,tipo_movimiento TEXT,fundacion_id INTEGER);
         CREATE TABLE sn_valoraciones(id INTEGER PRIMARY KEY, estado TEXT, fundacion_id INTEGER);
         """
     )
@@ -31,7 +38,11 @@ def _database(path):
          (2,"102","Niña Dos",None,10,"6 A 11 MESES","F","UDS Sur","S","Coord Uno","Doc Uno","FAMILIAR","ACTIVO",1,1),
          (3,"999","Otro Tenant","2021-01-01",60,"3 A 5 AÑOS","M","UDS Ajena","X","Coord Dos","Doc Dos","FAMILIAR","ACTIVO",1,2)],
     )
-    conn.executemany("INSERT INTO master_unidades VALUES(?,?,?,?)", [(1,"UDS Norte",1,1),(2,"UDS Sur",1,1),(3,"UDS Ajena",1,2)])
+    conn.executemany("INSERT INTO master_unidades VALUES(?,?,?,?,?,?,?,?,?)", [(1,"UDS Norte","N","Coord Uno",1,2,"FAMILIAR",1,1),(2,"UDS Sur","S","Coord Tres",1,1,"FAMILIAR",1,1),(3,"UDS Ajena","X","Coord Dos",1,1,"FAMILIAR",1,2)])
+    conn.executemany("INSERT INTO master_versiones VALUES(?,?,?,?,?)",[(8,"PUBLICADA","2026-09-14",1,1),(9,"PUBLICADA","2026-09-14",1,2)])
+    conn.executemany("INSERT INTO master_talento_humano VALUES(?,?,?,?,?,?,?,?,?)",[(1,"Coord Cuatro","Coordinador","COORDINADOR","UDS Norte","Coord Cuatro","ACTIVO",1,1),(2,"Psicóloga Uno","Psicología","PSICOSOCIAL","UDS Norte","Coord Cuatro","ACTIVO",1,1),(3,"Ajeno","Docente","DOCENTE","UDS Ajena","Coord Dos","ACTIVO",1,2)])
+    conn.executemany("INSERT INTO cargas_archivos VALUES(?,?,?,?,?,?,?,?,?)",[(1,"cuentame","ninos.xlsx","2026-09-14",2,2,0,"validado",1),(2,"talento_humano","talento.xlsx","2026-09-14",2,2,0,"validado",1)])
+    conn.executemany("INSERT INTO master_movimientos VALUES(?,?,?,?)",[(1,8,"NUEVO",1),(2,8,"PERMANECE",1),(3,9,"NUEVO",2)])
     conn.executemany("INSERT INTO sn_valoraciones VALUES(?,?,?)", [(1,"VALIDADA",1),(2,"PENDIENTE",1),(3,"CRITICA",2)])
     conn.commit();conn.close()
 
@@ -41,11 +52,23 @@ def test_summary_is_strictly_scoped_to_authenticated_foundation(tmp_path):
     result=execute('get_foundation_data_summary',args={'foundation_id':2},database_path=str(db),tenant_id=1,user={'rol':'DOCENTE'})
     assert result['scope']=={'foundation_id':1,'foundation_name':'Uno','source':'authenticated_session','cross_foundation':False}
     assert result['profiles']['total']==2
-    assert result['profiles']['coordinators']==1
+    assert result['profiles']['coordinators']==3
     assert result['beneficiaries']['total']==2
     assert result['units']['registered_active']==2
     assert {x['unit'] for x in result['units']['items']}=={'UDS Norte','UDS Sur'}
     assert result['data_quality']['incomplete_fields']['fecha_nacimiento']==1
+
+
+def test_summary_maps_coordinators_teams_sources_and_movements(tmp_path):
+    db=tmp_path/'liam-complete.db';_database(db)
+    result=execute('get_foundation_data_summary',args={},database_path=str(db),tenant_id=1,user={'rol':'SUPERADMIN'})
+    assert result['profiles']['coordinators']==3
+    assert {x['name'] for x in result['profiles']['coordinator_items']}=={'Coord Uno','Coord Tres','Coord Cuatro'}
+    assert result['profiles']['interdisciplinary_team_total']==2
+    assert result['units']['registered_active']==2
+    assert result['sources']['total_sources']==2
+    assert result['movements']['total']==2
+    assert result['master_version']['id']==8
 
 
 def test_profiles_are_scoped_filterable_and_paginated(tmp_path):

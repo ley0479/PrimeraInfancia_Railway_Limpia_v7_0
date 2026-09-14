@@ -223,7 +223,10 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                     value=execute(step['server_tool'],args=step.get('arguments') or {},database_path=database_path,tenant_id=int(ctx.get('fundacion_id') or 1),user=user)
                     tool_results.append({'tool':step['server_tool'],'result':value})
                     if step['server_tool']=='get_foundation_data_summary':
-                        p=value['profiles'];b=value['beneficiaries'];u=value['units'];parts.append(f"Base de datos: {b['total']} beneficiarios, {u['registered_active']} UDS activas, {p['total']} perfiles y {p['coordinators']} coordinadores")
+                        p=value['profiles'];b=value['beneficiaries'];u=value['units']
+                        coord_names=', '.join(x.get('name') or '' for x in p.get('coordinator_items') or []) or 'sin nombres registrados'
+                        unit_names=', '.join(x.get('unit') or '' for x in u.get('items') or []) or 'sin nombres registrados'
+                        parts.append(f"Base Maestra: {b['total']} beneficiarios, {u['registered_active']} UDS activas ({unit_names}), {p['total']} perfiles, {p['coordinators']} coordinadores ({coord_names}) y {p.get('interdisciplinary_team_total',0)} integrantes de talento humano")
                     elif step['server_tool']=='list_foundation_profiles':parts.append(f"Perfiles encontrados: {value['total']}")
                     elif step['server_tool']=='search_foundation_beneficiaries':
                         names=', '.join(str(x.get('nombre_completo') or x.get('documento')) for x in value.get('beneficiaries',[])[:5]) or 'sin coincidencias'
@@ -281,7 +284,11 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                     if proposal['server_tool']=='get_foundation_data_summary':
                         profiles=tool_result.get('profiles') or {};beneficiaries=tool_result.get('beneficiaries') or {};units=tool_result.get('units') or {}
                         groups=', '.join(f"{item['age_group']}: {item['total']}" for item in beneficiaries.get('by_age_group') or []) or 'sin grupos registrados'
-                        message=f"En la fundación de tu sesión hay {profiles.get('total',0)} perfiles, {profiles.get('coordinators',0)} coordinadores, {beneficiaries.get('total',0)} beneficiarios y {units.get('registered_active',0)} UDS activas. Por grupo etario: {groups}."
+                        coord_names=', '.join(x.get('name') or '' for x in profiles.get('coordinator_items') or []) or 'sin nombres registrados'
+                        unit_names=', '.join(x.get('unit') or '' for x in units.get('items') or []) or 'sin nombres registrados'
+                        sources=', '.join(f"{x.get('source')}: {x.get('valid',0)} válidos" for x in (tool_result.get('sources') or {}).get('active_loads') or []) or 'sin cargas registradas'
+                        moves=', '.join(f"{x.get('type')}: {x.get('total',0)}" for x in (tool_result.get('movements') or {}).get('by_type') or []) or 'sin movimientos'
+                        message=f"Resumen de la fundación activa: {profiles.get('total',0)} perfiles; {profiles.get('coordinators',0)} coordinadores ({coord_names}); {profiles.get('interdisciplinary_team_total',0)} integrantes de talento humano; {beneficiaries.get('total',0)} beneficiarios; y {units.get('registered_active',0)} UDS ({unit_names}). Por grupo etario: {groups}. Cargas vigentes: {sources}. Movimientos de la versión maestra: {moves}."
                         actions=[];total=int(beneficiaries.get('total') or 0)
                     elif proposal['server_tool']=='list_foundation_profiles':
                         roles={}
