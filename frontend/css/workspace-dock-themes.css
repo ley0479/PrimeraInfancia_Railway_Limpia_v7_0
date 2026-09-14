@@ -23,6 +23,23 @@ html[data-workspace-theme="light-emerald"] {
     --workspace-header-ink: #0f172a;
 }
 
+/* El motor heredado y los módulos consumen --pi-*. Se fijan aquí para que
+   todos los tableros pertenezcan a la misma paleta aprobada. */
+html[data-workspace-theme="slate-light"],
+html[data-workspace-theme="light-emerald"] {
+    color-scheme: light;
+    --pi-bg: var(--workspace-canvas) !important;
+    --pi-surface: #ffffff !important;
+    --pi-surface-soft: #f3f6f9 !important;
+    --pi-border: #d6dee8 !important;
+    --pi-text: #111827 !important;
+    --pi-muted: #526171 !important;
+    --pi-primary: var(--workspace-accent-strong) !important;
+    --pi-primary-hover: var(--workspace-accent) !important;
+    --pi-accent: var(--workspace-accent) !important;
+    --pi-sidebar-bg: var(--workspace-sidebar) !important;
+}
+
 .workspace-theme-toggle {
     display: inline-flex;
     align-items: center;
@@ -71,6 +88,56 @@ html[data-workspace-theme] #app-shell > main .text-slate-500 { color: var(--work
 html[data-workspace-theme] #app-shell > main input,
 html[data-workspace-theme] #app-shell > main select,
 html[data-workspace-theme] #app-shell > main textarea { color: var(--workspace-ink); border-color: var(--workspace-line); }
+
+/* Normalización de tableros: tarjetas, calendarios, tablas y formularios. */
+html[data-workspace-theme] body,
+html[data-workspace-theme] #app-shell { background: var(--workspace-canvas) !important; }
+html[data-workspace-theme] #app-shell > main section [class*="-card"]:not([class*="badge"]),
+html[data-workspace-theme] #app-shell > main section [class*="-panel"],
+html[data-workspace-theme] #app-shell > main section [class*="-metric"],
+html[data-workspace-theme] #app-shell > main section [class*="-hero"],
+html[data-workspace-theme] #app-shell > main section .card-metrica,
+html[data-workspace-theme] #app-shell > main section .bg-slate-950.border {
+    background: #fff !important;
+    border-color: #d6dee8 !important;
+    color: #111827 !important;
+    box-shadow: 0 4px 12px rgba(15,23,42,.055) !important;
+}
+html[data-workspace-theme] #app-shell > main section [class*="-card"]::before,
+html[data-workspace-theme] #app-shell > main section [class*="-panel"]::before,
+html[data-workspace-theme] #app-shell > main section [class*="-hero"]::before { opacity: .08 !important; }
+html[data-workspace-theme] #app-shell > main section h1,
+html[data-workspace-theme] #app-shell > main section h2,
+html[data-workspace-theme] #app-shell > main section h3,
+html[data-workspace-theme] #app-shell > main section h4,
+html[data-workspace-theme] #app-shell > main section p,
+html[data-workspace-theme] #app-shell > main section label,
+html[data-workspace-theme] #app-shell > main section td { color: #172033; }
+html[data-workspace-theme] #app-shell > main section table { background: #fff; color: #172033; }
+html[data-workspace-theme] #app-shell > main section th { background: #edf2f7 !important; color: #263548 !important; border-color: #d6dee8 !important; }
+html[data-workspace-theme] #app-shell > main section td { background: #fff; border-color: #e1e7ee !important; }
+html[data-workspace-theme] #app-shell > main .ci-calendar-grid { background: #d6dee8 !important; border-color: #d6dee8 !important; }
+html[data-workspace-theme] #app-shell > main .ci-weekday { background: #edf2f7 !important; color: #35445a !important; }
+html[data-workspace-theme] #app-shell > main .ci-day,
+html[data-workspace-theme] #app-shell > main .ci-mini-month,
+html[data-workspace-theme] #app-shell > main .ci-week-column,
+html[data-workspace-theme] #app-shell > main .ci-checklist-card,
+html[data-workspace-theme] #app-shell > main .ci-agenda-item,
+html[data-workspace-theme] #app-shell > main .ci-personal-pending { background: #fff !important; color: #172033 !important; border-color: #d6dee8 !important; }
+html[data-workspace-theme] #app-shell > main .ci-day-muted { background: #f5f7fa !important; color: #708094 !important; }
+html[data-workspace-theme] #app-shell > main .ci-day-number,
+html[data-workspace-theme] #app-shell > main .ci-mini-title,
+html[data-workspace-theme] #app-shell > main .ci-week-heading { color: #172033 !important; }
+html[data-workspace-theme] #app-shell > main .ci-week-heading { background: #edf2f7 !important; }
+html[data-workspace-theme] #app-shell > main section input,
+html[data-workspace-theme] #app-shell > main section select,
+html[data-workspace-theme] #app-shell > main section textarea,
+html[data-workspace-theme] #app-shell > main .ci-input,
+html[data-workspace-theme] #app-shell > main .sn-ent-input { background: #fff !important; color: #172033 !important; border-color: #cbd5e1 !important; }
+html[data-workspace-theme="slate-light"] #app-shell > main section [class*="-tab"].active,
+html[data-workspace-theme="slate-light"] #app-shell > main section [class*="-btn-primary"] { background: #5279aa !important; color: #fff !important; }
+html[data-workspace-theme="light-emerald"] #app-shell > main section [class*="-tab"].active,
+html[data-workspace-theme="light-emerald"] #app-shell > main section [class*="-btn-primary"] { background: #059669 !important; color: #fff !important; }
 
 /* LIAM conserva la tarjeta clara y translúcida de la referencia en ambas vistas. */
 html[data-workspace-theme] .liam-panel {

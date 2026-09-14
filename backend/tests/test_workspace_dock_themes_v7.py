@@ -6,8 +6,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_workspace_dock_assets_are_loaded_with_cachebuster():
     html = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
-    assert "workspace-dock-themes.css?v=2.7.5-dock-themes-4" in html
-    assert "workspace-dock-themes.js?v=2.7.5-dock-themes-4" in html
+    assert "workspace-dock-themes.css?v=2.7.5-dock-themes-5" in html
+    assert "workspace-dock-themes.js?v=2.7.5-dock-themes-5" in html
     assert html.index("responsive-mobile.css") < html.index("workspace-dock-themes.css")
 
 
@@ -35,6 +35,9 @@ def test_desktop_dock_keeps_mobile_drawer_and_hides_badges():
     assert '.liam-panel' in css
     assert 'font-weight: 700' in css
     assert 'color: #000 !important' in css
+    assert '--pi-surface: #ffffff !important' in css
+    assert '.ci-calendar-grid' in css
+    assert 'section [class*="-card"]' in css
     assert '.pi-menu-item small' in css
     assert 'display: none !important' in css
     assert 'light-emerald' in css
