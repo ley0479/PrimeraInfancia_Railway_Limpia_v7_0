@@ -23,6 +23,7 @@ RULES = {
     'get_monthly_relation_summary': ActionRule('get_monthly_relation_summary','read',ALL_AUTHENTICATED),
     'list_foundation_profiles': ActionRule('list_foundation_profiles','read',ALL_AUTHENTICATED),
     'search_foundation_beneficiaries': ActionRule('search_foundation_beneficiaries','read',ALL_AUTHENTICATED),
+    'universal_search': ActionRule('universal_search','read',ALL_AUTHENTICATED),
     'get_platform_module_summary': ActionRule('get_platform_module_summary','read',ALL_AUTHENTICATED),
     'get_monthly_health_indicators': ActionRule('get_monthly_health_indicators','read',ALL_AUTHENTICATED),
     'get_document_processing_status': ActionRule('get_document_processing_status','read',ALL_AUTHENTICATED),

@@ -19,6 +19,7 @@ CAPABILITIES = {
         Capability('get_monthly_relation_summary','analiza','Base Maestra'),
         Capability('list_foundation_profiles','consulta','Usuarios'),
         Capability('search_foundation_beneficiaries','consulta','Base Maestra'),
+        Capability('universal_search','consulta','Índice institucional'),
         Capability('get_platform_module_summary','consulta','Módulo autorizado'),
         Capability('get_monthly_health_indicators','analiza','Salud y Nutrición'),
         Capability('get_pending_activities_summary','analiza','Calendario y Entregables'),
@@ -33,4 +34,3 @@ CAPABILITIES = {
 def describe(name: str) -> dict:
     item=CAPABILITIES.get(str(name or ''))
     return asdict(item) if item else {}
-

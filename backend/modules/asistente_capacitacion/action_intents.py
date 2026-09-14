@@ -98,6 +98,11 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     if any(text in q for text in ('perfiles de la fundacion','usuarios de la fundacion','lista de perfiles','lista de usuarios')):
         role=next((item for item in ('SUPERADMIN','GERENTE','COORDINADOR','DOCENTE','NUTRICIONISTA','PSICOSOCIAL','AUXILIAR_ADMINISTRATIVO') if item.lower().replace('_',' ') in q),None)
         return {'id':'list_foundation_profiles','label':'Consultar perfiles de la fundación','summary':'Consultaré los perfiles de la fundación de tu sesión.','arguments':{'role':role,'limit':50,'offset':0},'missing':[],'confirmation_required':False,'server_tool':'list_foundation_profiles'}
+    if any(word in q for word in ('busca','buscar','encuentra','localiza')) and any(word in q for word in ('unidad','uds','uca','docente','usuario','perfil','talento','archivo','documento','registro')):
+        cleaned=re.sub(r'\b(?:liam|lian|lia|busca|buscar|encuentra|localiza|el|la|los|las|un|una|por|con|documento|archivo|unidad|uds|uca|docente|usuario|perfil|talento|registro)\b',' ',q)
+        query=_clean_unit(re.sub(r'\s+',' ',cleaned))
+        resource='documents' if any(x in q for x in ('archivo','documento')) else ('units' if any(x in q for x in ('unidad','uds','uca')) else ('talent' if any(x in q for x in ('docente','talento')) else 'profiles'))
+        return {'id':'universal_search','label':'Búsqueda universal','summary':'Buscaré únicamente en las fuentes autorizadas de tu fundación.','arguments':{'query':query,'resource':resource,'limit':25,'offset':0},'missing':[] if len(query)>=2 else ['término de búsqueda'],'confirmation_required':False,'server_tool':'universal_search'}
     if any(word in q for word in ('abre', 'abrir', 'llevame', 'ir a', 've a')):
         for aliases, module, label in MODULE_ALIASES:
             if any(alias in q for alias in aliases):

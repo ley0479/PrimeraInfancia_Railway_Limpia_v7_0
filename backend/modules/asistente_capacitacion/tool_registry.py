@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','get_platform_module_summary','get_monthly_health_indicators','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -177,6 +177,31 @@ def _beneficiaries(database_path: str, tenant_id: int, args: dict) -> dict:
       'filters':{'query':query or None,'unit':unit or None,'age_group':age_group or None,'status':status or None},
       'total':int(total['total'] or 0),'limit':limit,'offset':offset,'beneficiaries':[dict(row) for row in rows],'read_only':True}
 
+def _universal_search(database_path: str, tenant_id: int, args: dict) -> dict:
+    query=str(args.get('query') or '').strip()
+    if len(query)<2 or len(query)>120:raise ValueError('La búsqueda debe contener entre 2 y 120 caracteres.')
+    resource=str(args.get('resource') or 'all').strip().lower()
+    allowed={'all','beneficiaries','profiles','talent','units','documents'}
+    if resource not in allowed:raise ValueError('El tipo de recurso no está permitido.')
+    try:limit=max(1,min(int(args.get('limit') or 25),50));offset=max(0,int(args.get('offset') or 0))
+    except (TypeError,ValueError):raise ValueError('limit y offset deben ser enteros válidos.')
+    pattern=f"%{query.lower()}%";results=[];conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    def collect(kind,source,sql,params):
+        if resource not in {'all',kind}:return
+        try:
+            for row in conn.execute(sql,params).fetchall():
+                item=dict(row);item.update({'resource_type':kind,'source':source});results.append(item)
+        except Exception:return
+    try:
+        collect('beneficiaries','Base Maestra','''SELECT id,nombre_completo AS title,documento AS reference,unidad_servicio AS unit,estado AS status FROM master_ninos WHERE fundacion_id=? AND COALESCE(activo,1)=1 AND (LOWER(COALESCE(nombre_completo,'')) LIKE ? OR LOWER(COALESCE(documento,'')) LIKE ? OR LOWER(COALESCE(unidad_servicio,'')) LIKE ? OR LOWER(COALESCE(docente,'')) LIKE ?) ORDER BY nombre_completo LIMIT ?''',(tenant_id,pattern,pattern,pattern,pattern,limit+offset))
+        collect('profiles','Usuarios','''SELECT id,COALESCE(nombre_completo,username) AS title,username AS reference,rol AS unit,CASE WHEN COALESCE(activo,1)=1 THEN 'ACTIVO' ELSE 'INACTIVO' END AS status FROM usuarios_app WHERE fundacion_id=? AND (LOWER(COALESCE(nombre_completo,'')) LIKE ? OR LOWER(COALESCE(username,'')) LIKE ? OR LOWER(COALESCE(email,'')) LIKE ? OR LOWER(COALESCE(rol,'')) LIKE ?) ORDER BY title LIMIT ?''',(tenant_id,pattern,pattern,pattern,pattern,limit+offset))
+        collect('talent','Talento Humano','''SELECT id,nombre_completo AS title,documento AS reference,unidad_servicio AS unit,estado AS status FROM master_talento_humano WHERE fundacion_id=? AND COALESCE(activo,1)=1 AND (LOWER(COALESCE(nombre_completo,'')) LIKE ? OR LOWER(COALESCE(documento,'')) LIKE ? OR LOWER(COALESCE(cargo,'')) LIKE ? OR LOWER(COALESCE(unidad_servicio,'')) LIKE ? OR LOWER(COALESCE(coordinador,'')) LIKE ?) ORDER BY nombre_completo LIMIT ?''',(tenant_id,pattern,pattern,pattern,pattern,pattern,limit+offset))
+        collect('units','Base Institucional','''SELECT id,nombre AS title,codigo_unidad AS reference,coordinador AS unit,CASE WHEN COALESCE(activo,1)=1 THEN 'ACTIVA' ELSE 'INACTIVA' END AS status FROM master_unidades WHERE fundacion_id=? AND COALESCE(activo,1)=1 AND (LOWER(COALESCE(nombre,'')) LIKE ? OR LOWER(COALESCE(codigo_unidad,'')) LIKE ? OR LOWER(COALESCE(coordinador,'')) LIKE ?) ORDER BY nombre LIMIT ?''',(tenant_id,pattern,pattern,pattern,limit+offset))
+        collect('documents','Centro Documental','''SELECT id,COALESCE(tema,tipo_documento) AS title,tipo_documento AS reference,uds AS unit,estado AS status FROM doc_instancias WHERE fundacion_id=? AND (LOWER(COALESCE(tema,'')) LIKE ? OR LOWER(COALESCE(tipo_documento,'')) LIKE ? OR LOWER(COALESCE(uds,'')) LIKE ? OR LOWER(COALESCE(periodo,'')) LIKE ? OR CAST(id AS TEXT) LIKE ?) ORDER BY actualizado_en DESC LIMIT ?''',(tenant_id,pattern,pattern,pattern,pattern,pattern,limit+offset))
+    finally:conn.close()
+    total=len(results);results=results[offset:offset+limit]
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'query':query,'resource':resource,'total':total,'limit':limit,'offset':offset,'results':results,'read_only':True}
+
 def _module_summary(database_path: str, tenant_id: int, args: dict) -> dict:
     module=str(args.get('module') or '').strip().lower()
     if module not in MODULE_DATASETS:raise ValueError('Módulo no reconocido para consulta operativa.')
@@ -297,6 +322,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_monthly_relation_summary': return _monthly_relation(database_path,tenant_id,args)
     if tool_name=='list_foundation_profiles': return _foundation_profiles(database_path,tenant_id,args)
     if tool_name=='search_foundation_beneficiaries': return _beneficiaries(database_path,tenant_id,args)
+    if tool_name=='universal_search': return _universal_search(database_path,tenant_id,args)
     if tool_name=='get_platform_module_summary':
         module=str(args.get('module') or '').strip().lower();allowed=set(ROLE_MENU_PERMISSIONS.get(str(user.get('rol') or ''),[]))
         if allowed and module not in allowed:raise PermissionError('Tu rol no tiene permiso para consultar ese módulo.')
