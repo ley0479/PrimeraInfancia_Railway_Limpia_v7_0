@@ -59,6 +59,41 @@
         openGroup = group;
     }
 
+    function configureFlyoutItems(group, flyout) {
+        flyout.querySelectorAll('[data-menu-item]').forEach((item) => {
+            if (item.dataset.dockDoubleClickReady === '1') return;
+            item.dataset.dockDoubleClickReady = '1';
+            const originalAction = item.onclick;
+            item.onclick = null;
+            item.title = `${item.textContent.trim()}: doble clic para abrir`;
+            item.setAttribute('aria-description', 'Doble clic para abrir. También puede usar Enter.');
+
+            const execute = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (typeof originalAction === 'function') originalAction.call(item, event);
+                closeFlyout(group);
+            };
+
+            item.addEventListener('click', (event) => {
+                if (window.matchMedia('(max-width: 1024px)').matches) {
+                    execute(event);
+                    return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                flyout.querySelectorAll('[data-dock-selected="true"]').forEach((node) => {
+                    if (node !== item) node.removeAttribute('data-dock-selected');
+                });
+                item.dataset.dockSelected = 'true';
+            });
+            item.addEventListener('dblclick', execute);
+            item.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') execute(event);
+            });
+        });
+    }
+
     function configureDock(nav) {
         nav.querySelectorAll('.pi-menu-group').forEach((group) => {
             const toggle = group.querySelector('.pi-menu-group-toggle');
@@ -69,7 +104,6 @@
             flyout.dataset.flyoutLabel = label;
             toggle.setAttribute('aria-label', `Abrir ${label}`);
             toggle.title = label;
-            toggle.addEventListener('pointerenter', () => openFlyout(group));
             group.addEventListener('pointerleave', (event) => {
                 if (!group.contains(event.relatedTarget)) closeFlyout(group);
             });
@@ -80,9 +114,7 @@
                 group.classList.contains('dock-flyout-open') ? closeFlyout(group) : openFlyout(group);
             }, true);
             toggle.addEventListener('focus', () => openFlyout(group));
-            flyout.addEventListener('click', (event) => {
-                if (event.target.closest('[data-menu-item]')) closeFlyout(group);
-            });
+            configureFlyoutItems(group, flyout);
         });
     }
 

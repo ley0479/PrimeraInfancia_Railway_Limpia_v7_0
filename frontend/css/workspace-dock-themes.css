@@ -131,13 +131,28 @@ html[data-workspace-theme] .liam-composer textarea { background: #fff !important
         display: none;
     }
     html[data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-item,
-    html[data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-placeholder { color: #111827; padding: .48rem .72rem; font-size: .82rem; }
+    html[data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-placeholder {
+        color: #000 !important;
+        padding: .55rem .72rem;
+        font-size: .92rem;
+        font-weight: 700;
+        line-height: 1.35;
+        letter-spacing: .005em;
+    }
     html[data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-item svg,
     html[data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-placeholder svg { display: none; }
-    html[data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-item:hover { color: #111827; background: #eef3f8; transform: none; }
+    html[data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-item:hover,
+    html[data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-item[data-dock-selected="true"] {
+        color: #000 !important;
+        background: #e7edf4 !important;
+        border-color: #c8d3df !important;
+        transform: none;
+    }
+    html[data-workspace-theme="light-emerald"][data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-item:hover,
+    html[data-workspace-theme="light-emerald"][data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-item[data-dock-selected="true"] { background: #e3f5ef !important; border-color: #a7dcca !important; }
     html[data-workspace-nav="dock"] .pi-menu-item small,
     html[data-workspace-nav="dock"] .pi-menu-placeholder small { display: none !important; }
-    html[data-workspace-nav="dock"] .pi-menu-item-active { background: linear-gradient(90deg, var(--workspace-accent-strong), var(--workspace-accent)) !important; }
+    html[data-workspace-nav="dock"] .pi-menu-group.dock-flyout-open .pi-menu-item-active { color: #000 !important; background: #dce6f1 !important; box-shadow: none; }
 }
 
 @media (max-width: 1024px) {
