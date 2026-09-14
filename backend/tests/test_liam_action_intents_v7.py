@@ -134,6 +134,13 @@ def test_notification_center_intent_is_read_only():
     assert value['confirmation_required'] is False
 
 
+def test_communication_intent_creates_draft_not_send_action():
+    value=propose_action('Liam prepara un aviso para los docentes con pendientes de septiembre de 2026')
+    assert value['server_tool']=='prepare_communication_draft'
+    assert value['arguments']=={'audience':'pending_deliverables','period':'2026-09'}
+    assert value['confirmation_required'] is False
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -152,4 +159,5 @@ if __name__=='__main__':
     test_early_warning_intent_uses_risk_language()
     test_incident_center_intent_filters_open_items()
     test_notification_center_intent_is_read_only()
+    test_communication_intent_creates_draft_not_send_action()
     print('LIAM_ACTION_INTENTS_V7_PASS')

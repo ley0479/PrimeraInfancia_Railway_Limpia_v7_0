@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -560,6 +560,25 @@ def _notification_center(database_path: str, tenant_id: int, args: dict, user: d
     counts={'critical':sum(1 for x in items if rank.get(x['priority'],3)==0),'warning':sum(1 for x in items if rank.get(x['priority'],3) in {1,2}),'information':sum(1 for x in items if rank.get(x['priority'],3)==3)}
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'summary':{'total':len(items),**counts},'notifications':items,'sources':sources,'role_scope':'foundation' if role in {'SUPERADMIN','GERENTE'} else 'own_or_role_targeted','read_only':True,'send_actions':False}
 
+
+def _communication_draft(database_path: str, tenant_id: int, args: dict, user: dict) -> dict:
+    audience=str(args.get('audience') or 'pending_deliverables').strip().lower()
+    if audience!='pending_deliverables':raise ValueError('La audiencia solicitada no está permitida.')
+    supervision=_deliverable_supervision(database_path,tenant_id,{'period':args.get('period')},user)
+    pending=[item for item in supervision['items'] if item.get('category') in {'PENDIENTE','VENCIDO','DEVUELTO','INCOMPLETO'}]
+    grouped={}
+    for item in pending:
+        responsible=str(item.get('responsible') or '').strip()
+        if not responsible:continue
+        entry=grouped.setdefault(responsible,{'responsible':responsible,'units':set(),'pending':0,'overdue':0})
+        if item.get('unit'):entry['units'].add(str(item['unit']))
+        entry['pending']+=1;entry['overdue']+=int(item.get('category')=='VENCIDO')
+    recipients=[{'responsible':x['responsible'],'units':sorted(x['units']),'pending':x['pending'],'overdue':x['overdue']} for x in grouped.values()]
+    recipients.sort(key=lambda x:x['responsible'].upper())
+    period=str(args.get('period') or '').strip();subject=f"Recordatorio de entregables pendientes{f' · {period}' if period else ''}"
+    body=f"Cordial saludo. Se identificaron {len(pending)} entregables que requieren atención dentro del alcance autorizado. Por favor revisa el Calendario Inteligente, valida fechas y soportes, y actualiza cada registro en su módulo de origen."
+    return {'scope':supervision['scope'],'audience':audience,'period':period or None,'recipients':recipients,'recipient_count':len(recipients),'subject':subject,'message':body,'pending_count':len(pending),'source':'Calendario Inteligente','draft_only':True,'send_enabled':False,'requires_approval_before_send':True,'read_only':True}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -623,6 +642,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_early_warnings': return _early_warnings(database_path,tenant_id,args,user)
     if tool_name=='get_incident_center': return _incident_center(database_path,tenant_id,args,user)
     if tool_name=='get_notification_center': return _notification_center(database_path,tenant_id,args,user)
+    if tool_name=='prepare_communication_draft': return _communication_draft(database_path,tenant_id,args,user)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')
