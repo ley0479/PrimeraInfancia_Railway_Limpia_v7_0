@@ -79,14 +79,20 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         except (TypeError,ValueError):limit=100
         try:page=max(1,int(request.args.get('page') or 1))
         except (TypeError,ValueError):page=1
-        search=str(request.args.get('search') or '').strip()[:120];where='fundacion_id=? AND usuario_id=?';params=[int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0)]
+        search=str(request.args.get('search') or '').strip()[:120];module_filter=str(request.args.get('module') or '').strip()[:80];role_filter=str(request.args.get('role') or '').strip().lower();date_from=str(request.args.get('date_from') or '').strip()[:10];date_to=str(request.args.get('date_to') or '').strip()[:10]
+        if role_filter and role_filter not in {'user','assistant'}:return jsonify({'error':'Tipo de mensaje no válido.'}),422
+        where='fundacion_id=? AND usuario_id=?';params=[int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0)]
         if search:where+=' AND LOWER(content_redacted) LIKE LOWER(?)';params.append(f'%{search}%')
+        if module_filter:where+=' AND module=?';params.append(module_filter)
+        if role_filter:where+=' AND role=?';params.append(role_filter)
+        if date_from:where+=' AND created_at>=?';params.append(date_from+'T00:00:00')
+        if date_to:where+=' AND created_at<=?';params.append(date_to+'T23:59:59')
         conn=connect();total=int(conn.execute(f'SELECT COUNT(*) FROM lia_conversation_messages WHERE {where}',tuple(params)).fetchone()[0] or 0)
         rows=conn.execute(f'''SELECT id,role,content_redacted,module,request_id,created_at
           FROM lia_conversation_messages WHERE {where}
           ORDER BY id DESC LIMIT ? OFFSET ?''',tuple([*params,limit,(page-1)*limit])).fetchall();conn.close()
         messages=[{'id':row['id'],'role':row['role'],'content':row['content_redacted'],'module':row['module'],'request_id':row['request_id'],'created_at':row['created_at']} for row in reversed(rows)]
-        return jsonify({'messages':messages,'total':total,'page':page,'limit':limit,'has_more':page*limit<total,'search':search or None,'append_only':True}),200
+        return jsonify({'messages':messages,'total':total,'page':page,'limit':limit,'has_more':page*limit<total,'filters':{'search':search or None,'module':module_filter or None,'role':role_filter or None,'date_from':date_from or None,'date_to':date_to or None},'append_only':True}),200
 
     @bp.get('/chat/history/export.csv')
     def export_chat_history():
@@ -95,6 +101,33 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         stream=io.StringIO();writer=csv.writer(stream);writer.writerow(['fecha','rol','modulo','mensaje'])
         for row in rows:writer.writerow([row['created_at'],row['role'],row['module'],row['content_redacted']])
         return Response('\ufeff'+stream.getvalue(),200,{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="historial_lia.csv"','Cache-Control':'no-store'})
+
+    @bp.get('/chat/history/export.xlsx')
+    def export_chat_history_xlsx():
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        ctx=get_request_user_context();conn=connect();rows=conn.execute('''SELECT created_at,role,module,content_redacted FROM lia_conversation_messages
+          WHERE fundacion_id=? AND usuario_id=? ORDER BY id''',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0))).fetchall();conn.close()
+        book=Workbook();sheet=book.active;sheet.title='Historial Lía';sheet.append(['Fecha','Tipo','Módulo','Mensaje'])
+        for cell in sheet[1]:cell.font=Font(bold=True,color='FFFFFF');cell.fill=PatternFill('solid',fgColor='0F766E')
+        for row in rows:sheet.append([row['created_at'],'Usuario' if row['role']=='user' else 'Lía',row['module'],row['content_redacted']])
+        sheet.column_dimensions['A'].width=22;sheet.column_dimensions['B'].width=12;sheet.column_dimensions['C'].width=28;sheet.column_dimensions['D'].width=90
+        output=io.BytesIO();book.save(output);output.seek(0)
+        return Response(output.getvalue(),200,{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':'attachment; filename="historial_lia.xlsx"','Cache-Control':'no-store'})
+
+    @bp.get('/chat/history/admin')
+    def admin_chat_history():
+        ctx=get_request_user_context()
+        if str(ctx.get('rol') or '').upper() not in {'SUPERADMIN','GERENTE','COORDINADOR'}:return jsonify({'error':'No tienes permiso para auditar conversaciones.'}),403
+        try:limit=max(1,min(int(request.args.get('limit') or 100),500))
+        except (TypeError,ValueError):limit=100
+        target=request.args.get('user_id',type=int);where='m.fundacion_id=?';params=[int(ctx.get('fundacion_id') or 1)]
+        if target:where+=' AND m.usuario_id=?';params.append(target)
+        conn=connect();rows=conn.execute(f'''SELECT m.id,m.usuario_id,u.username,m.role,m.content_redacted,m.module,m.request_id,m.created_at
+          FROM lia_conversation_messages m LEFT JOIN usuarios_app u ON u.id=m.usuario_id AND u.fundacion_id=m.fundacion_id
+          WHERE {where} ORDER BY m.id DESC LIMIT ?''',tuple([*params,limit])).fetchall();conn.close()
+        audit_lia(ctx,'CONVERSATION_HISTORY_AUDITED',module='administracion',metadata={'target_user_id':target,'rows':len(rows)})
+        return jsonify({'messages':[dict(row) for row in rows],'scope':{'foundation_id':int(ctx.get('fundacion_id') or 1),'cross_foundation':False},'read_only':True}),200
 
     @bp.get('/config')
     def config_publica():

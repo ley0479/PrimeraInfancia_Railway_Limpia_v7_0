@@ -21,6 +21,8 @@
     historyPage: 1,
     historyHasMore: false,
     historySearch: "",
+    historyFilters: {},
+    realtimeSessionId: "",
     history: [],
   };
   const apiBase = () => `${window.backendUrl || ""}/api/asistente-capacitacion`;
@@ -323,13 +325,15 @@
       style.textContent = ".liam-history-tools{display:grid;grid-template-columns:minmax(100px,1fr) auto auto auto;gap:5px;margin-top:10px}.liam-history-tools input{min-width:0;border:1px solid #475569;border-radius:8px;background:#fff;color:#172033;padding:7px;font-size:11px}.liam-history-tools button{border:1px solid #64748b;border-radius:8px;background:#0f766e;color:#fff;padding:6px;font-size:10px;font-weight:700}@media(max-width:520px){.liam-history-tools{grid-template-columns:1fr 1fr}.liam-history-tools input{grid-column:1/-1}}";
       document.head.appendChild(style);
     }
-    box.insertAdjacentHTML("beforebegin", `<div id="liam-history-tools" class="liam-history-tools"><input id="liam-history-search" type="search" maxlength="120" placeholder="Buscar en el historial"><button type="button" data-action="history-search">Buscar</button><button type="button" data-action="history-more" id="liam-history-more">Ver anteriores</button><button type="button" data-action="history-export">Exportar</button></div>`);
+    const canAudit = ["SUPERADMIN", "GERENTE", "COORDINADOR"].includes(String(authenticatedUser().rol || "").toUpperCase());
+    box.insertAdjacentHTML("beforebegin", `<div id="liam-history-tools" class="liam-history-tools"><input id="liam-history-search" type="search" maxlength="120" placeholder="Buscar"><input id="liam-history-module" maxlength="80" placeholder="Módulo"><input id="liam-history-from" type="date" title="Desde"><input id="liam-history-to" type="date" title="Hasta"><select id="liam-history-role"><option value="">Todos</option><option value="user">Órdenes</option><option value="assistant">Respuestas</option></select><button type="button" data-action="history-search">Filtrar</button><button type="button" data-action="history-more" id="liam-history-more">Ver anteriores</button><button type="button" data-action="history-export">CSV</button><button type="button" data-action="history-export-xlsx">Excel</button>${canAudit ? '<button type="button" data-action="history-audit">Auditoría</button>' : ''}</div>`);
   }
   async function loadHistory({ page = 1, appendOlder = false } = {}) {
     if (state.historyLoaded && page === 1 && !state.historySearch) return;
     ensureHistoryTools();
     const query = new URLSearchParams({ limit: "100", page: String(page) });
     if (state.historySearch) query.set("search", state.historySearch);
+    for (const [key, value] of Object.entries(state.historyFilters)) if (value) query.set(key, value);
     const data = await request(`/chat/history?${query}`);
     const messages = Array.isArray(data.messages) ? data.messages : [];
     const box = document.getElementById("liam-conversation");
@@ -350,18 +354,25 @@
   }
   async function searchHistory() {
     state.historySearch = String(document.getElementById("liam-history-search")?.value || "").trim();
+    state.historyFilters = { date_from: document.getElementById("liam-history-from")?.value || "", date_to: document.getElementById("liam-history-to")?.value || "", role: document.getElementById("liam-history-role")?.value || "", module: String(document.getElementById("liam-history-module")?.value || "").trim() };
     state.historyLoaded = false;
     await loadHistory({ page: 1 });
   }
-  async function exportHistory() {
-    const response = await fetch(`${apiBase()}/chat/history/export.csv`, { headers: headers() });
+  async function exportHistory(format = "csv") {
+    const response = await fetch(`${apiBase()}/chat/history/export.${format}`, { headers: headers() });
     if (!response.ok) throw new Error("No se pudo exportar el historial.");
     const url = URL.createObjectURL(await response.blob()), link = document.createElement("a");
-    link.href = url; link.download = "historial_lia.csv"; link.click();
+    link.href = url; link.download = `historial_lia.${format}`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
+  async function auditHistory() {
+    const data = await request("/chat/history/admin?limit=100");
+    const box = document.getElementById("liam-conversation");
+    if (box) box.innerHTML = "";
+    for (const item of [...(data.messages || [])].reverse()) add(item.role === "user" ? "user" : "liam", `${item.username || `Usuario ${item.usuario_id}`}: ${item.content_redacted}`);
+  }
   function saveVoiceTranscript(role, content) {
-    return request("/voice/realtime/event", { method: "POST", body: JSON.stringify({ event: "transcript", role, content, module: state.module }) }).catch(() => {});
+    return request("/voice/realtime/event", { method: "POST", body: JSON.stringify({ event: "transcript", role, content, module: state.module, request_id: state.realtimeSessionId }) }).catch(() => {});
   }
   function auditClientAction(action, status, requestId, module, detail = "") {
     request("/actions/client-event", {
@@ -1134,6 +1145,8 @@
     else if (action === "history-search") searchHistory().catch((error) => add("liam", error.message));
     else if (action === "history-more") loadHistory({ page: state.historyPage + 1, appendOlder: true }).catch((error) => add("liam", error.message));
     else if (action === "history-export") exportHistory().catch((error) => add("liam", error.message));
+    else if (action === "history-export-xlsx") exportHistory("xlsx").catch((error) => add("liam", error.message));
+    else if (action === "history-audit") auditHistory().catch((error) => add("liam", error.message));
     else if (action === "stop") {
       window.LIAM_REALTIME?.stop();
       window.LIA_SPEECH?.stop();
@@ -1288,6 +1301,7 @@
     window.LIAM_STATE?.set("thinking");
   });
   document.addEventListener("liam:realtime-started", () => {
+    state.realtimeSessionId = globalThis.crypto?.randomUUID?.() || `voice-${Date.now()}`;
     const b = document.querySelector('[data-action="realtime"]');
     if (b) {
       b.textContent = "⏹ Finalizar";
@@ -1407,8 +1421,10 @@
         reason,
         duration: event.detail?.duration || 0,
         module: state.module,
+        request_id: state.realtimeSessionId,
       }),
     }).catch(() => {});
+    state.realtimeSessionId = "";
     window.LIAM_LIP_SYNC?.stop();
     window.LIAM_STATE?.set("idle");
   });
