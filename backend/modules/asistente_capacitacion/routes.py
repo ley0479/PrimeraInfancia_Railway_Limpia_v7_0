@@ -21,6 +21,7 @@ from .error_center import record as record_incident, get as get_incident, list_r
 from .credit_agent import parse_credit_request, query as query_credits, create_proposal as create_credit_proposal, confirm as confirm_credit_proposal
 from .action_policy import decision as action_decision, public_policy
 from .system_prompt import realtime_instructions
+from .orchestrator import LiamOrchestrator
 import csv, io, json, uuid, os, tempfile, re, hashlib, requests
 
 
@@ -30,6 +31,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     conn = connect(); conn.executescript(SCHEMA_SQL); conn.commit(); conn.close()
     bp = Blueprint('asistente_capacitacion', __name__, url_prefix='/api/asistente-capacitacion')
+    orchestrator=LiamOrchestrator(database_path)
 
     def audit_lia(ctx, event_type, *, module=None, tool=None, success=True, request_id=None, metadata=None):
         conn=None
@@ -672,14 +674,14 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if not user.get('id'): user={'id':ctx.get('usuario_id'),'rol':ctx.get('rol')}
         request_id=uuid.uuid4().hex
         try:
-            result=execute(tool_name,args=request.get_json(silent=True) or {},database_path=database_path,tenant_id=int(ctx.get('fundacion_id') or 1),user=user)
+            outcome=orchestrator.run(tool_name,args=request.get_json(silent=True) or {},tenant_id=int(ctx.get('fundacion_id') or 1),user=user,module=str(request.headers.get('X-Liam-Module') or 'dashboard'),request_id=request_id);result=outcome.result
         except PermissionError as exc: audit_lia(ctx,'TOOL_REJECTED',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),403
         except LookupError as exc: audit_lia(ctx,'TOOL_NOT_FOUND',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),404
         except ValueError as exc: audit_lia(ctx,'TOOL_INVALID_ARGUMENT',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),422
-        audit_lia(ctx,'TOOL_COMPLETED',tool=tool_name,request_id=request_id,metadata={'read_only':tool_name!='propose_platform_action','proposal_only':tool_name=='propose_platform_action'})
+        audit_lia(ctx,'TOOL_COMPLETED',tool=tool_name,request_id=request_id,metadata={**outcome.telemetry,'proposal_only':tool_name=='propose_platform_action'})
         active_module=str(request.headers.get('X-Liam-Module') or 'dashboard').strip()[:80]
         ui=visual_payload({'message':'Datos consultados por Lía.','tool_result':result},active_module)
-        return jsonify({'tool':tool_name,'result':result,'ui':ui,'read_only':True,'request_id':request_id}),200
+        return jsonify({'tool':tool_name,'result':result,'ui':ui,'read_only':outcome.telemetry['read_only'],'request_id':request_id,'trace':outcome.telemetry}),200
 
     @bp.route('/preferences',methods=['GET','PUT'])
     def preferences():
