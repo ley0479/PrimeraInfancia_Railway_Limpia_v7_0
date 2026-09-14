@@ -1,6 +1,6 @@
 import sqlite3
 
-from modules.asistente_capacitacion.action_intents import propose_action
+from modules.asistente_capacitacion.action_intents import propose_action, propose_read_actions
 from modules.asistente_capacitacion.tool_registry import execute
 
 
@@ -12,8 +12,8 @@ def _database(path):
         CREATE TABLE usuarios_app(id INTEGER PRIMARY KEY, username TEXT, email TEXT, rol TEXT,
           nombre_completo TEXT, activo INTEGER, estado TEXT, fecha_ultima_conexion TEXT, fundacion_id INTEGER);
         CREATE TABLE master_ninos(id INTEGER PRIMARY KEY, documento TEXT, nombre_completo TEXT,
-          fecha_nacimiento TEXT, edad_meses INTEGER, grupo_etario TEXT, unidad_servicio TEXT,
-          codigo_unidad TEXT, estado TEXT, activo INTEGER, fundacion_id INTEGER);
+          fecha_nacimiento TEXT, edad_meses INTEGER, grupo_etario TEXT, sexo TEXT, unidad_servicio TEXT,
+          codigo_unidad TEXT, coordinador TEXT, docente TEXT, modalidad TEXT, estado TEXT, activo INTEGER, fundacion_id INTEGER);
         CREATE TABLE master_unidades(id INTEGER PRIMARY KEY, nombre TEXT, activo INTEGER, fundacion_id INTEGER);
         """
     )
@@ -25,10 +25,10 @@ def _database(path):
          (3,"coord2","c2@example.test","COORDINADOR","Coord Dos",1,"ACTIVO",None,2)],
     )
     conn.executemany(
-        "INSERT INTO master_ninos VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-        [(1,"101","Niño Uno","2022-01-01",48,"3 A 5 AÑOS","UDS Norte","N", "ACTIVO",1,1),
-         (2,"102","Niña Dos",None,10,"6 A 11 MESES","UDS Sur","S","ACTIVO",1,1),
-         (3,"999","Otro Tenant","2021-01-01",60,"3 A 5 AÑOS","UDS Ajena","X","ACTIVO",1,2)],
+        "INSERT INTO master_ninos VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [(1,"101","Niño Uno","2022-01-01",48,"3 A 5 AÑOS","M","UDS Norte","N","Coord Uno","Doc Uno","FAMILIAR","ACTIVO",1,1),
+         (2,"102","Niña Dos",None,10,"6 A 11 MESES","F","UDS Sur","S","Coord Uno","Doc Uno","FAMILIAR","ACTIVO",1,1),
+         (3,"999","Otro Tenant","2021-01-01",60,"3 A 5 AÑOS","M","UDS Ajena","X","Coord Dos","Doc Dos","FAMILIAR","ACTIVO",1,2)],
     )
     conn.executemany("INSERT INTO master_unidades VALUES(?,?,?,?)", [(1,"UDS Norte",1,1),(2,"UDS Sur",1,1),(3,"UDS Ajena",1,2)])
     conn.commit();conn.close()
@@ -57,3 +57,12 @@ def test_profiles_are_scoped_filterable_and_paginated(tmp_path):
 def test_foundation_questions_route_to_read_only_tools():
     assert propose_action('¿Cuántos niños hay por grupo etario?')['server_tool']=='get_foundation_data_summary'
     assert propose_action('Muéstrame los perfiles de la fundación')['server_tool']=='list_foundation_profiles'
+
+
+def test_beneficiary_search_and_multitask_plan_are_tenant_scoped(tmp_path):
+    db=tmp_path/'liam.db';_database(db)
+    found=execute('search_foundation_beneficiaries',args={'query':'Niño','foundation_id':2},database_path=str(db),tenant_id=1,user={'rol':'DOCENTE'})
+    assert found['total']==1 and found['beneficiaries'][0]['documento']=='101'
+    assert all(item['documento']!='999' for item in found['beneficiaries'])
+    plan=propose_read_actions('¿Cuántos niños hay y cuáles son mis tareas pendientes?')
+    assert [item['server_tool'] for item in plan]==['get_foundation_data_summary','get_pending_activities_summary']

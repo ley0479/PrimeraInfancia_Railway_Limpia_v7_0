@@ -46,6 +46,12 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    search_words=('busca','buscar','consulta','consultar','muestra','dime quien','cual nino','cual nina')
+    if any(word in q for word in search_words) and any(word in q for word in ('nino','nina','beneficiario','participante')):
+        document_match=re.search(r'\b(?:documento|cedula|identificacion|nui)\s*(?:numero|nro|no)?\s*[:#-]?\s*(\d{5,15})\b',q)
+        name_match=re.search(r'\b(?:nino|nina|beneficiario|participante)\s+(?:llamad[oa]\s+|de nombre\s+)?([a-z][a-z ]{2,80}?)(?=\s+(?:en|de|con|por)\b|$)',q)
+        query=document_match.group(1) if document_match else (_clean_unit(name_match.group(1)) if name_match else '')
+        return {'id':'search_foundation_beneficiaries','label':'Consultar beneficiarios','summary':'Consultaré los beneficiarios autorizados de la fundación de tu sesión.','arguments':{'query':query,'limit':20,'offset':0},'missing':[],'confirmation_required':False,'server_tool':'search_foundation_beneficiaries'}
     if any(text in q for text in ('cuantos ninos','cuantas ninas','cuantos beneficiarios','cuantos perfiles','grupo etario','grupos etarios','cuantos coordinadores','ninos por unidad','beneficiarios por unidad','unidades activas','uds activas','ods activas','cuales son las uds','cuales son las ods','informacion de la base de datos','resumen de la base de datos','datos de la fundacion','base maestra incompleta','campos incompletos')):
         return {'id':'get_foundation_data_summary','label':'Consultar información de la fundación','summary':'Consultaré la información autorizada de la fundación de tu sesión.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_foundation_data_summary'}
     if any(text in q for text in ('perfiles de la fundacion','usuarios de la fundacion','lista de perfiles','lista de usuarios')):
@@ -72,6 +78,7 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     document_match=re.search(r'\b(?:documento|cedula|identificacion|nui)\s*(?:numero|nro|no)?\s*[:#-]?\s*(\d{5,15})\b',q)
     if document_match and any(word in q for word in ('busca', 'buscar', 'muestra', 'consulta', 'consultar')):
         return {'id':'search_beneficiary','label':'Buscar beneficiario','summary':'Abriré la búsqueda autorizada del beneficiario.','arguments':{'query':document_match.group(1),'module':'buscador-beneficiarios'},'missing':[],'confirmation_required':False,'client_handler':'search_beneficiary'}
+
     version_match=re.search(r'\bversion\s*(?:id|numero|nro|no)?\s*[:#-]?\s*(\d+)\b',q)
     if 'base maestra' in q and any(word in q for word in ('publica','publicar')):
         version_id=int(version_match.group(1)) if version_match else None
@@ -148,3 +155,24 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
         'arguments': {'unit': unit or None, 'month': month, 'year': year, 'group': group},
         'missing': missing, 'confirmation_required': True, 'client_handler': 'download_rpp',
     }
+
+
+def propose_read_actions(question: str, *, screen_context: dict | None = None) -> list[dict]:
+    """Planifica varias consultas de lectura pedidas en un mismo turno."""
+    q=_plain(question);actions=[]
+    summary_terms=('cuantos ninos','cuantas ninas','cuantos beneficiarios','cuantos perfiles','grupo etario','grupos etarios','cuantos coordinadores','ninos por unidad','beneficiarios por unidad','unidades activas','uds activas','ods activas','cuales son las uds','cuales son las ods','informacion de la base de datos','resumen de la base de datos','datos de la fundacion','base maestra incompleta','campos incompletos')
+    if any(text in q for text in summary_terms):
+        actions.append({'id':'get_foundation_data_summary','arguments':{},'server_tool':'get_foundation_data_summary'})
+    if any(text in q for text in ('perfiles de la fundacion','usuarios de la fundacion','lista de perfiles','lista de usuarios')):
+        actions.append({'id':'list_foundation_profiles','arguments':{'limit':50,'offset':0},'server_tool':'list_foundation_profiles'})
+    if any(word in q for word in ('pendiente','pendientes','por entregar','vencimiento')):
+        action=propose_action('muéstrame mis tareas pendientes'+(' de mi equipo' if 'equipo' in q else ''),screen_context=screen_context)
+        if action and action.get('server_tool'):actions.append(action)
+    if any(word in q for word in ('busca','buscar','consulta','consultar')) and any(word in q for word in ('nino','nina','beneficiario','participante')):
+        action=propose_action(question,screen_context=screen_context)
+        if action and action.get('server_tool')=='search_foundation_beneficiaries':actions.append(action)
+    unique=[];seen=set()
+    for action in actions:
+        key=(action['server_tool'],repr(sorted((action.get('arguments') or {}).items())))
+        if key not in seen:seen.add(key);unique.append(action)
+    return unique

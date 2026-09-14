@@ -16,7 +16,7 @@ from .provider_adapter import OpenAIResponsesProvider, ProviderUnavailable, prov
 from .knowledge_base import manual_for_role, manual_for_question, build_manual_pdf
 from .privacy_service import redact
 from .local_speech import enabled as local_speech_enabled, status as local_speech_status, transcribe_wav
-from .action_intents import propose_action
+from .action_intents import propose_action, propose_read_actions
 from .error_center import record as record_incident, get as get_incident, list_recent as list_incidents
 from .credit_agent import parse_credit_request, query as query_credits, create_proposal as create_credit_proposal, confirm as confirm_credit_proposal
 from .action_policy import decision as action_decision, public_policy
@@ -212,8 +212,29 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             if content: history.append({'role':item['role'],'content':content})
         screen_context=data.get('screen_context') if isinstance(data.get('screen_context'),dict) else {}
         proposal=propose_action(question,screen_context=screen_context)
+        read_plan=propose_read_actions(question,screen_context=screen_context)
         credit_request=parse_credit_request(question)
         result=respond(question=question, module=module, role=str(ctx.get('rol') or ''),allowed_modules=sorted(allowed),knowledge=knowledge,history=history)
+        if len(read_plan)>1 and not credit_request:
+            user=dict(getattr(g,'current_user',None) or {}) or {'id':ctx.get('usuario_id'),'rol':ctx.get('rol')}
+            tool_results=[];parts=[]
+            for step in read_plan[:5]:
+                try:
+                    value=execute(step['server_tool'],args=step.get('arguments') or {},database_path=database_path,tenant_id=int(ctx.get('fundacion_id') or 1),user=user)
+                    tool_results.append({'tool':step['server_tool'],'result':value})
+                    if step['server_tool']=='get_foundation_data_summary':
+                        p=value['profiles'];b=value['beneficiaries'];u=value['units'];parts.append(f"Base de datos: {b['total']} beneficiarios, {u['registered_active']} UDS activas, {p['total']} perfiles y {p['coordinators']} coordinadores")
+                    elif step['server_tool']=='list_foundation_profiles':parts.append(f"Perfiles encontrados: {value['total']}")
+                    elif step['server_tool']=='search_foundation_beneficiaries':
+                        names=', '.join(str(x.get('nombre_completo') or x.get('documento')) for x in value.get('beneficiaries',[])[:5]) or 'sin coincidencias'
+                        parts.append(f"Beneficiarios encontrados: {value['total']} ({names})")
+                    elif step['server_tool']=='get_pending_activities_summary':parts.append(f"Tareas pendientes: {value['total']}, de ellas {value['overdue']} vencidas y {value['due_today']} para hoy")
+                    audit_lia(ctx,'TOOL_COMPLETED',module=module,tool=step['server_tool'],request_id=result['request_id'],metadata={'read_only':True,'agentic_step':len(tool_results)})
+                except (PermissionError,LookupError,ValueError) as exc:parts.append(f"{step['server_tool']}: {exc}")
+            message='. '.join(parts)+'.'
+            result.update({'message':message,'speech_text':message,'confidence':'confirmed','confirmation_required':False,'actions':[],'tool_results':tool_results,'agentic':{'steps':len(tool_results),'max_steps':5,'read_only':True}})
+            audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'multi_tool':True,'steps':len(tool_results)})
+            return jsonify(result),200
         incident_match=re.search(r'\bINC-\d{8}-\d{6}-[A-Z0-9]{6}\b',question.upper())
         if incident_match:
             incident=get_incident(database_path,incident_match.group(0),int(ctx.get('fundacion_id') or 1))
@@ -263,6 +284,11 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                         detail=', '.join(f'{role}: {count}' for role,count in sorted(roles.items())) or 'sin perfiles'
                         message=f"Encontré {tool_result.get('total',0)} perfiles en la fundación de tu sesión. En esta página: {detail}."
                         actions=[];total=int(tool_result.get('total') or 0)
+                    elif proposal['server_tool']=='search_foundation_beneficiaries':
+                        total=int(tool_result.get('total') or 0);items=tool_result.get('beneficiaries') or []
+                        detail=', '.join(f"{item.get('nombre_completo') or 'Sin nombre'} ({item.get('documento') or 'sin documento'}, {item.get('unidad_servicio') or 'sin UDS'})" for item in items[:10]) or 'sin coincidencias'
+                        message=f"Encontré {total} beneficiarios autorizados: {detail}."
+                        actions=[]
                     else:
                         total=int(tool_result.get('total') or 0); overdue=int(tool_result.get('overdue') or 0); today=int(tool_result.get('due_today') or 0); upcoming=int(tool_result.get('upcoming') or 0); undated=int(tool_result.get('undated') or 0)
                         query=tool_result.get('query') or {}; scope_label='del equipo' if query.get('scope')=='team' else 'asignadas a tu cuenta'; period_label=f" del periodo {query.get('period')}" if query.get('period') else ''
@@ -366,6 +392,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             {'type':'function','name':'get_pending_activities_summary','description':'Consulta actividades pendientes autorizadas por periodo y alcance personal o de equipo.','parameters':{'type':'object','properties':{'period':{'type':'string','description':'Periodo opcional en formato AAAA-MM.'},'scope':{'type':'string','enum':['self','team'],'description':'self para pendientes propios; team para equipo autorizado.'}},'additionalProperties':False}},
             {'type':'function','name':'get_foundation_data_summary','description':'Consulta estadísticas completas de la fundación de la sesión activa: perfiles, coordinadores, beneficiarios, grupos etarios, unidades o UDS y campos incompletos. Nunca consulta otra fundación.','parameters':{'type':'object','properties':{},'additionalProperties':False}},
             {'type':'function','name':'list_foundation_profiles','description':'Lista perfiles de usuario de la fundación de la sesión activa. Puede filtrar por rol y paginar; nunca consulta otra fundación.','parameters':{'type':'object','properties':{'role':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':100},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
+            {'type':'function','name':'search_foundation_beneficiaries','description':'Busca y filtra beneficiarios de la fundación de la sesión activa por nombre, documento, UDS, grupo etario o estado. Es de solo lectura y nunca cruza fundaciones.','parameters':{'type':'object','properties':{'query':{'type':'string'},'unit':{'type':'string'},'age_group':{'type':'string'},'status':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':50},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
             {'type':'function','name':'get_structured_error','description':'Explica un código de error de la plataforma.','parameters':{'type':'object','properties':{'code':{'type':'string'}},'required':['code'],'additionalProperties':False}},
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
             {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},

@@ -11,7 +11,7 @@ from .action_policy import decision as action_decision
 from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','list_foundation_profiles','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','list_foundation_profiles','search_foundation_beneficiaries','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 def _foundation_summary(database_path: str, tenant_id: int) -> dict:
     """Resumen de solo lectura. El tenant siempre proviene de la sesión autenticada."""
@@ -60,6 +60,28 @@ def _foundation_profiles(database_path: str, tenant_id: int, args: dict) -> dict
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'total':int(total['total'] or 0),'limit':limit,'offset':offset,
       'profiles':[dict(row) for row in rows],'read_only':True}
 
+def _beneficiaries(database_path: str, tenant_id: int, args: dict) -> dict:
+    limit=max(1,min(50,int(args.get('limit') or 20)));offset=max(0,int(args.get('offset') or 0))
+    query=str(args.get('query') or '').strip()[:120];unit=str(args.get('unit') or '').strip()[:120]
+    age_group=str(args.get('age_group') or '').strip()[:120];status=str(args.get('status') or '').strip()[:40]
+    where=['fundacion_id=?','COALESCE(activo,1)=1'];params=[tenant_id]
+    if query:
+        where.append("(LOWER(COALESCE(documento,'')) LIKE LOWER(?) OR LOWER(COALESCE(nombre_completo,'')) LIKE LOWER(?))")
+        params.extend([f'%{query}%',f'%{query}%'])
+    if unit:where.append("LOWER(COALESCE(unidad_servicio,'')) LIKE LOWER(?)");params.append(f'%{unit}%')
+    if age_group:where.append("LOWER(COALESCE(grupo_etario,'')) LIKE LOWER(?)");params.append(f'%{age_group}%')
+    if status:where.append("UPPER(COALESCE(estado,''))=UPPER(?)");params.append(status)
+    clause=' AND '.join(where);conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        total=conn.execute(f'SELECT COUNT(*) AS total FROM master_ninos WHERE {clause}',tuple(params)).fetchone()
+        rows=conn.execute(f'''SELECT id,documento,nombre_completo,fecha_nacimiento,edad_meses,grupo_etario,sexo,
+          unidad_servicio,codigo_unidad,coordinador,docente,modalidad,estado
+          FROM master_ninos WHERE {clause} ORDER BY nombre_completo,documento LIMIT ? OFFSET ?''',tuple([*params,limit,offset])).fetchall()
+    finally:conn.close()
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},
+      'filters':{'query':query or None,'unit':unit or None,'age_group':age_group or None,'status':status or None},
+      'total':int(total['total'] or 0),'limit':limit,'offset':offset,'beneficiaries':[dict(row) for row in rows],'read_only':True}
+
 def _int_arg(args, name, minimum=1):
     try: value=int(args.get(name))
     except (TypeError,ValueError): raise ValueError(f'{name} debe ser un entero válido.')
@@ -87,6 +109,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_structured_error': return explain(str(args.get('code') or ''))
     if tool_name=='get_foundation_data_summary': return _foundation_summary(database_path,tenant_id)
     if tool_name=='list_foundation_profiles': return _foundation_profiles(database_path,tenant_id,args)
+    if tool_name=='search_foundation_beneficiaries': return _beneficiaries(database_path,tenant_id,args)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')

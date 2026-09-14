@@ -21,6 +21,7 @@ RULES = {
     'get_pending_activities_summary': ActionRule('get_pending_activities_summary','read',ALL_AUTHENTICATED),
     'get_foundation_data_summary': ActionRule('get_foundation_data_summary','read',ALL_AUTHENTICATED),
     'list_foundation_profiles': ActionRule('list_foundation_profiles','read',ALL_AUTHENTICATED),
+    'search_foundation_beneficiaries': ActionRule('search_foundation_beneficiaries','read',ALL_AUTHENTICATED),
     'get_document_processing_status': ActionRule('get_document_processing_status','read',ALL_AUTHENTICATED),
     'get_format_generation_status': ActionRule('get_format_generation_status','read',ALL_AUTHENTICATED),
     'get_structured_error': ActionRule('get_structured_error','read',ALL_AUTHENTICATED),

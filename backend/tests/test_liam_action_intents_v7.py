@@ -41,7 +41,8 @@ def test_navigation_and_read_only_intents_are_closed_actions():
     pending = propose_action('Muéstrame los pendientes de mi equipo de septiembre de 2026')
     assert pending['arguments'] == {'period': '2026-09', 'scope': 'team'}
     search = propose_action('Busca el niño con documento 1077456789')
-    assert search['client_handler'] == 'search_beneficiary'
+    assert search['server_tool'] == 'search_foundation_beneficiaries'
+    assert search['arguments']['query'] == '1077456789'
     assert search['arguments']['query'] == '1077456789'
 
 
