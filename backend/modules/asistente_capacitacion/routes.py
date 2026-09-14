@@ -24,6 +24,7 @@ from .system_prompt import realtime_instructions
 from .orchestrator import LiamOrchestrator
 from .context_service import load as load_session_context, save as save_session_context, clear as clear_session_context
 from .repair_registry import public_registry
+from .action_audit import record_proposal as audit_action_proposal, complete as complete_action_audit
 from .notification_providers import provider_catalog
 import csv, io, json, uuid, os, tempfile, re, hashlib, requests
 
@@ -666,6 +667,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                     'provider_response_id':generated.get('response_id'),'output_guard':generated.get('output_guard')})
             except ProviderUnavailable as exc:
                 app.logger.warning('LIAM usa recuperación local por indisponibilidad del proveedor: %s',str(exc))
+        if isinstance(result.get('action_proposal'),dict):
+            audit_action_proposal(database_path,ctx,result['action_proposal'],result['request_id'],module)
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
         result['ui']=visual_payload(result,module)
         result.update(result['ui'])
@@ -683,6 +686,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         status=str(data.get('status') or '')
         if status not in {'completed','failed','cancelled'}: return jsonify({'error':'Estado de acción no válido.'}),422
         audit_lia(ctx,'CLIENT_ACTION_'+status.upper(),module=str(data.get('module') or '')[:80],tool=action,success=status=='completed',request_id=str(data.get('request_id') or '')[:64],metadata={'detail':redact(str(data.get('detail') or ''))[:160]})
+        complete_action_audit(database_path,ctx,str(data.get('request_id') or ''),action,status,data.get('detail'))
         return jsonify({'ok':True}),200
 
     @bp.get('/actions/policy')
