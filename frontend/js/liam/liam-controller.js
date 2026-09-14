@@ -313,6 +313,43 @@
     );
     box.scrollTop = box.scrollHeight;
   }
+  function highlightElement(selector, duration = 5000) {
+    if (!selector || !/^#[A-Za-z][\w:-]*$/.test(selector)) return false;
+    const element = document.querySelector(selector);
+    if (!element) return false;
+    element.classList.add("lia-spotlight");
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => element.classList.remove("lia-spotlight"), Math.max(1000, Math.min(10000, duration)));
+    return true;
+  }
+  function richContent(payload) {
+    const type = payload?.componentType, data = payload?.data || {};
+    if (!["metric-card", "table", "list", "spotlight"].includes(type)) return null;
+    const root = document.createElement("div"); root.className = "lia-rich"; root.dataset.componentType = type;
+    if (type === "metric-card") {
+      const grid = document.createElement("div"); grid.className = "lia-metrics";
+      for (const item of (data.metrics || []).slice(0, 16)) { const card = document.createElement("div"), value = document.createElement("strong"), label = document.createElement("span"); card.className = "lia-metric"; value.textContent = String(item.value ?? "—"); label.textContent = String(item.label || "Indicador"); card.append(value, label); grid.appendChild(card); }
+      root.appendChild(grid);
+    } else if (type === "table") {
+      const table = document.createElement("table"), head = document.createElement("thead"), body = document.createElement("tbody"), tr = document.createElement("tr");
+      for (const label of (data.columns || []).slice(0, 8)) { const th = document.createElement("th"); th.textContent = String(label ?? ""); tr.appendChild(th); } head.appendChild(tr);
+      for (const row of (data.rows || []).slice(0, 50)) { const line = document.createElement("tr"); for (const value of (Array.isArray(row) ? row : []).slice(0, 8)) { const td = document.createElement("td"); td.textContent = String(value ?? "—"); line.appendChild(td); } body.appendChild(line); }
+      table.append(head, body); root.appendChild(table);
+    } else if (type === "list") {
+      const list = document.createElement("ul"); for (const item of (data.items || []).slice(0, 30)) { const li = document.createElement("li"); li.textContent = `${item.label || "Dato"}: ${item.value ?? "—"}`; list.appendChild(li); } root.appendChild(list);
+    }
+    return root;
+  }
+  function renderStructured(payload) {
+    if (!payload || payload.schemaVersion !== "lia-ui-v1") return;
+    const content = richContent(payload);
+    if (payload.display === "drawer" && content) {
+      let drawer = document.getElementById("lia-data-drawer");
+      if (!drawer) { drawer = document.createElement("aside"); drawer.id = "lia-data-drawer"; drawer.className = "lia-data-drawer"; drawer.innerHTML = '<header><strong>Datos consultados por Lía</strong><button type="button" aria-label="Cerrar panel">×</button></header><div data-lia-drawer-content></div>'; drawer.querySelector("button").onclick = () => drawer.dataset.open = "false"; document.body.appendChild(drawer); }
+      const destination = drawer.querySelector("[data-lia-drawer-content]"); destination.replaceChildren(content); drawer.dataset.open = "true";
+    } else if (content) document.querySelector("#liam-conversation > div:last-child")?.appendChild(content);
+    if (payload.targetSelector) highlightElement(payload.targetSelector);
+  }
   function remember(role, content) {
     state.history.push({ role, content: String(content || "").slice(0, 1200) });
   }
@@ -910,6 +947,7 @@
         }),
       });
       add("liam", d.message);
+      renderStructured(d.ui);
       remember("assistant", d.message);
       showProposal(d.action_proposal);
       window.LIAM_STATE?.set(
@@ -1457,6 +1495,7 @@
     applyVisual,
     enterPresenter,
     exitPresenter,
+    highlightElement,
   });
   window.IAN_BOOT = bootIan;
   if (document.readyState === "loading")

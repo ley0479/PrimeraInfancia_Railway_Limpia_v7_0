@@ -51,6 +51,28 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         flags=public_flags();key=f"{ctx.get('fundacion_id')}:{ctx.get('usuario_id')}"
         return not allow(key,flags['rate_limit_per_minute'])
 
+    def visual_payload(result, module):
+        """Contrato visual cerrado; el cliente nunca interpreta HTML procedente del modelo."""
+        tool=str(((result.get('agentic') or {}).get('tool')) or '')
+        value=result.get('tool_result') if isinstance(result.get('tool_result'),dict) else {}
+        component='spotlight';data={};display='inline'
+        if result.get('tool_results'):
+            component='list';display='drawer';data={'items':[{'label':str(x.get('tool') or 'Consulta'),'value':'Completada'} for x in result['tool_results'][:8]]}
+        elif value and 'indicators' in value:
+            component='metric-card';display='drawer';ind=value.get('indicators') or {};data={'metrics':[{'label':str(k).replace('_',' ').title(),'value':v} for k,v in ind.items() if isinstance(v,(int,float))][:12]}
+        elif value and 'beneficiaries' in value and isinstance(value.get('beneficiaries'),list):
+            component='table';display='drawer';data={'columns':['Nombre','Documento','UDS','Estado'],'rows':[[x.get('nombre_completo'),x.get('documento'),x.get('unidad_servicio'),x.get('estado')] for x in value['beneficiaries'][:20]]}
+        elif value and 'profiles' in value and isinstance(value.get('profiles'),list):
+            component='table';display='drawer';data={'columns':['Nombre','Usuario','Rol','Estado'],'rows':[[x.get('nombre_completo'),x.get('username'),x.get('rol'),'Activo' if x.get('activo') else 'Inactivo'] for x in value['profiles'][:20]]}
+        elif value and 'datasets' in value:
+            component='table';display='drawer';data={'columns':['Fuente','Registros'],'rows':[[x.get('name'),x.get('total')] for x in value.get('datasets',[])[:20]]}
+        elif value and 'items' in value:
+            component='table';display='drawer';data={'columns':['Actividad','Fecha','Estado','Unidad'],'rows':[[x.get('title'),x.get('due_date'),x.get('status'),x.get('unit')] for x in value.get('items',[])[:20]]}
+        elif value and {'profiles','beneficiaries','units'} <= set(value):
+            component='metric-card';display='drawer';data={'metrics':[{'label':'Beneficiarios','value':(value.get('beneficiaries') or {}).get('total',0)},{'label':'UDS activas','value':(value.get('units') or {}).get('registered_active',0)},{'label':'Perfiles','value':(value.get('profiles') or {}).get('total',0)},{'label':'Coordinadores','value':(value.get('profiles') or {}).get('coordinators',0)}]}
+        target=f'#nav-{module}' if re.fullmatch(r'[a-z0-9-]+',str(module or '')) else None
+        return {'text':result.get('message') or '','componentType':component,'data':data,'targetSelector':target,'display':display,'schemaVersion':'lia-ui-v1','tool':tool or None}
+
     def save_message(ctx, *, role, content, module, request_id):
         if role not in {'user','assistant'}:raise ValueError('Rol de conversación no válido.')
         conn=connect()
@@ -366,6 +388,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 except (PermissionError,LookupError,ValueError) as exc:parts.append(f"{step['server_tool']}: {exc}")
             message='. '.join(parts)+'.'
             result.update({'message':message,'speech_text':message,'confidence':'confirmed','confirmation_required':False,'actions':[],'tool_results':tool_results,'agentic':{'steps':len(tool_results),'max_steps':5,'read_only':True}})
+            result['ui']=visual_payload(result,module)
+            result.update(result['ui'])
             audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'multi_tool':True,'steps':len(tool_results)})
             save_exchange(ctx,question=question,answer=result['message'],module=module,request_id=result['request_id'])
             return jsonify(result),200
@@ -465,6 +489,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             except ProviderUnavailable as exc:
                 app.logger.warning('LIAM usa recuperación local por indisponibilidad del proveedor: %s',str(exc))
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
+        result['ui']=visual_payload(result,module)
+        result.update(result['ui'])
         save_exchange(ctx,question=question,answer=result['message'],module=module,request_id=result['request_id'])
         return jsonify(result), 200
 
