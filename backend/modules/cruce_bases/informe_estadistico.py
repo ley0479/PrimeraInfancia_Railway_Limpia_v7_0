@@ -422,6 +422,18 @@ def _preparar_df_maestro(df: pd.DataFrame, fuente: str) -> tuple[pd.DataFrame, l
     df['documento'] = df.get('documento', pd.Series([''] * len(df), index=df.index)).apply(_doc_key)
     # Se conserva la regla histórica: si no hay documento, no se cuenta como niño maestro.
     df = df[df['documento'].astype(str).str.len() > 0].copy()
+    encabezados_documento = {
+        'documento', 'numero documento', 'numero de documento', 'n documento',
+        'no documento', 'identificacion', 'numero identificacion', 'doc'
+    }
+    contaminadas = df['documento'].apply(_norm_text).isin(encabezados_documento)
+    if int(contaminadas.sum()):
+        df = df[~contaminadas].copy()
+        if df.empty and fuente == 'master_ninos':
+            raise ValueError(
+                'La Base Maestra activa no contiene niños válidos: sus registros corresponden a una fila de encabezados. '
+                'Corrige la fila de títulos en la carga y vuelve a consolidar/publicar la Base Maestra.'
+            )
     if df.empty:
         return pd.DataFrame(columns=['documento', 'nombre_completo', 'unidad', 'estado', 'sexo', 'grupo_etario', 'coordinador']), [], fuente
     df['nombre_completo'] = df.apply(_nombre_completo, axis=1)
@@ -780,8 +792,29 @@ def _movimientos_contexto(resultado: dict[str, Any], df_scope: pd.DataFrame, fil
     scope_active = any(_safe_text(filtros.get(k)) for k in ['unidad', 'coordinador', 'grupo_etario', 'estado_nutricional', 'diagnostico']) or str(filtros.get('alertas') or '').lower() in {'1', 'true', 'si', 'sí'} or str(filtros.get('faltantes') or '').lower() in {'1', 'true', 'si', 'sí'}
     doc_scope_required = any(_safe_text(filtros.get(k)) for k in ['grupo_etario', 'estado_nutricional', 'diagnostico']) or str(filtros.get('alertas') or '').lower() in {'1', 'true', 'si', 'sí'} or str(filtros.get('faltantes') or '').lower() in {'1', 'true', 'si', 'sí'}
     filtros = dict(filtros, _scope_active=scope_active, _doc_scope_required=doc_scope_required)
-    tipos = ['nuevos', 'retirados', 'reemplazados', 'trasladados', 'cambios', 'cambios_unidad', 'cambios_docente', 'cambios_acudiente', 'cambios_telefono', 'cambios_direccion']
+    tipos = ['nuevos', 'retirados', 'permanecen', 'reemplazados', 'trasladados', 'cambios', 'cambios_unidad', 'cambios_docente', 'cambios_acudiente', 'cambios_telefono', 'cambios_direccion']
     return {tipo: _filtrar_items_movimiento(resultado.get(tipo, []) or [], docs, filtros, unidad_coord) for tipo in tipos}
+
+
+def _movimientos_version_maestra(conn: sqlite3.Connection, version_id: int | None, fundacion_id: int) -> dict[str, list[dict[str, Any]]]:
+    """Lee movimientos de la misma versión maestra y la misma fundación."""
+    result = {'nuevos': [], 'retirados': [], 'permanecen': [], 'cambios_unidad': []}
+    if not version_id or not _table_exists(conn, 'master_movimientos'):
+        return result
+    cols = _columns(conn, 'master_movimientos')
+    sql = 'SELECT * FROM master_movimientos WHERE version_id = ?'
+    params: list[Any] = [version_id]
+    if 'fundacion_id' in cols:
+        sql += ' AND COALESCE(fundacion_id, 1) = ?'
+        params.append(fundacion_id)
+    type_map = {'nuevo': 'nuevos', 'retirado': 'retirados', 'permanece': 'permanecen', 'cambio unidad': 'cambios_unidad'}
+    for raw in conn.execute(sql, params).fetchall():
+        row = dict(raw)
+        key = type_map.get(_norm_text(row.get('tipo_movimiento')).replace('_', ' '))
+        if key:
+            row['unidad'] = row.get('unidad_nueva') or row.get('unidad_anterior') or ''
+            result[key].append(row)
+    return result
 
 
 def _conteo_estado_activo(df: pd.DataFrame) -> int:
@@ -1199,20 +1232,25 @@ def construir_contexto_informe(database_path: str, row_cruce: dict[str, Any], re
     conn = _connect(database_path)
     try:
         df_master, duplicados, fuente_maestra = _cargar_base_maestra(conn, fundacion_id, superadmin)
+        version_maestra = None
+        if fuente_maestra == 'master_ninos' and not df_master.empty and 'version_id' in df_master.columns:
+            versiones = pd.to_numeric(df_master['version_id'], errors='coerce').dropna()
+            version_maestra = int(versiones.iloc[0]) if not versiones.empty else None
         df_master, unidad_coord = _enriquecer_coordinador(df_master, conn, fundacion_id, superadmin)
         df_master, notas_salud, alertas_df = _enriquecer_salud_nutricion(df_master, conn, fundacion_id, superadmin)
         df_scope = _apply_filters(df_master, filtros)
-        movimientos = _movimientos_contexto(resultado, df_scope, filtros, unidad_coord)
+        fuente_movimientos = _movimientos_version_maestra(conn, version_maestra, fundacion_id) if fuente_maestra == 'master_ninos' else resultado
+        movimientos = _movimientos_contexto(fuente_movimientos, df_scope, filtros, unidad_coord)
         alertas_prioritarias = _alertas_prioritarias(alertas_df, df_scope)
     finally:
         conn.close()
 
     salud = _indicadores_salud(df_scope)
     resumen_cruce = resultado.get('resumen') or {}
-    total_actual = int(resumen_cruce.get('total_actual') or len(df_scope))
+    total_actual = int(len(df_scope)) if fuente_maestra == 'master_ninos' else int(resumen_cruce.get('total_actual') or len(df_scope))
     nuevos = len(movimientos.get('nuevos', []))
     retirados = len(movimientos.get('retirados', []))
-    permanecen = max(0, int(total_actual) - int(resumen_cruce.get('nuevos') or nuevos)) if not filtros else max(0, len(df_scope) - nuevos)
+    permanecen = len(movimientos.get('permanecen', [])) if fuente_maestra == 'master_ninos' else (max(0, int(total_actual) - int(resumen_cruce.get('nuevos') or nuevos)) if not filtros else max(0, len(df_scope) - nuevos))
     cambiaron_unidad = len(movimientos.get('cambios_unidad', [])) or len(movimientos.get('trasladados', []))
 
     resumen_ejecutivo = {
@@ -1224,7 +1262,7 @@ def construir_contexto_informe(database_path: str, row_cruce: dict[str, Any], re
         'total_retirados': retirados,
         'total_permanecen': permanecen,
         'total_cambios_unidad': cambiaron_unidad,
-        'diferencia_bases': int(resumen_cruce.get('total_actual') or 0) - int(resumen_cruce.get('total_anterior') or 0),
+        'diferencia_bases': int(nuevos - retirados) if fuente_maestra == 'master_ninos' else int(resumen_cruce.get('total_actual') or 0) - int(resumen_cruce.get('total_anterior') or 0),
         'duplicados_detectados': len({d.get('documento') for d in duplicados if d.get('documento')}),
     }
 

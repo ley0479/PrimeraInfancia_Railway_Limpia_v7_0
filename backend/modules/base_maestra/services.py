@@ -871,8 +871,23 @@ def latest_rows_for_type(repo: BaseMaestraRepository, tipo: str, fundacion_id: i
 
 def consolidate_by_document(rows: list[dict[str, Any]], repo: BaseMaestraRepository, version_id: int, carga: dict[str, Any] | None, tipo: str, fundacion_id: int, corporacion_id: int) -> dict[str, dict[str, Any]]:
     by_doc: dict[str, dict[str, Any]] = {}
+    header_documents = {'documento', 'numero_documento', 'numero_de_documento', 'n_documento', 'no_documento', 'identificacion', 'numero_identificacion', 'doc'}
     for row in rows:
         doc = normalize_doc(row.get('documento'))
+        if norm_key(doc) in header_documents:
+            repo.registrar_inconsistencia({
+                'version_id': version_id,
+                'carga_id': carga.get('id') if carga else None,
+                'tipo_fuente': tipo,
+                'severidad': 'CRITICA',
+                'tipo': 'FILA_ENCABEZADO_COMO_REGISTRO',
+                'documento': doc,
+                'descripcion': 'La fila contiene nombres de columnas y no corresponde a un beneficiario.',
+                'corporacion_id': corporacion_id,
+                'fundacion_id': fundacion_id,
+                'datos': row,
+            })
+            continue
         if not doc:
             repo.registrar_inconsistencia({
                 'version_id': version_id,
