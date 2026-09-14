@@ -53,6 +53,12 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 try: conn.close()
                 except Exception: pass
 
+    def safe_action_audit(operation, *args):
+        try:return operation(database_path,*args)
+        except Exception as exc:
+            app.logger.warning('LIAM continúa sin auditoría estructurada de acción: %s',type(exc).__name__)
+            return False
+
     def limited(ctx):
         flags=public_flags();key=f"{ctx.get('fundacion_id')}:{ctx.get('usuario_id')}"
         return not allow(key,flags['rate_limit_per_minute'])
@@ -669,7 +675,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 app.logger.warning('LIAM usa recuperación local por indisponibilidad del proveedor: %s',str(exc))
         if isinstance(result.get('action_proposal'),dict):
             action_trace=result['action_proposal'].get('proposal_id') or result['request_id']
-            audit_action_proposal(database_path,ctx,result['action_proposal'],action_trace,module)
+            safe_action_audit(audit_action_proposal,ctx,result['action_proposal'],action_trace,module)
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
         result['ui']=visual_payload(result,module)
         result.update(result['ui'])
@@ -687,7 +693,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         status=str(data.get('status') or '')
         if status not in {'completed','failed','cancelled'}: return jsonify({'error':'Estado de acción no válido.'}),422
         audit_lia(ctx,'CLIENT_ACTION_'+status.upper(),module=str(data.get('module') or '')[:80],tool=action,success=status=='completed',request_id=str(data.get('request_id') or '')[:64],metadata={'detail':redact(str(data.get('detail') or ''))[:160]})
-        complete_action_audit(database_path,ctx,str(data.get('request_id') or ''),action,status,data.get('detail'))
+        safe_action_audit(complete_action_audit,ctx,str(data.get('request_id') or ''),action,status,data.get('detail'))
         return jsonify({'ok':True}),200
 
     @bp.get('/actions/policy')
@@ -712,7 +718,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         except PermissionError as exc:return jsonify({'error':str(exc)}),403
         except LookupError as exc:return jsonify({'error':str(exc)}),404
         except ValueError as exc:return jsonify({'error':str(exc)}),422
-        complete_server_proposal(database_path,ctx,proposal_id)
+        safe_action_audit(complete_server_proposal,ctx,proposal_id)
         audit_lia(ctx,'CREDIT_ACTION_COMPLETED',module='facturacion',tool='credit_subscription_update',request_id=proposal_id,metadata={'confirmed':True})
         return jsonify(result),200
 
