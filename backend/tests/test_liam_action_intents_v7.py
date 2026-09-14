@@ -89,6 +89,13 @@ def test_custom_report_intent_maps_only_predefined_fields():
     assert value['confirmation_required'] is False
 
 
+def test_deliverable_supervisor_intent_uses_selected_period():
+    value = propose_action('Liam supervisa los entregables de septiembre de 2026')
+    assert value['server_tool'] == 'supervise_deliverables'
+    assert value['arguments']['period'] == '2026-09'
+    assert value['confirmation_required'] is False
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -100,4 +107,5 @@ if __name__=='__main__':
     test_monthly_relation_and_nutrition_report_requires_confirmation()
     test_period_comparison_uses_two_explicit_months_and_context_year()
     test_custom_report_intent_maps_only_predefined_fields()
+    test_deliverable_supervisor_intent_uses_selected_period()
     print('LIAM_ACTION_INTENTS_V7_PASS')

@@ -71,6 +71,12 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    if any(text in q for text in ('entregables esperados', 'entregables recibidos', 'unidades no entregan', 'supervisa los entregables', 'supervision de entregables')):
+        month = next((number for name, number in MONTHS.items() if re.search(rf'\b{name}\b', q)), None) or context.get('selected_month')
+        year_match = re.search(r'\b(20\d{2}|2100)\b', q)
+        year = int(year_match.group(1)) if year_match else context.get('selected_year')
+        period = f'{int(year):04d}-{int(month):02d}' if month and year else None
+        return {'id':'supervise_deliverables','label':'Supervisar entregables','summary':'Compararé entregables esperados y recibidos dentro de tu alcance.','arguments':{'period':period},'missing':[],'confirmation_required':False,'server_tool':'supervise_deliverables'}
     if any(text in q for text in ('reporte personalizado', 'crea un reporte con', 'crear un reporte con', 'vista previa del reporte')):
         report = 'age_distribution' if 'grupo etario' in q else ('coordinator_coverage' if 'coordinador' in q and 'docente' not in q else 'unit_coverage')
         aliases = (

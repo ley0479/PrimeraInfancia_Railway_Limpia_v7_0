@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -358,6 +358,59 @@ def _custom_report_preview(database_path: str, tenant_id: int, args: dict, user:
         'role_scope': 'assigned_records' if role in {'DOCENTE', 'COORDINADOR'} else 'active_foundation',
     }
 
+
+def _deliverable_supervision(database_path: str, tenant_id: int, args: dict, user: dict) -> dict:
+    period = str(args.get('period') or '').strip()
+    if period and (len(period) != 7 or period[4] != '-' or not period[:4].isdigit() or not period[5:].isdigit() or not 1 <= int(period[5:]) <= 12):
+        raise ValueError('period debe tener el formato AAAA-MM.')
+    role = str(user.get('rol') or user.get('role') or '').strip().upper()
+    identity = str(user.get('nombre_completo') or user.get('nombre') or user.get('username') or '').strip()
+    where = ['fundacion_id=?'];params = [tenant_id]
+    if period:
+        where.append("SUBSTR(COALESCE(fecha_limite,''),1,7)=?");params.append(period)
+    if role in {'DOCENTE', 'NUTRICIONISTA', 'PSICOSOCIAL', 'AUXILIAR_ADMINISTRATIVO'}:
+        if not identity: raise PermissionError('Tu perfil no tiene una identidad verificable para limitar entregables.')
+        where.append("UPPER(TRIM(COALESCE(responsable_nombre,'')))=UPPER(?)");params.append(identity)
+    elif role == 'COORDINADOR':
+        if not identity: raise PermissionError('Tu perfil no tiene una identidad verificable para limitar el equipo.')
+        where.append("UPPER(TRIM(COALESCE(coordinador,'')))=UPPER(?)");params.append(identity)
+    conn = sqlite3.connect(database_path);conn.row_factory = sqlite3.Row
+    try:
+        rows = [dict(row) for row in conn.execute(
+            f'''SELECT id,titulo,fecha_limite,modulo,responsable_nombre,coordinador,unidad,estado,
+              prioridad,requiere_evidencia,archivo_evidencia,fecha_entrega,clave_unica
+              FROM calendario_entregables WHERE {' AND '.join(where)}
+              ORDER BY fecha_limite,prioridad DESC,id''', tuple(params)).fetchall()]
+    finally: conn.close()
+    today = datetime.now(ZoneInfo('America/Bogota')).date().isoformat()
+    received_states = {'entregado','aprobado','cerrado','cargado','en revision','en revisión'}
+    returned_states = {'devuelto','rechazado','rechazada'}
+    cancelled_states = {'cancelado','no_aplica','no aplica'}
+    counters = {'expected':0,'received':0,'pending':0,'overdue':0,'returned':0,'incomplete':0,'duplicates':0}
+    seen = set();items = []
+    for row in rows:
+        state = str(row.get('estado') or 'pendiente').strip().lower()
+        if state in cancelled_states: continue
+        counters['expected'] += 1
+        returned = state in returned_states
+        received = not returned and (state in received_states or bool(row.get('fecha_entrega')))
+        incomplete = state == 'incompleto' or (received and bool(row.get('requiere_evidencia')) and not row.get('archivo_evidencia'))
+        overdue = not received and not returned and bool(row.get('fecha_limite')) and str(row['fecha_limite']) < today
+        pending = not received and not returned and not overdue
+        if received: counters['received'] += 1
+        if returned: counters['returned'] += 1
+        if incomplete: counters['incomplete'] += 1
+        if overdue: counters['overdue'] += 1
+        if pending: counters['pending'] += 1
+        key = str(row.get('clave_unica') or '').strip()
+        duplicate = bool(key and key in seen)
+        if duplicate: counters['duplicates'] += 1
+        if key: seen.add(key)
+        category = 'INCOMPLETO' if incomplete else ('DEVUELTO' if returned else ('RECIBIDO' if received else ('VENCIDO' if overdue else 'PENDIENTE')))
+        items.append({'id':row.get('id'),'title':row.get('titulo'),'unit':row.get('unidad'),'responsible':row.get('responsable_nombre'),'due_date':row.get('fecha_limite'),'status':row.get('estado'),'category':category,'priority':row.get('prioridad'),'duplicate_candidate':duplicate})
+    compliance = round((counters['received'] / counters['expected']) * 100, 2) if counters['expected'] else 0
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'period':period or None,'summary':{**counters,'compliance_percent':compliance},'items':items[:200],'total_items':len(items),'role_scope':'assigned_records' if role not in {'SUPERADMIN','GERENTE'} else 'active_foundation','source':'Calendario Inteligente','read_only':True}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -414,6 +467,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_monthly_health_indicators': return _health_indicators(database_path,tenant_id,args)
     if tool_name=='compare_periods': return _compare_periods(database_path,tenant_id,args)
     if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
+    if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')
