@@ -75,6 +75,8 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
         return {'id':'get_system_health','label':'Consultar salud del sistema','summary':'Revisaré componentes internos sin exponer secretos.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_system_health'}
     if 'fundacion' in q and any(text in q for text in ('proximas a vencer','proxima a vencer','sin usuarios','sin actividad','fundaciones activas','estado de las fundaciones')):
         return {'id':'get_foundation_portfolio','label':'Consultar fundaciones','summary':'Consultaré el portafolio global autorizado de fundaciones y suscripciones.','arguments':{'limit':100},'missing':[],'confirmation_required':False,'server_tool':'get_foundation_portfolio'}
+    if any(text in q for text in ('calidad de la base maestra','duplicados de la base maestra','inconsistencias de la base maestra','uds inexistentes','docentes sin unidad')):
+        return {'id':'analyze_master_data_quality','label':'Analizar calidad de datos','summary':'Analizaré inconsistencias verificables sin corregir registros automáticamente.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'analyze_master_data_quality'}
     if any(text in q for text in ('entregables esperados', 'entregables recibidos', 'unidades no entregan', 'supervisa los entregables', 'supervision de entregables')):
         month = next((number for name, number in MONTHS.items() if re.search(rf'\b{name}\b', q)), None) or context.get('selected_month')
         year_match = re.search(r'\b(20\d{2}|2100)\b', q)

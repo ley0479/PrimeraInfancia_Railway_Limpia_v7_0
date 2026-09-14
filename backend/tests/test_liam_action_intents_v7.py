@@ -108,6 +108,12 @@ def test_foundation_portfolio_intent_is_closed_tool():
     assert value['confirmation_required'] is False
 
 
+def test_master_quality_intent_never_requests_mutation():
+    value = propose_action('Liam revisa la calidad de la Base Maestra')
+    assert value['server_tool'] == 'analyze_master_data_quality'
+    assert value['confirmation_required'] is False
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -122,4 +128,5 @@ if __name__=='__main__':
     test_deliverable_supervisor_intent_uses_selected_period()
     test_system_health_intent_is_closed_tool()
     test_foundation_portfolio_intent_is_closed_tool()
+    test_master_quality_intent_never_requests_mutation()
     print('LIAM_ACTION_INTENTS_V7_PASS')

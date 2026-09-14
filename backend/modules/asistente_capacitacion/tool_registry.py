@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -468,6 +468,37 @@ def _foundation_portfolio(database_path: str, args: dict) -> dict:
         items.append({'foundation_id':row.get('id'),'foundation':row.get('nombre'),'status':state or 'SIN ESTADO','subscription_status':substate,'plan':row.get('plan'),'expiry_date':row.get('fecha_vencimiento'),'days_remaining':days,'credits_available':available,'credits_included':included,'credit_available_percent':credit_percent,'active_users':int(row.get('active_users') or 0),'last_activity':row.get('last_activity'),'alert':'CRITICA' if expired or available<=0 else ('ALTA' if expiring or (credit_percent is not None and credit_percent<=20) else 'NORMAL')})
     return {'scope':{'type':'authorized_global','cross_foundation':True,'role':'SUPERADMIN'},'summary':summary,'items':items,'limit':limit,'source':'Fundaciones y Suscripciones','read_only':True}
 
+
+def _master_data_quality(database_path: str, tenant_id: int, user: dict) -> dict:
+    role=str(user.get('rol') or user.get('role') or '').strip().upper();identity=str(user.get('nombre_completo') or user.get('nombre') or user.get('username') or '').strip()
+    where=['n.fundacion_id=?','COALESCE(n.activo,1)=1'];params=[tenant_id]
+    if role in {'DOCENTE','COORDINADOR'}:
+        if not identity:raise PermissionError('Tu perfil no tiene una identidad verificable para limitar el diagnóstico.')
+        column='docente' if role=='DOCENTE' else 'coordinador';where.append(f"UPPER(TRIM(COALESCE(n.{column},'')))=UPPER(?)");params.append(identity)
+    clause=' AND '.join(where);conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        scalar=lambda sql,extra=():int((conn.execute(sql,tuple([*params,*extra])).fetchone() or [0])[0] or 0)
+        total=scalar(f'SELECT COUNT(*) FROM master_ninos n WHERE {clause}')
+        missing={field:scalar(f"SELECT COUNT(*) FROM master_ninos n WHERE {clause} AND COALESCE(TRIM(n.{column}),'')='' ") for field,column in (('document','documento'),('name','nombre_completo'),('birth_date','fecha_nacimiento'),('age_group','grupo_etario'),('unit','unidad_servicio'),('teacher','docente'))}
+        duplicate_groups=scalar(f"SELECT COUNT(*) FROM (SELECT n.documento FROM master_ninos n WHERE {clause} AND COALESCE(TRIM(n.documento),'')<>'' GROUP BY n.documento HAVING COUNT(*)>1) duplicates")
+        duplicate_excess=scalar(f"SELECT COALESCE(SUM(total-1),0) FROM (SELECT COUNT(*) AS total FROM master_ninos n WHERE {clause} AND COALESCE(TRIM(n.documento),'')<>'' GROUP BY n.documento HAVING COUNT(*)>1) duplicates")
+        unregistered=scalar(f'''SELECT COUNT(*) FROM master_ninos n WHERE {clause} AND COALESCE(TRIM(n.unidad_servicio),'')<>'' AND NOT EXISTS(
+          SELECT 1 FROM master_unidades u WHERE u.fundacion_id=n.fundacion_id AND COALESCE(u.activo,1)=1 AND
+          (UPPER(TRIM(u.nombre))=UPPER(TRIM(n.unidad_servicio)) OR (COALESCE(TRIM(n.codigo_unidad),'')<>'' AND UPPER(TRIM(u.codigo_unidad))=UPPER(TRIM(n.codigo_unidad)))) )''')
+        unit_scope=" AND UPPER(TRIM(COALESCE(coordinador,'')))=UPPER(?)" if role=='COORDINADOR' else ''
+        unit_params=(tenant_id,identity) if role=='COORDINADOR' else (tenant_id,)
+        units_without=int(conn.execute(f"SELECT COUNT(*) FROM master_unidades WHERE fundacion_id=? AND COALESCE(activo,1)=1 AND COALESCE(TRIM(coordinador),'')='' {unit_scope}",unit_params).fetchone()[0] or 0)
+        talent_scope=" AND UPPER(TRIM(COALESCE(coordinador,'')))=UPPER(?)" if role=='COORDINADOR' else ''
+        talent_params=(tenant_id,identity) if role=='COORDINADOR' else (tenant_id,)
+        teachers_without=int(conn.execute(f"SELECT COUNT(*) FROM master_talento_humano WHERE fundacion_id=? AND COALESCE(activo,1)=1 AND UPPER(COALESCE(rol_normalizado,cargo,'')) LIKE '%DOCENTE%' AND COALESCE(TRIM(unidad_servicio),'')='' {talent_scope}",talent_params).fetchone()[0] or 0)
+        try:open_issues=int(conn.execute('SELECT COUNT(*) FROM master_inconsistencias WHERE fundacion_id=? AND COALESCE(resuelta,0)=0',(tenant_id,)).fetchone()[0] or 0)
+        except Exception:open_issues=None
+    finally:conn.close()
+    findings=[{'code':'DUPLICATE_DOCUMENT','label':'Documentos duplicados','total':duplicate_groups,'affected_records':duplicate_excess,'severity':'CRITICA' if duplicate_groups else 'NORMAL'},{'code':'UNREGISTERED_UNIT','label':'Beneficiarios con UDS inexistente','total':unregistered,'severity':'ALTA' if unregistered else 'NORMAL'},{'code':'UNIT_WITHOUT_RESPONSIBLE','label':'UDS sin responsable','total':units_without,'severity':'ALTA' if units_without else 'NORMAL'},{'code':'TEACHER_WITHOUT_UNIT','label':'Docentes sin unidad','total':teachers_without,'severity':'ALTA' if teachers_without else 'NORMAL'}]
+    findings.extend({'code':f'MISSING_{key.upper()}','label':f'Campo faltante: {key}','total':value,'severity':'ALTA' if value else 'NORMAL'} for key,value in missing.items())
+    alerts=sum(1 for item in findings if item['total']>0)
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'total_records':total,'findings':findings,'summary':{'alerts':alerts,'duplicate_document_groups':duplicate_groups,'duplicate_excess_records':duplicate_excess,'unregistered_units':unregistered,'units_without_responsible':units_without,'teachers_without_unit':teachers_without,'open_registered_inconsistencies':open_issues},'role_scope':'assigned_records' if role in {'DOCENTE','COORDINADOR'} else 'active_foundation','source':'Base Maestra activa','read_only':True,'automatic_corrections':False}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -527,6 +558,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)
     if tool_name=='get_system_health': return _system_health(database_path,tenant_id)
     if tool_name=='get_foundation_portfolio': return _foundation_portfolio(database_path,args)
+    if tool_name=='analyze_master_data_quality': return _master_data_quality(database_path,tenant_id,user)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')

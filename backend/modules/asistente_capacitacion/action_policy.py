@@ -31,6 +31,7 @@ RULES = {
     'supervise_deliverables': ActionRule('supervise_deliverables','read',ALL_AUTHENTICATED),
     'get_system_health': ActionRule('get_system_health','read',frozenset({'SUPERADMIN'})),
     'get_foundation_portfolio': ActionRule('get_foundation_portfolio','read',frozenset({'SUPERADMIN'})),
+    'analyze_master_data_quality': ActionRule('analyze_master_data_quality','read',ALL_AUTHENTICATED),
     'get_document_processing_status': ActionRule('get_document_processing_status','read',ALL_AUTHENTICATED),
     'get_format_generation_status': ActionRule('get_format_generation_status','read',ALL_AUTHENTICATED),
     'get_structured_error': ActionRule('get_structured_error','read',ALL_AUTHENTICATED),
