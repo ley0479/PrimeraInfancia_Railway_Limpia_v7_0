@@ -61,7 +61,7 @@ assert 'elian_platform_tour_progress' in schema
 assert "@bp.get('/elian/platform-tour')" in routes
 assert "@bp.route('/elian/platform-tour/progress'" in routes
 assert "@bp.route('/elian/visual-config'" in routes
-assert 'd.elian||' in controller
+assert 'd.elian || d.liam || {}' in controller
 assert 'elian-admin-config.js' in html
 assert 'administracion.elian.visual-config' in html
 assert "method:'PUT'" in admin_ui

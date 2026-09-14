@@ -441,7 +441,11 @@
   async function viewFavorites(){
     const data=await request("/command-favorites"),box=document.getElementById("liam-conversation");
     box?.querySelector(".liam-favorites-list")?.remove();
-    const node=document.createElement("section");node.className="liam-favorites-list";node.innerHTML=`<strong>Comandos favoritos</strong>${(data.favorites||[]).map(item=>`<div><span>${esc(item.nombre)}</span><button type="button" data-favorite-run="${esc(item.nombre)}">Ejecutar</button><button type="button" data-favorite-delete="${Number(item.id)}">Eliminar</button></div>`).join("")||"<p>No tienes favoritos guardados.</p>"}`;box?.appendChild(node);
+    const node=document.createElement("section");node.className="liam-favorites-list";
+    const title=document.createElement("strong");title.textContent="Comandos favoritos";node.appendChild(title);
+    const favorites=Array.isArray(data.favorites)?data.favorites:[];
+    if(!favorites.length){const empty=document.createElement("p");empty.textContent="No tienes favoritos guardados.";node.appendChild(empty)}
+    favorites.forEach(item=>{const row=document.createElement("div"),name=document.createElement("span"),run=document.createElement("button"),remove=document.createElement("button");name.textContent=String(item.nombre||"");run.type="button";run.dataset.favoriteRun=String(item.nombre||"");run.textContent="Ejecutar";remove.type="button";remove.dataset.favoriteDelete=String(Number(item.id)||0);remove.textContent="Eliminar";row.append(name,run,remove);node.appendChild(row)});box?.appendChild(node);
     node.querySelectorAll("[data-favorite-run]").forEach(button=>button.addEventListener("click",()=>ask(`Liam ejecuta ${button.dataset.favoriteRun}`)));
     node.querySelectorAll("[data-favorite-delete]").forEach(button=>button.addEventListener("click",async()=>{await request(`/command-favorites/${Number(button.dataset.favoriteDelete)}`,{method:"DELETE"});button.parentElement?.remove()}));
   }
