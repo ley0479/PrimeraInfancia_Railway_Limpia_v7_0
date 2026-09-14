@@ -53,25 +53,33 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     def visual_payload(result, module):
         """Contrato visual cerrado; el cliente nunca interpreta HTML procedente del modelo."""
-        tool=str(((result.get('agentic') or {}).get('tool')) or '')
-        value=result.get('tool_result') if isinstance(result.get('tool_result'),dict) else {}
-        component='spotlight';data={};display='inline'
+        tool='';component='spotlight';data={};display='inline'
+        def table_for(value):
+            if not isinstance(value,dict):return None
+            if {'profiles','beneficiaries','units'} <= set(value):
+                p=value.get('profiles') or {};b=value.get('beneficiaries') or {};u=value.get('units') or {};rows=[['Beneficiarios',b.get('total',0),'Base Maestra'],['UDS activas',u.get('registered_active',0),'Unidades'],['Perfiles',p.get('total',0),'Usuarios'],['Coordinadores',p.get('coordinators',0),'Consolidado'],['Talento humano',p.get('interdisciplinary_team_total',0),'Base institucional']]
+                rows.extend([[f"UDS: {x.get('unit') or 'Sin nombre'}",x.get('beneficiaries',0),x.get('coordinator') or 'Sin coordinador'] for x in (u.get('items') or [])[:20]]);return {'columns':['Indicador','Valor','Detalle'],'rows':rows}
+            if isinstance(value.get('beneficiaries'),list):return {'columns':['Nombre','Documento','UDS','Estado'],'rows':[[x.get('nombre_completo'),x.get('documento'),x.get('unidad_servicio'),x.get('estado')] for x in value['beneficiaries'][:30]]}
+            if isinstance(value.get('profiles'),list):return {'columns':['Nombre','Usuario','Rol','Estado'],'rows':[[x.get('nombre_completo'),x.get('username'),x.get('rol'),'Activo' if x.get('activo') else 'Inactivo'] for x in value['profiles'][:30]]}
+            if isinstance(value.get('indicators'),dict):return {'columns':['Indicador','Total'],'rows':[[str(k).replace('_',' ').title(),v] for k,v in value['indicators'].items() if isinstance(v,(int,float))]}
+            if isinstance(value.get('datasets'),list):return {'columns':['Fuente','Registros','Disponibilidad'],'rows':[[x.get('name'),x.get('total'), 'Disponible' if x.get('available',True) else 'No disponible'] for x in value['datasets'][:30]]}
+            if isinstance(value.get('items'),list):return {'columns':['Actividad','Fecha','Estado','Unidad'],'rows':[[x.get('title'),x.get('due_date'),x.get('status'),x.get('unit')] for x in value['items'][:30]]}
+            return None
         if result.get('tool_results'):
-            component='list';display='drawer';data={'items':[{'label':str(x.get('tool') or 'Consulta'),'value':'Completada'} for x in result['tool_results'][:8]]}
-        elif value and 'indicators' in value:
-            component='metric-card';display='drawer';ind=value.get('indicators') or {};data={'metrics':[{'label':str(k).replace('_',' ').title(),'value':v} for k,v in ind.items() if isinstance(v,(int,float))][:12]}
-        elif value and 'beneficiaries' in value and isinstance(value.get('beneficiaries'),list):
-            component='table';display='drawer';data={'columns':['Nombre','Documento','UDS','Estado'],'rows':[[x.get('nombre_completo'),x.get('documento'),x.get('unidad_servicio'),x.get('estado')] for x in value['beneficiaries'][:20]]}
-        elif value and 'profiles' in value and isinstance(value.get('profiles'),list):
-            component='table';display='drawer';data={'columns':['Nombre','Usuario','Rol','Estado'],'rows':[[x.get('nombre_completo'),x.get('username'),x.get('rol'),'Activo' if x.get('activo') else 'Inactivo'] for x in value['profiles'][:20]]}
-        elif value and 'datasets' in value:
-            component='table';display='drawer';data={'columns':['Fuente','Registros'],'rows':[[x.get('name'),x.get('total')] for x in value.get('datasets',[])[:20]]}
-        elif value and 'items' in value:
-            component='table';display='drawer';data={'columns':['Actividad','Fecha','Estado','Unidad'],'rows':[[x.get('title'),x.get('due_date'),x.get('status'),x.get('unit')] for x in value.get('items',[])[:20]]}
-        elif value and {'profiles','beneficiaries','units'} <= set(value):
-            component='metric-card';display='drawer';data={'metrics':[{'label':'Beneficiarios','value':(value.get('beneficiaries') or {}).get('total',0)},{'label':'UDS activas','value':(value.get('units') or {}).get('registered_active',0)},{'label':'Perfiles','value':(value.get('profiles') or {}).get('total',0)},{'label':'Coordinadores','value':(value.get('profiles') or {}).get('coordinators',0)}]}
+            combined=[]
+            for entry in result['tool_results'][:8]:
+                current=table_for(entry.get('result'));tool=str(entry.get('tool') or tool)
+                if current:
+                    for row in current['rows'][:20]:combined.append([tool,*row])
+            if combined:component='table';display='drawer';data={'columns':['Consulta','Dato 1','Dato 2','Dato 3','Dato 4'],'rows':combined[:50]}
+        if not data:
+            value=result.get('tool_result') if isinstance(result.get('tool_result'),dict) else {};table=table_for(value)
+            if table:component='table';display='drawer';data=table
+        if not data:
+            steps=[x.strip(' -') for x in re.split(r'\n+|(?=\d+\.\s)',str(result.get('message') or '')) if x.strip()]
+            if len(steps)>1:component='list';data={'items':[{'label':f'Paso {i}','value':text} for i,text in enumerate(steps[:12],1)]}
         target=f'#nav-{module}' if re.fullmatch(r'[a-z0-9-]+',str(module or '')) else None
-        return {'text':result.get('message') or '','componentType':component,'data':data,'targetSelector':target,'display':display,'schemaVersion':'lia-ui-v1','tool':tool or None}
+        return {'text':result.get('message') or '','componentType':component,'data':data,'targetSelector':target,'display':display,'schemaVersion':'lia-ui-v1','supportedComponents':['metric-card','table','list','spotlight'],'tool':tool or None}
 
     def save_message(ctx, *, role, content, module, request_id):
         if role not in {'user','assistant'}:raise ValueError('Rol de conversación no válido.')

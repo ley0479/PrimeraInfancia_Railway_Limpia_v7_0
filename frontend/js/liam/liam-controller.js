@@ -334,6 +334,7 @@
       const table = document.createElement("table"), head = document.createElement("thead"), body = document.createElement("tbody"), tr = document.createElement("tr");
       for (const label of (data.columns || []).slice(0, 8)) { const th = document.createElement("th"); th.textContent = String(label ?? ""); tr.appendChild(th); } head.appendChild(tr);
       for (const row of (data.rows || []).slice(0, 50)) { const line = document.createElement("tr"); for (const value of (Array.isArray(row) ? row : []).slice(0, 8)) { const td = document.createElement("td"); td.textContent = String(value ?? "—"); line.appendChild(td); } body.appendChild(line); }
+      if (!body.children.length) { const line = document.createElement("tr"), td = document.createElement("td"); td.colSpan = Math.max(1, (data.columns || []).length); td.textContent = "La consulta no devolvió registros para mostrar."; line.appendChild(td); body.appendChild(line); }
       table.append(head, body); root.appendChild(table);
     } else if (type === "list") {
       const list = document.createElement("ul"); for (const item of (data.items || []).slice(0, 30)) { const li = document.createElement("li"); li.textContent = `${item.label || "Dato"}: ${item.value ?? "—"}`; list.appendChild(li); } root.appendChild(list);

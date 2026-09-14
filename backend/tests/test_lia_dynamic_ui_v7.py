@@ -8,6 +8,7 @@ def test_backend_emits_structured_visual_contract():
     for field in ("'text'", "'componentType'", "'data'", "'targetSelector'", "'schemaVersion'"):
         assert field in routes
     assert "metric-card" in routes and "table" in routes and "spotlight" in routes
+    assert "UDS: {x.get('unit')" in routes and "La consulta no devolvió registros" in (ROOT/'frontend/js/liam/liam-controller.js').read_text(encoding='utf-8')
 
 def test_frontend_renders_without_injecting_data_as_html():
     controller=(ROOT/'frontend/js/liam/liam-controller.js').read_text(encoding='utf-8')
