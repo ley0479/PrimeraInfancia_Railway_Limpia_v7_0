@@ -14,7 +14,7 @@ from .tool_registry import ALLOWED_TOOLS, MODULE_DATASETS, execute
 from .rate_limit import allow
 from .provider_adapter import OpenAIResponsesProvider, ProviderUnavailable, provider_status
 from .knowledge_base import manual_for_role, manual_for_question, build_manual_pdf
-from .privacy_service import redact, redact_data
+from .privacy_service import redact, redact_credentials, redact_data
 from .local_speech import enabled as local_speech_enabled, status as local_speech_status, transcribe_wav
 from .action_intents import propose_action, propose_read_actions
 from .error_center import record as record_incident, get as get_incident, list_recent as list_incidents
@@ -904,7 +904,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if not flags['enabled'] or not flags['feedback_enabled']: return jsonify({'error':'La retroalimentación está desactivada.'}),404
         ctx=get_request_user_context();data=request.get_json(silent=True) or {};rating=int(data.get('rating') or 0)
         if rating not in {-1,1}: return jsonify({'error':'Valoración no válida.'}),422
-        reason=str(data.get('reason') or '')[:240];module=str(data.get('module') or '')[:80];request_id=str(data.get('request_id') or '')[:64];conn=connect();now=datetime.now().isoformat(timespec='seconds')
+        reason=redact(str(data.get('reason') or ''))[:240];module=redact(str(data.get('module') or ''))[:80];request_id=redact(str(data.get('request_id') or ''))[:64];conn=connect();now=datetime.now().isoformat(timespec='seconds')
         conn.execute('INSERT INTO lia_feedback(fundacion_id,usuario_id,request_id,rating,reason,module,created_at) VALUES(?,?,?,?,?,?,?)',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),request_id,rating,reason,module,now));conn.commit();conn.close();audit_lia(ctx,'FEEDBACK_RECORDED',module=module,request_id=request_id,metadata={'rating':rating})
         return jsonify({'message':'Gracias. Registramos tu valoración sin guardar datos personales de la conversación.'}),201
 
@@ -914,7 +914,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if request.method=='GET':
             rows=conn.execute('SELECT id,nombre,comando,created_at,updated_at FROM lia_command_favorites WHERE fundacion_id=? AND usuario_id=? ORDER BY nombre',(fid,uid)).fetchall();conn.close()
             return jsonify({'favorites':[dict(row) for row in rows]}),200
-        data=request.get_json(silent=True) or {};name=re.sub(r'\s+',' ',str(data.get('name') or '')).strip();command=re.sub(r'\s+',' ',str(data.get('command') or '')).strip()
+        data=request.get_json(silent=True) or {};name=redact_credentials(re.sub(r'\s+',' ',str(data.get('name') or '')).strip());command=redact_credentials(re.sub(r'\s+',' ',str(data.get('command') or '')).strip())
         if not 2<=len(name)<=60 or not 2<=len(command)<=1000:conn.close();return jsonify({'error':'Nombre o comando favorito no válido.'}),422
         now=datetime.now().isoformat(timespec='seconds');existing=conn.execute('SELECT id FROM lia_command_favorites WHERE fundacion_id=? AND usuario_id=? AND LOWER(nombre)=LOWER(?)',(fid,uid,name)).fetchone()
         if existing:

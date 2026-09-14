@@ -31,5 +31,9 @@ with tempfile.TemporaryDirectory() as tmp:
     mutable=LiamOrchestrator(db).run('run_command_favorite',args={'name':'Reporte mensual'},tenant_id=1,user={'id':10,'rol':'GERENTE','username':'u1'}).result
     assert mutable['executed'] is False and mutable['confirmation_required'] is True
     assert mutable['proposal']['id']=='download_ram'
+    protected=client.post('/api/asistente-capacitacion/command-favorites',json={'name':'Consulta protegida','command':'Busca documento 1234567890 token=private-favorite-token'},headers={'X-Test-Identity':'u2'});assert protected.status_code==201
+    saved_command=protected.get_json()['favorite']['command'];assert 'private-favorite-token' not in saved_command and '1234567890' in saved_command
+    conn=sqlite3.connect(db);raw=conn.execute('SELECT comando FROM lia_command_favorites WHERE id=?',(protected.get_json()['favorite']['id'],)).fetchone()[0];conn.close()
+    assert 'private-favorite-token' not in raw and '1234567890' in raw
 
 print('LIAM_COMMAND_FAVORITES_V7_PASS')

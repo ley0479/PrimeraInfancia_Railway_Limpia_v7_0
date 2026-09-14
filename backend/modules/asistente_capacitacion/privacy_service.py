@@ -8,11 +8,18 @@ PATTERNS = (
     (re.compile(r'(?i)\b(?:token|password|contraseña|secret|api[_ -]?key)\s*[:=]\s*\S+'), '[SECRETO REDACTADO]'),
 )
 
+CREDENTIAL_PATTERN=re.compile(r'(?i)\b(?:token|password|contraseña|secret|api[_ -]?key|authorization)\s*[:=]\s*\S+')
+
 def redact(text: str) -> str:
     value = str(text or '')
     for pattern, replacement in PATTERNS:
         value = pattern.sub(replacement, value)
     return value
+
+
+def redact_credentials(text: str) -> str:
+    """Protege credenciales conservando referencias operativas que el usuario decidió guardar."""
+    return CREDENTIAL_PATTERN.sub('[SECRETO REDACTADO]',str(text or ''))
 
 
 def redact_data(value, depth: int = 0):
