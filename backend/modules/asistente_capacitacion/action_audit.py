@@ -25,3 +25,13 @@ def complete(database_path,ctx,trace_id,action,status,detail=''):
         normalized=str(status or '').upper();error=_text(detail,300) if normalized=='FAILED' else None
         conn.execute('UPDATE liam_action_audit SET result=?,error=?,updated_at=? WHERE action_key=?',(normalized,error,now,row[0]));conn.commit()
     conn.close();return bool(row)
+
+def list_authorized(database_path,ctx,limit=50,offset=0):
+    role=str(ctx.get('rol') or ctx.get('role') or '').upper()
+    if role not in {'SUPERADMIN','GERENTE'}:raise PermissionError('Tu rol no tiene permiso para consultar el historial administrativo de acciones.')
+    limit=max(1,min(int(limit or 50),100));offset=max(0,int(offset or 0));tenant=int(ctx.get('fundacion_id') or 1)
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    total=int(conn.execute('SELECT COUNT(*) FROM liam_action_audit WHERE fundacion_id=?',(tenant,)).fetchone()[0] or 0)
+    rows=[dict(row) for row in conn.execute('''SELECT action_key,usuario_id,trace_id,intent,requested_action,approved_action,risk_level,resource,resource_id,result,created_at,updated_at
+      FROM liam_action_audit WHERE fundacion_id=? ORDER BY id DESC LIMIT ? OFFSET ?''',(tenant,limit,offset)).fetchall()]
+    conn.close();return {'scope':{'foundation_id':tenant,'cross_foundation':False},'total':total,'limit':limit,'offset':offset,'has_more':offset+len(rows)<total,'actions':rows,'technical_details_included':False}

@@ -495,6 +495,18 @@
     if (box) box.innerHTML = "";
     for (const item of [...(data.messages || [])].reverse()) add(item.role === "user" ? "user" : "liam", `${item.username || `Usuario ${item.usuario_id}`}: ${item.content_redacted}`);
   }
+  async function viewActionHistory() {
+    const data = await request('/actions/history?limit=50'), host = document.getElementById('liam-action-history-content');
+    if (!host) return;
+    host.textContent = '';
+    if (!(data.actions || []).length) { const empty=document.createElement('p');empty.className='text-slate-500';empty.textContent='No hay acciones LIAM registradas.';host.appendChild(empty);return; }
+    const table=document.createElement('table');table.className='min-w-full text-left';
+    const head=document.createElement('thead'),header=document.createElement('tr');
+    for (const label of ['Fecha','Usuario','Acción','Riesgo','Resultado']) { const cell=document.createElement('th');cell.className='border-b border-slate-700 px-3 py-2 text-cyan-200';cell.textContent=label;header.appendChild(cell); }
+    head.appendChild(header);table.appendChild(head);const body=document.createElement('tbody');
+    for (const item of data.actions) { const row=document.createElement('tr');for (const value of [item.created_at,item.usuario_id,item.approved_action||item.requested_action,item.risk_level||'—',item.result]) { const cell=document.createElement('td');cell.className='border-b border-slate-800 px-3 py-2';cell.textContent=String(value??'—');row.appendChild(cell); }body.appendChild(row); }
+    table.appendChild(body);host.appendChild(table);
+  }
   async function viewHistoryStats() {
     const data = await request("/chat/history/stats"), detail = (data.top_modules || []).map((x) => `${x.module}: ${x.total}`).join(", ") || "sin actividad";
     add("liam", `Historial: ${data.commands} órdenes, ${data.messages} mensajes y ${data.sessions} sesiones. Módulos principales: ${detail}.`);
@@ -1314,6 +1326,7 @@
     else if (action === "history-sessions") viewHistorySessions().catch((error) => add("liam", error.message));
     else if (action === "history-stats") viewHistoryStats().catch((error) => add("liam", error.message));
     else if (action === "history-audit") auditHistory().catch((error) => add("liam", error.message));
+    else if (action === "liam-action-history") viewActionHistory().catch((error) => add("liam", error.message));
     else if (action === "favorite-save") saveFavorite().catch((error) => add("liam", error.message));
     else if (action === "favorite-list") viewFavorites().catch((error) => add("liam", error.message));
     else if (action === "liam-center") {

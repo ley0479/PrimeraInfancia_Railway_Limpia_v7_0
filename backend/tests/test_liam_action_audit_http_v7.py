@@ -22,5 +22,8 @@ with tempfile.TemporaryDirectory() as tmp:
     assert event.status_code==200
     conn=sqlite3.connect(db);row=conn.execute('SELECT result FROM liam_action_audit WHERE trace_id=? AND requested_action=?',(request_id,action)).fetchone();conn.close()
     assert row[0]=='COMPLETED'
+    history=client.get('/api/asistente-capacitacion/actions/history?limit=20')
+    assert history.status_code==200 and history.get_json()['total']==1
+    assert history.get_json()['scope']['foundation_id']==1
 
 print('LIAM_ACTION_AUDIT_HTTP_V7_PASS')

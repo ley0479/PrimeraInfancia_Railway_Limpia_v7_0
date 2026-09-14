@@ -24,7 +24,7 @@ from .system_prompt import realtime_instructions
 from .orchestrator import LiamOrchestrator
 from .context_service import load as load_session_context, save as save_session_context, clear as clear_session_context
 from .repair_registry import public_registry
-from .action_audit import record_proposal as audit_action_proposal, complete as complete_action_audit
+from .action_audit import record_proposal as audit_action_proposal, complete as complete_action_audit, list_authorized as list_action_audit
 from .notification_providers import provider_catalog
 import csv, io, json, uuid, os, tempfile, re, hashlib, requests
 
@@ -693,6 +693,15 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def actions_policy():
         ctx=get_request_user_context()
         return jsonify({'role':str(ctx.get('rol') or ''),'actions':public_policy(str(ctx.get('rol') or ''))}),200
+
+    @bp.get('/actions/history')
+    def actions_history():
+        if not public_liam_flags().get('admin_enabled'):return jsonify({'error':'La administración de Liam está desactivada por configuración.'}),403
+        ctx=get_request_user_context()
+        try:result=list_action_audit(database_path,ctx,request.args.get('limit',50,type=int),request.args.get('offset',0,type=int))
+        except PermissionError as exc:return jsonify({'error':str(exc)}),403
+        audit_lia(ctx,'ACTION_HISTORY_VIEWED',module='administracion',metadata={'rows':len(result['actions']),'offset':result['offset']})
+        return jsonify(result),200
 
     @bp.post('/actions/confirm/<string:proposal_id>')
     def confirm_server_action(proposal_id):

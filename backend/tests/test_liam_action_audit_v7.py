@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys,tempfile
 BACKEND=Path(__file__).resolve().parents[1];sys.path.insert(0,str(BACKEND))
-from modules.asistente_capacitacion.action_audit import record_proposal,complete
+from modules.asistente_capacitacion.action_audit import record_proposal,complete,list_authorized
 from modules.asistente_capacitacion.schema import SCHEMA_SQL
 from modules.dbapi_compat import sqlite3
 
@@ -20,5 +20,11 @@ with tempfile.TemporaryDirectory() as tmp:
     assert row['requested_action']=='generate_monthly_reports' and row['approved_action']=='generate_monthly_reports'
     assert row['before_state']=='{}' and row['after_state']=='{}' and row['error'] is None
     assert 'password' not in str(row).lower() and 'no-guardar' not in str(row)
+    history=list_authorized(db,{'fundacion_id':1,'usuario_id':99,'rol':'GERENTE'},50,0)
+    assert history['total']==1 and history['scope']['cross_foundation'] is False
+    assert 'before_state' not in history['actions'][0] and 'error' not in history['actions'][0]
+    try:list_authorized(db,{'fundacion_id':1,'usuario_id':10,'rol':'DOCENTE'})
+    except PermissionError:pass
+    else:raise AssertionError('Un rol operativo accedió al historial administrativo.')
 
 print('LIAM_ACTION_AUDIT_V7_PASS')
