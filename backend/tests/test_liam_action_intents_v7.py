@@ -178,6 +178,13 @@ def test_meeting_brief_uses_context_without_creating_tasks():
     assert value['arguments']=={'period':'2026-09'} and value['confirmation_required'] is False
 
 
+def test_meeting_followup_extracts_only_a_draft():
+    value=propose_action('Liam compromisos de la reunión compromiso: revisar informe; responsable: Ana; fecha: 2026-09-30')
+    assert value['server_tool']=='prepare_meeting_followup'
+    assert value['arguments']['commitments']==[{'title':'revisar informe','responsible':'ana','due_date':'2026-09-30'}]
+    assert value['confirmation_required'] is False
+
+
 def test_safe_repair_requires_confirmation_but_preview_does_not():
     preview=propose_action('Liam muéstrame el plan de reparación')
     assert preview['client_handler']=='safe_repair_preview' and preview['confirmation_required'] is False
@@ -210,5 +217,6 @@ if __name__=='__main__':
     test_liam_center_intent_is_closed_read_only_tool()
     test_role_dashboard_uses_session_period_and_requested_scope()
     test_meeting_brief_uses_context_without_creating_tasks()
+    test_meeting_followup_extracts_only_a_draft()
     test_safe_repair_requires_confirmation_but_preview_does_not()
     print('LIAM_ACTION_INTENTS_V7_PASS')

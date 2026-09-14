@@ -82,6 +82,10 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     if any(text in q for text in ('prepara la reunion','resumen para la reunion','agenda para la reunion','antes de la reunion')):
         month=next((number for name,number in MONTHS.items() if re.search(rf'\b{name}\b',q)),None) or context.get('selected_month');year_match=re.search(r'\b(20\d{2}|2100)\b',q);year=int(year_match.group(1)) if year_match else context.get('selected_year');period=f'{int(year):04d}-{int(month):02d}' if month and year else context.get('selected_period')
         return {'id':'prepare_meeting_brief','label':'Preparar reunión','summary':'Prepararé un resumen previo con indicadores, pendientes y alertas disponibles. No crearé tareas automáticamente.','arguments':{'period':period},'missing':[],'confirmation_required':False,'server_tool':'prepare_meeting_brief'}
+    if any(text in q for text in ('seguimiento de la reunion','compromisos de la reunion','despues de la reunion')):
+        match=re.search(r'\bcompromiso\b\s*:?\s*(.+?)\s*[;,]\s*responsable\s*:?\s*(.+?)\s*[;,]\s*fecha\s*:?\s*(20\d{2}-\d{2}-\d{2})',q)
+        commitments=[{'title':_clean_unit(match.group(1)),'responsible':_clean_unit(match.group(2)),'due_date':match.group(3)}] if match else []
+        return {'id':'prepare_meeting_followup','label':'Preparar seguimiento','summary':'Prepararé compromisos como borradores. No crearé tareas sin una confirmación posterior.','arguments':{'commitments':commitments},'missing':[],'confirmation_required':False,'server_tool':'prepare_meeting_followup'}
     if any(text in q for text in ('plan de reparacion','analiza reparaciones','vista previa de reparacion')):
         return {'id':'safe_repair_preview','label':'Analizar reparación segura','summary':'Iniciaré un diagnóstico de reparación sin aplicar cambios.','arguments':{'repair_id':'integrity_safe_repair'},'missing':[],'confirmation_required':False,'client_handler':'safe_repair_preview'}
     if any(text in q for text in ('repara el sistema','aplica la reparacion','ejecuta la reparacion segura')):

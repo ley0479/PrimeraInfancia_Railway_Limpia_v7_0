@@ -13,7 +13,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard','prepare_meeting_brief','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard','prepare_meeting_brief','prepare_meeting_followup','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -639,6 +639,23 @@ def _run_favorite(database_path: str, tenant_id: int, args: dict, user: dict) ->
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'favorite':{'id':row['id'],'name':row['nombre']},'resolved_action':proposal.get('id'),'executed':False,'proposal':proposal,'confirmation_required':bool(proposal.get('confirmation_required')),'read_only':True}
 
 
+def _meeting_followup(tenant_id: int,args: dict,user: dict) -> dict:
+    role=str(user.get('rol') or user.get('role') or '').upper()
+    if role not in {'SUPERADMIN','GERENTE','COORDINADOR'}:raise PermissionError('Tu rol no tiene permiso para preparar seguimientos de reunión.')
+    raw=args.get('commitments') if isinstance(args.get('commitments'),list) else [];items=[]
+    for index,value in enumerate(raw[:20],1):
+        if not isinstance(value,dict):continue
+        title=re.sub(r'\s+',' ',str(value.get('title') or '')).strip()[:240]
+        responsible=re.sub(r'\s+',' ',str(value.get('responsible') or '')).strip()[:160]
+        due_date=str(value.get('due_date') or '').strip()[:10]
+        if due_date:
+            try:date.fromisoformat(due_date)
+            except ValueError:due_date=''
+        missing=[name for name,current in (('compromiso',title),('responsable',responsible),('fecha',due_date)) if not current]
+        items.append({'draft_id':index,'title':title or 'Pendiente de definir','responsible':responsible or 'Pendiente de definir','due_date':due_date or None,'status':'BORRADOR','missing':missing,'ready_for_confirmation':not missing})
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'title':'Seguimiento posterior a reunión','commitments':items,'summary':{'total':len(items),'complete':sum(x['ready_for_confirmation'] for x in items),'incomplete':sum(not x['ready_for_confirmation'] for x in items)},'required_fields':['title','responsible','due_date'],'draft_only':True,'tasks_created':False,'confirmation_required_before_creation':True,'source':'Compromisos proporcionados por el usuario','read_only':True}
+
+
 def _meeting_brief(database_path: str,tenant_id: int,args: dict,user: dict) -> dict:
     role=str(user.get('rol') or user.get('role') or '').upper()
     if role not in {'SUPERADMIN','GERENTE','COORDINADOR'}:raise PermissionError('Tu rol no tiene permiso para preparar resúmenes de reunión.')
@@ -769,6 +786,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_monthly_health_indicators': return _health_indicators(database_path,tenant_id,args)
     if tool_name=='get_role_dashboard': return _role_dashboard(database_path,tenant_id,args,user)
     if tool_name=='prepare_meeting_brief': return _meeting_brief(database_path,tenant_id,args,user)
+    if tool_name=='prepare_meeting_followup': return _meeting_followup(tenant_id,args,user)
     if tool_name=='compare_periods': return _compare_periods(database_path,tenant_id,args)
     if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)
