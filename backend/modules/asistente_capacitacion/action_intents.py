@@ -71,6 +71,8 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    if any(text in q for text in ('salud del sistema', 'estado del sistema', 'diagnostico del sistema')):
+        return {'id':'get_system_health','label':'Consultar salud del sistema','summary':'Revisaré componentes internos sin exponer secretos.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_system_health'}
     if any(text in q for text in ('entregables esperados', 'entregables recibidos', 'unidades no entregan', 'supervisa los entregables', 'supervision de entregables')):
         month = next((number for name, number in MONTHS.items() if re.search(rf'\b{name}\b', q)), None) or context.get('selected_month')
         year_match = re.search(r'\b(20\d{2}|2100)\b', q)

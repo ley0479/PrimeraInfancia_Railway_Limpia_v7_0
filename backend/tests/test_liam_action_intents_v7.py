@@ -96,6 +96,12 @@ def test_deliverable_supervisor_intent_uses_selected_period():
     assert value['confirmation_required'] is False
 
 
+def test_system_health_intent_is_closed_tool():
+    value = propose_action('Liam, dime el estado del sistema')
+    assert value['server_tool'] == 'get_system_health'
+    assert value['confirmation_required'] is False
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -108,4 +114,5 @@ if __name__=='__main__':
     test_period_comparison_uses_two_explicit_months_and_context_year()
     test_custom_report_intent_maps_only_predefined_fields()
     test_deliverable_supervisor_intent_uses_selected_period()
+    test_system_health_intent_is_closed_tool()
     print('LIAM_ACTION_INTENTS_V7_PASS')

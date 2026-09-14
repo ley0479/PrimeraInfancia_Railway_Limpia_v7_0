@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -411,6 +411,29 @@ def _deliverable_supervision(database_path: str, tenant_id: int, args: dict, use
     compliance = round((counters['received'] / counters['expected']) * 100, 2) if counters['expected'] else 0
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'period':period or None,'summary':{**counters,'compliance_percent':compliance},'items':items[:200],'total_items':len(items),'role_scope':'assigned_records' if role not in {'SUPERADMIN','GERENTE'} else 'active_foundation','source':'Calendario Inteligente','read_only':True}
 
+
+def _system_health(database_path: str, tenant_id: int) -> dict:
+    started = datetime.now(ZoneInfo('America/Bogota'))
+    conn = sqlite3.connect(database_path);conn.row_factory = sqlite3.Row
+    components = []
+    try:
+        conn.execute('SELECT 1').fetchone()
+        components.append({'component':'Base de datos','status':'OPERATIVO'})
+        for label, table in (('LIAM y auditoría','lia_audit_events'),('Motor documental','idp_documentos'),('Calendario','calendario_entregables'),('Base Maestra','master_ninos')):
+            try:
+                conn.execute(f'SELECT 1 FROM {table} WHERE fundacion_id=? LIMIT 1',(tenant_id,)).fetchone()
+                components.append({'component':label,'status':'OPERATIVO'})
+            except Exception:
+                components.append({'component':label,'status':'DEGRADADO'})
+        try:
+            recent_errors = conn.execute("SELECT COUNT(*) AS total FROM lia_audit_events WHERE fundacion_id=? AND COALESCE(success,1)=0",(tenant_id,)).fetchone()
+            error_count = int(recent_errors['total'] or 0)
+        except Exception: error_count = None
+    finally: conn.close()
+    overall = 'OPERATIVO' if all(item['status']=='OPERATIVO' for item in components) else 'DEGRADADO'
+    elapsed = round((datetime.now(ZoneInfo('America/Bogota'))-started).total_seconds()*1000,2)
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'overall_status':overall,'components':components,'failed_audit_events':error_count,'checked_at':started.isoformat(timespec='seconds'),'duration_ms':elapsed,'sanitized':True,'secrets_included':False,'read_only':True}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -468,6 +491,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='compare_periods': return _compare_periods(database_path,tenant_id,args)
     if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)
+    if tool_name=='get_system_health': return _system_health(database_path,tenant_id)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')

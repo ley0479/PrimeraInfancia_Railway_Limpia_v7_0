@@ -25,6 +25,7 @@ CAPABILITIES = {
         Capability('compare_periods','analiza','Cruce de Bases'),
         Capability('build_custom_report_preview','analiza','Base Maestra'),
         Capability('supervise_deliverables','analiza','Calendario y Entregables'),
+        Capability('get_system_health','admin','Diagnóstico interno'),
         Capability('get_pending_activities_summary','analiza','Calendario y Entregables'),
         Capability('get_document_processing_status','consulta','Motor Documental'),
         Capability('get_format_generation_status','consulta','Motor de Formatos'),
