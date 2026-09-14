@@ -102,6 +102,12 @@ def test_system_health_intent_is_closed_tool():
     assert value['confirmation_required'] is False
 
 
+def test_backup_status_intent_is_read_only():
+    value=propose_action('Liam cuál es el estado de las copias de seguridad')
+    assert value['server_tool']=='get_backup_status'
+    assert value['confirmation_required'] is False
+
+
 def test_foundation_portfolio_intent_is_closed_tool():
     value = propose_action('Liam, cuáles fundaciones están próximas a vencer')
     assert value['server_tool'] == 'get_foundation_portfolio'
@@ -173,6 +179,7 @@ if __name__=='__main__':
     test_custom_report_intent_maps_only_predefined_fields()
     test_deliverable_supervisor_intent_uses_selected_period()
     test_system_health_intent_is_closed_tool()
+    test_backup_status_intent_is_read_only()
     test_foundation_portfolio_intent_is_closed_tool()
     test_master_quality_intent_never_requests_mutation()
     test_early_warning_intent_uses_risk_language()

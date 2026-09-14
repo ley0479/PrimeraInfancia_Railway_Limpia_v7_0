@@ -24,7 +24,7 @@ def test_center_is_superadmin_only_and_reports_partial_sources():
         result=execute('get_liam_center',args={},database_path=database,tenant_id=1,user={'id':7,'rol':'SUPERADMIN'})
         assert result['read_only'] is True and result['sanitized'] is True
         assert result['scope']['active_foundation_id']==1
-        assert result['scope']['cross_foundation_sections']==['foundations','changes']
+        assert result['scope']['cross_foundation_sections']==['foundations','backups','changes']
         assert result['sections']['activity']['total']==1
         assert result['sections']['changes']['pending']==1
         assert result['availability']['activity'] is True

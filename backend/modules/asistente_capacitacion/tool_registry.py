@@ -13,7 +13,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -436,6 +436,20 @@ def _system_health(database_path: str, tenant_id: int) -> dict:
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'overall_status':overall,'components':components,'failed_audit_events':error_count,'checked_at':started.isoformat(timespec='seconds'),'duration_ms':elapsed,'sanitized':True,'secrets_included':False,'read_only':True}
 
 
+def _backup_status(database_path: str) -> dict:
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        summary=dict(conn.execute("""SELECT COUNT(*) AS total,
+          SUM(CASE WHEN UPPER(COALESCE(estado,''))='VALIDO' THEN 1 ELSE 0 END) AS valid,
+          SUM(CASE WHEN UPPER(COALESCE(estado,''))<>'VALIDO' THEN 1 ELSE 0 END) AS errors
+          FROM backups_sistema""").fetchone())
+        latest=conn.execute('''SELECT id,motivo,estado,integridad,tamano_bytes,fecha_creacion,fecha_validacion
+          FROM backups_sistema ORDER BY fecha_creacion DESC,id DESC LIMIT 1''').fetchone()
+    finally:conn.close()
+    item=dict(latest) if latest else None
+    return {'scope':{'type':'authorized_system_backup','cross_foundation':True,'role':'SUPERADMIN'},'summary':{key:int(value or 0) for key,value in summary.items()},'latest':item,'has_backup':bool(item),'source':'Registro de Copias de Seguridad','sanitized':True,'paths_included':False,'hashes_included':False,'restore_available':False,'restore_requires_elevated_confirmation':True,'read_only':True}
+
+
 def _foundation_portfolio(database_path: str, args: dict) -> dict:
     limit = max(1, min(int(args.get('limit') or 100), 200))
     conn = sqlite3.connect(database_path);conn.row_factory = sqlite3.Row
@@ -604,12 +618,13 @@ def _run_favorite(database_path: str, tenant_id: int, args: dict, user: dict) ->
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'favorite':{'id':row['id'],'name':row['nombre']},'resolved_action':proposal.get('id'),'executed':False,'proposal':proposal,'confirmation_required':bool(proposal.get('confirmation_required')),'read_only':True}
 
 
-def _liam_center(database_path: str, tenant_id: int, user: dict) -> dict:
+def _liam_center_base(database_path: str, tenant_id: int, user: dict) -> dict:
     sections={};availability={}
     def section(name,call):
         try:sections[name]=call();availability[name]=True
         except Exception:sections[name]={};availability[name]=False
     section('system_health',lambda:_system_health(database_path,tenant_id))
+    section('backups',lambda:_backup_status(database_path))
     section('foundations',lambda:_foundation_portfolio(database_path,{}))
     section('incidents',lambda:_incident_center(database_path,tenant_id,{'limit':100},user))
     section('notifications',lambda:_notification_center(database_path,tenant_id,{'limit':100},user))
@@ -624,9 +639,17 @@ def _liam_center(database_path: str, tenant_id: int, user: dict) -> dict:
     except Exception:activity={'total':0,'failed':0,'users':0};changes={'total':0,'pending':0,'completed':0};availability['activity']=False;availability['changes']=False
     finally:conn.close()
     sections['activity']={key:int(value or 0) for key,value in activity.items()};sections['changes']={key:int(value or 0) for key,value in changes.items()}
-    health=sections.get('system_health',{});foundation=sections.get('foundations',{}).get('summary',{});incident=sections.get('incidents',{}).get('summary',{});notifications=sections.get('notifications',{}).get('summary',{});deliverables=sections.get('deliverables',{}).get('summary',{});quality=sections.get('data_quality',{}).get('summary',{})
+    health=sections.get('system_health',{});backup=sections.get('backups',{});foundation=sections.get('foundations',{}).get('summary',{});incident=sections.get('incidents',{}).get('summary',{});notifications=sections.get('notifications',{}).get('summary',{});deliverables=sections.get('deliverables',{}).get('summary',{});quality=sections.get('data_quality',{}).get('summary',{})
     metrics=[{'label':'Salud del sistema','value':health.get('overall_status','NO DISPONIBLE'),'section':'system_health'},{'label':'Consultas hoy','value':sections['activity'].get('total',0),'section':'activity'},{'label':'Errores detectados','value':incident.get('open',0),'section':'incidents'},{'label':'Alertas críticas','value':notifications.get('critical',0),'section':'notifications'},{'label':'Fundaciones activas','value':foundation.get('active',0),'section':'foundations'},{'label':'Próximas a vencer','value':foundation.get('expiring',0),'section':'foundations'},{'label':'Crédito bajo o agotado','value':int(foundation.get('low_credit',0) or 0)+int(foundation.get('exhausted_credit',0) or 0),'section':'foundations'},{'label':'Entregables pendientes','value':deliverables.get('pending',0),'section':'deliverables'},{'label':'Entregables vencidos','value':deliverables.get('overdue',0),'section':'deliverables'},{'label':'Hallazgos de calidad','value':quality.get('alerts',0),'section':'data_quality'},{'label':'Cambios esperando aprobación','value':sections['changes'].get('pending',0),'section':'changes'}]
     return {'scope':{'type':'authorized_admin_center','active_foundation_id':tenant_id,'cross_foundation_sections':['foundations','changes'],'role':'SUPERADMIN'},'title':'LIAM · Centro Inteligente','metrics':metrics,'sections':sections,'availability':availability,'partial':not all(availability.values()),'sanitized':True,'read_only':True}
+
+def _liam_center(database_path: str, tenant_id: int, user: dict) -> dict:
+    result=_liam_center_base(database_path,tenant_id,user)
+    backup=result.get('sections',{}).get('backups') or {}
+    result.setdefault('metrics',[]).insert(1,{'label':'Último backup','value':(backup.get('latest') or {}).get('fecha_creacion') or 'NO DISPONIBLE','section':'backups'})
+    result.setdefault('scope',{})['cross_foundation_sections']=['foundations','backups','changes']
+    return result
+
 
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
@@ -686,6 +709,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)
     if tool_name=='get_system_health': return _system_health(database_path,tenant_id)
+    if tool_name=='get_backup_status': return _backup_status(database_path)
     if tool_name=='get_foundation_portfolio': return _foundation_portfolio(database_path,args)
     if tool_name=='analyze_master_data_quality': return _master_data_quality(database_path,tenant_id,user)
     if tool_name=='get_early_warnings': return _early_warnings(database_path,tenant_id,args,user)
