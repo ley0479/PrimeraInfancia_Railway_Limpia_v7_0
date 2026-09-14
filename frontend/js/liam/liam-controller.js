@@ -344,7 +344,8 @@
     const status = document.querySelector("[data-lia-presenter-status]");
     if (status) status.textContent = `Explicando: ${label}`;
     document.querySelector("[data-lia-presenter-avatar]")?.setAttribute("data-state", "pointing_right");
-    presentation.items[bounded].scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches||state.preferences?.reduced_motion;
+    presentation.items[bounded].scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "nearest" });
   }
   function syncDataPresentation(delta, completed = false) {
     const presentation = state.dataPresentation;
@@ -376,6 +377,8 @@
     drawer.querySelector('[data-lia-drawer-action="minimize"]')?.addEventListener("click", (event) => { const minimized=drawer.dataset.minimized!=="true"; drawer.dataset.minimized=String(minimized); event.currentTarget.textContent=minimized?"▢":"—"; });
     drawer.querySelector('[data-lia-drawer-action="maximize"]')?.addEventListener("click", () => drawer.dataset.maximized=String(drawer.dataset.maximized!=="true"));
     drawer.querySelector('[data-lia-drawer-action="ratio"]')?.addEventListener("click", () => { const index=ratios.indexOf(drawer.dataset.ratio); drawer.dataset.ratio=ratios[(index+1)%ratios.length]; localStorage.setItem("lia-data-panel-ratio",drawer.dataset.ratio); applyLabel(); });
+    drawer.querySelector('[data-lia-presenter-action="previous"]')?.addEventListener("click",()=>activatePresentationItem((state.dataPresentation?.index||0)-1));
+    drawer.querySelector('[data-lia-presenter-action="next"]')?.addEventListener("click",()=>activatePresentationItem((state.dataPresentation?.index||0)+1));
     applyLabel();
   }
   function richContent(payload) {
@@ -407,7 +410,7 @@
     const content = richContent(payload);
     if (payload.display === "drawer" && content) {
       let drawer = document.getElementById("lia-data-drawer");
-      if (!drawer) { drawer = document.createElement("aside"); drawer.id = "lia-data-drawer"; drawer.className = "lia-data-drawer"; drawer.setAttribute("aria-label","Panel visual de Lía"); drawer.innerHTML = '<header><strong>Datos consultados por Lía</strong><div class="lia-drawer-controls"><button type="button" data-lia-drawer-action="minimize" aria-label="Minimizar panel">—</button><button type="button" data-lia-drawer-action="ratio" aria-label="Cambiar proporción del panel">50%</button><button type="button" data-lia-drawer-action="maximize" aria-label="Maximizar panel">□</button><button type="button" data-lia-drawer-action="close" aria-label="Cerrar panel">×</button></div></header><div class="lia-data-layout"><div class="lia-data-presenter"><div data-lia-presenter-avatar></div><span data-lia-presenter-status>Preparando explicación…</span></div><div data-lia-drawer-content></div></div>'; document.body.appendChild(drawer); configureDataDrawer(drawer); }
+      if (!drawer) { drawer = document.createElement("aside"); drawer.id = "lia-data-drawer"; drawer.className = "lia-data-drawer"; drawer.setAttribute("aria-label","Panel visual de Lía"); drawer.innerHTML = '<header><strong>Datos consultados por Lía</strong><div class="lia-drawer-controls"><button type="button" data-lia-drawer-action="minimize" aria-label="Minimizar panel">—</button><button type="button" data-lia-drawer-action="ratio" aria-label="Cambiar proporción del panel">50%</button><button type="button" data-lia-drawer-action="maximize" aria-label="Maximizar panel">□</button><button type="button" data-lia-drawer-action="close" aria-label="Cerrar panel">×</button></div></header><div class="lia-data-layout"><div class="lia-data-presenter"><div data-lia-presenter-avatar></div><span data-lia-presenter-status role="status" aria-live="polite">Preparando explicación…</span><div class="lia-presenter-controls"><button type="button" data-lia-presenter-action="previous" aria-label="Explicar punto anterior">Anterior</button><button type="button" data-lia-presenter-action="next" aria-label="Explicar punto siguiente">Siguiente</button></div></div><div data-lia-drawer-content></div></div>'; document.body.appendChild(drawer); configureDataDrawer(drawer); }
       drawer.dataset.minimized = "false";
       const destination = drawer.querySelector("[data-lia-drawer-content]"); destination.replaceChildren(content); drawer.dataset.open = "true";
       window.IAN_AVATAR?.render("[data-lia-presenter-avatar]", { gender: state.visual?.avatar_gender || "female", variant: state.visual?.avatar_variant });

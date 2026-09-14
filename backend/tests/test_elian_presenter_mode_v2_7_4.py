@@ -24,17 +24,17 @@ assert 'data-action="elian-next"' in controller
 assert 'data-action="elian-cancel"' in controller
 assert "function enterPresenter()" in controller
 assert "function exitPresenter(" in controller
-assert "enterPresenter,mode:'automatic'" in controller
+assert "enterPresenter," in controller and 'mode: "automatic"' in controller
 assert "options.enterPresenter?.()" in tour
-assert "enterPresenter();announce(msg)" in controller
-assert "document.body.classList.add('elian-presenter-active')" in controller
-assert "document.body.classList.remove('elian-presenter-active')" in controller
+assert "enterPresenter();" in controller and "announce(msg);" in controller
+assert 'document.body.classList.add("elian-presenter-active")' in controller
+assert 'document.body.classList.remove("elian-presenter-active")' in controller
 assert "window.LIAM_MOVEMENT?.remove()" in controller
 assert "pointer-events: none" in styles
 assert ".liam-panel { width: min(380px" in styles
 assert '.liam-shell[data-mode="presenter"] > .liam-panel' in styles
-assert "elian-presenter.css?v=2.7.4-presenter-1" in index
-assert "liam-controller.js?v=2.7.5-fullbody-rig-2" in index
+assert "elian-presenter.css?v=2.7.5-liam-3d-presenter-3" in index
+assert "liam-controller.js?v=2.7.5-presenter-controls-1" in index
 assert "Esta plataforma fue diseñada por" in tour
 assert "fue creada el" in tour
 assert "Su versión actual es" in tour

@@ -19,7 +19,7 @@ def test_frontend_renders_without_injecting_data_as_html():
     assert "function renderStructured" in controller and "function highlightElement" in controller
     assert 'td.textContent = String(value' in controller and 'value.textContent = String(item.value' in controller
     assert "lia-data-drawer" in css and "lia-spotlight" in css
-    assert "lia-dynamic-ui.css?v=2.7.5-smart-panel-1" in html
+    assert "lia-dynamic-ui.css?v=2.7.5-presenter-controls-1" in html
     assert 'renderStructured(result.ui)' in controller and '"X-Liam-Module"' in controller
     assert "ui=visual_payload({'message':'Datos consultados por Lía.','tool_result':result},active_module)" in routes
     assert "function syncDataPresentation" in controller and "lia-data-active" in css
