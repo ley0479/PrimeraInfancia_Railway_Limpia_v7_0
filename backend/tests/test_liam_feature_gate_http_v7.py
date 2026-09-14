@@ -21,6 +21,10 @@ try:
         for tool,args in (('universal_search',{'query':'Juan'}),('get_system_health',{}),('propose_platform_action',{'command':'abre dashboard'}),('get_dev_change_review',{'request_id':'DEV-20260914-ABC12345'})):
             response=client.post('/api/asistente-capacitacion/tools/'+tool,json=args);assert response.status_code==403,(tool,response.get_json())
         repair=client.get('/api/asistente-capacitacion/repairs');assert repair.status_code==403 and repair.get_json()['repairs']==[]
+        proposed=client.post('/api/asistente-capacitacion/chat',json={'message':'Liam genera el RPP de Bajo Pacurita para septiembre de 2026 grupo 3 a 5 años','module':'formatos'})
+        assert proposed.status_code==200,(proposed.status_code,proposed.get_json());proposal_body=proposed.get_json()
+        assert proposal_body['confidence']=='forbidden' and proposal_body['confirmation_required'] is False and 'action_proposal' not in proposal_body
+        assert 'acciones de Liam están desactivadas' in proposal_body['message']
         assert client.get('/api/asistente-capacitacion/contexto?modulo=dashboard').status_code==404
         assert client.get('/api/asistente-capacitacion/presentation').status_code==404
         assert client.get('/api/asistente-capacitacion/elian/platform-tour').status_code==404

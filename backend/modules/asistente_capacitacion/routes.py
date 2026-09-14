@@ -507,7 +507,10 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 result.update({'message':policy.get('reason'),'speech_text':policy.get('reason'),'confidence':'forbidden','confirmation_required':False,'actions':[]})
             else:
                 proposal.update({'risk':policy['risk'],'confirmation_type':policy['confirmation']})
-                if proposal.get('id') in {'safe_repair_preview','safe_repair_apply'} and not public_liam_flags().get('repair_enabled'):
+                mutable_risks={'generation','modification','critical','administration','financial'}
+                if policy.get('risk') in mutable_risks and not public_liam_flags().get('actions_enabled'):
+                    proposal=None;result.update({'message':'Las acciones de Liam están desactivadas por configuración. Puedes continuar usando consultas y orientación.','speech_text':'Las acciones de Liam están desactivadas por configuración. Puedes continuar usando consultas y orientación.','confidence':'forbidden','confirmation_required':False,'actions':[]})
+                elif proposal.get('id') in {'safe_repair_preview','safe_repair_apply'} and not public_liam_flags().get('repair_enabled'):
                     proposal=None;result.update({'message':'Las reparaciones de Liam están desactivadas por configuración.','speech_text':'Las reparaciones de Liam están desactivadas por configuración.','confidence':'forbidden','confirmation_required':False,'actions':[]})
                 if proposal and proposal.get('confirmation_required'):
                     proposal.setdefault('expires_at',(datetime.now()+timedelta(seconds=60)).isoformat(timespec='seconds'))
