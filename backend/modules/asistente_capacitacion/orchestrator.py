@@ -43,6 +43,8 @@ class LiamOrchestrator:
             returned=scope.get('foundation_id')
             if returned is not None and int(returned)!=int(tenant_id):
                 raise PermissionError('La herramienta devolvió un alcance institucional no autorizado.')
+        provenance={'source':capability['source'],'scope':'active_foundation' if capability['tenant_scoped'] else 'authorized_global_or_catalog','foundation_id':int(tenant_id) if capability['tenant_scoped'] else None,'read_only':capability['read_only'],'verified_tool':tool_name}
+        if isinstance(result,dict):
+            result=dict(result);result.setdefault('provenance',provenance)
         telemetry={'trace_id':trace_id,'tool':tool_name,'engine':capability['engine'],'source':capability['source'],'tenant_scoped':capability['tenant_scoped'],'read_only':capability['read_only'],'duration_ms':elapsed,'module':str(module or '')[:80]}
         return ToolOutcome(result=result,telemetry=telemetry)
-

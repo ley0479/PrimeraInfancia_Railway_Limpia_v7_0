@@ -101,7 +101,13 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             if combined:component='table';display='drawer';data={'columns':['Consulta','Dato 1','Dato 2','Dato 3','Dato 4'],'rows':combined[:50]}
         if not data:
             value=result.get('tool_result') if isinstance(result.get('tool_result'),dict) else {};table=table_for(value)
-            if table:component='metric-card' if table.get('metrics') else 'table';display='drawer';data=table
+            if table:
+                provenance=value.get('provenance') if isinstance(value.get('provenance'),dict) else {}
+                if provenance.get('source'):
+                    source_note=f"Fuente: {provenance['source']}. Alcance: {'fundación activa' if provenance.get('scope')=='active_foundation' else 'alcance global o catálogo autorizado'}."
+                    table['note']=f"{table.get('note')} {source_note}".strip() if table.get('note') else source_note
+                    table['provenance']=provenance
+                component='metric-card' if table.get('metrics') else 'table';display='drawer';data=table
         if not data:
             steps=[x.strip(' -') for x in re.split(r'\n+|(?=\d+\.\s)',str(result.get('message') or '')) if x.strip()]
             if len(steps)>1:component='list';data={'items':[{'label':f'Paso {i}','value':text} for i,text in enumerate(steps[:12],1)]}

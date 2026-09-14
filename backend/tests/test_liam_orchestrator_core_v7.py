@@ -16,4 +16,5 @@ with tempfile.TemporaryDirectory() as tmp:
     assert len(outcome.result['relation_rows'])==1 and outcome.result['relation_rows'][0][0]=='UDS A'
     assert outcome.telemetry['trace_id']=='trace-test' and outcome.telemetry['source']=='Base Maestra'
     assert outcome.telemetry['tenant_scoped'] is True and outcome.telemetry['duration_ms']>=0
+    assert outcome.result['provenance']=={'source':'Base Maestra','scope':'active_foundation','foundation_id':1,'read_only':True,'verified_tool':'get_monthly_relation_summary'}
 print('LIAM_ORCHESTRATOR_CORE_V7_PASS')
