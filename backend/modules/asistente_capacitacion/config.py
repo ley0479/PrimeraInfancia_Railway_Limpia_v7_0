@@ -99,7 +99,7 @@ def public_elian_flags() -> dict:
         **legacy,
         'enabled': enabled,
         'assistant_name': (os.getenv('LIAM_ASSISTANT_NAME') or os.getenv('IAN_ASSISTANT_NAME') or os.getenv('ELIAN_ASSISTANT_NAME') or 'LIAM').strip()[:40] or 'LIAM',
-        'platform_tour_enabled': enabled and _bool('ELIAN_PLATFORM_TOUR_ENABLED', True),
+        'platform_tour_enabled': enabled and legacy['tours_enabled'] and _bool('ELIAN_PLATFORM_TOUR_ENABLED', True),
         'avatar_gender': (os.getenv('LIAM_AVATAR_GENDER') or os.getenv('ELIAN_AVATAR_GENDER') or 'female').strip().lower(),
         'avatar_variant': (os.getenv('ELIAN_AVATAR_VARIANT') or 'afro_colombian_institutional').strip().lower(),
         'skin_tone': (os.getenv('ELIAN_SKIN_TONE') or 'dark').strip().lower(),

@@ -279,7 +279,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.get('/contexto')
     def contexto():
-        if not public_flags()['enabled']:
+        if not public_flags()['enabled'] or not public_flags()['context_help_enabled']:
             return jsonify({'error':'LÍA está desactivada.'}), 404
         ctx = get_request_user_context(); modulo = str(request.args.get('modulo') or 'dashboard').strip()
         allowed = set(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''), []))
@@ -292,7 +292,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.get('/presentation')
     def presentation():
-        if not public_flags()['enabled']: return jsonify({'error':'LÍA está desactivada.'}),404
+        if not public_flags()['enabled'] or not public_liam_flags()['platform_presentation_enabled']: return jsonify({'error':'La presentación de Liam está desactivada.'}),404
         ctx=get_request_user_context();allowed=list(ROLE_MENU_PERMISSIONS.get(str(ctx.get('rol') or ''),[]))
         modules=[]
         for key in allowed:
@@ -343,7 +343,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.route('/elian/platform-tour/progress',methods=['GET','PUT'])
     def elian_platform_tour_progress():
-        if not public_elian_flags()['enabled']: return jsonify({'error':'ELIAN está desactivado.'}),404
+        if not public_elian_flags()['enabled'] or not public_elian_flags()['platform_tour_enabled']: return jsonify({'error':'El recorrido general de ELIAN está desactivado.'}),404
         ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0);tour_id='platform-overview';conn=connect()
         if request.method=='GET':
             row=conn.execute('SELECT * FROM elian_platform_tour_progress WHERE fundacion_id=? AND usuario_id=? AND tour_id=?',(fid,uid,tour_id)).fetchone();conn.close()
@@ -394,7 +394,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.post('/progreso')
     def progreso():
-        if not public_flags()['enabled']:
+        if not public_flags()['enabled'] or not public_flags()['guided_tours_enabled']:
             return jsonify({'error':'LÍA está desactivada.'}), 404
         ctx=get_request_user_context(); data=request.get_json(silent=True) or {}; modulo=str(data.get('modulo') or '').strip()
         if not modulo: return jsonify({'error':'Módulo requerido.'}),400
