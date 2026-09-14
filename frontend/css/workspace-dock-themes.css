@@ -2,24 +2,24 @@
 :root {
     --workspace-accent: #6687b3;
     --workspace-accent-strong: #5279aa;
-    --workspace-canvas: #f4f7fa;
+    --workspace-canvas: #e9eef4;
     --workspace-surface: #ffffff;
     --workspace-ink: #0f172a;
     --workspace-muted: #64748b;
     --workspace-line: #e2e8f0;
-    --workspace-sidebar: #354c6b;
-    --workspace-dock: #293e5a;
-    --workspace-header: #354c6b;
+    --workspace-sidebar: #425573;
+    --workspace-dock: #2d3d56;
+    --workspace-header: #2d3c53;
     --workspace-header-ink: #ffffff;
 }
 
 html[data-workspace-theme="light-emerald"] {
     --workspace-accent: #10b981;
     --workspace-accent-strong: #059669;
-    --workspace-canvas: #f8fafc;
-    --workspace-sidebar: #f1f5f9;
-    --workspace-dock: #f7f9fb;
-    --workspace-header: rgba(255,255,255,.96);
+    --workspace-canvas: #f6f7fb;
+    --workspace-sidebar: #f6f7fb;
+    --workspace-dock: #f4f8fb;
+    --workspace-header: #ffffff;
     --workspace-header-ink: #0f172a;
 }
 
