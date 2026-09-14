@@ -24,7 +24,7 @@ from .system_prompt import realtime_instructions
 from .orchestrator import LiamOrchestrator
 from .context_service import load as load_session_context, save as save_session_context, clear as clear_session_context
 from .repair_registry import public_registry
-from .action_audit import record_proposal as audit_action_proposal, complete as complete_action_audit, list_authorized as list_action_audit
+from .action_audit import record_proposal as audit_action_proposal, complete as complete_action_audit, complete_server_proposal, list_authorized as list_action_audit
 from .notification_providers import provider_catalog
 import csv, io, json, uuid, os, tempfile, re, hashlib, requests
 
@@ -668,7 +668,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             except ProviderUnavailable as exc:
                 app.logger.warning('LIAM usa recuperación local por indisponibilidad del proveedor: %s',str(exc))
         if isinstance(result.get('action_proposal'),dict):
-            audit_action_proposal(database_path,ctx,result['action_proposal'],result['request_id'],module)
+            action_trace=result['action_proposal'].get('proposal_id') or result['request_id']
+            audit_action_proposal(database_path,ctx,result['action_proposal'],action_trace,module)
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
         result['ui']=visual_payload(result,module)
         result.update(result['ui'])
@@ -711,6 +712,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         except PermissionError as exc:return jsonify({'error':str(exc)}),403
         except LookupError as exc:return jsonify({'error':str(exc)}),404
         except ValueError as exc:return jsonify({'error':str(exc)}),422
+        complete_server_proposal(database_path,ctx,proposal_id)
         audit_lia(ctx,'CREDIT_ACTION_COMPLETED',module='facturacion',tool='credit_subscription_update',request_id=proposal_id,metadata={'confirmed':True})
         return jsonify(result),200
 
