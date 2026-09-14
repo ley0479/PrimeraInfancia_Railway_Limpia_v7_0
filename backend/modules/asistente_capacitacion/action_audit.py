@@ -2,6 +2,7 @@
 from __future__ import annotations
 from datetime import datetime
 import hashlib,json
+import re
 from modules.dbapi_compat import sqlite3
 from .privacy_service import redact
 
@@ -9,6 +10,14 @@ def _text(value,limit=160):return redact(str(value or ''))[:limit]
 def _financial_state(value):
     source=value if isinstance(value,dict) else {}
     return {key:source.get(key) for key in ('estado','fecha_vencimiento','creditos_disponibles','creditos_incluidos_periodo') if key in source}
+def _trusted_state(action,value):
+    if action=='transition_incident':
+        source=value if isinstance(value,dict) else {}
+        result={key:(_text(source.get(key),500) if source.get(key) is not None else None) for key in ('status','error_code','solution') if key in source}
+        incident=str(source.get('incident_id') or '').upper()
+        if re.fullmatch(r'INC-\d{8}-\d{6}-[A-Z0-9]{6}',incident):result['incident_id']=incident
+        return result
+    return _financial_state(value)
 
 def record_proposal(database_path,ctx,proposal,trace_id,module=''):
     trace=_text(trace_id,80);action=_text(proposal.get('id') or proposal.get('action'),100);before={};resource_id=_text((proposal.get('arguments') or {}).get('id'),100) or None
@@ -16,7 +25,7 @@ def record_proposal(database_path,ctx,proposal,trace_id,module=''):
     if proposal.get('server_confirmation') and proposal.get('proposal_id'):
         row=conn.execute('SELECT action_name,target_fundacion_id,before_json FROM lia_action_proposals WHERE proposal_id=? AND usuario_id=?',(str(proposal['proposal_id']),int(ctx.get('usuario_id') or 0))).fetchone()
         if row:
-            action=_text(row[0],100);resource_id=str(row[1]);before=_financial_state(json.loads(row[2] or '{}'))
+            action=_text(row[0],100);before=_trusted_state(action,json.loads(row[2] or '{}'));resource_id=before.get('incident_id') if action=='transition_incident' else str(row[1])
     raw=f"{int(ctx.get('fundacion_id') or 1)}:{int(ctx.get('usuario_id') or 0)}:{trace}:{action}"
     key='LAA-'+hashlib.sha256(raw.encode()).hexdigest()[:24];now=datetime.now().isoformat(timespec='seconds')
     result='AWAITING_CONFIRMATION' if proposal.get('confirmation_required') else 'AUTHORIZED'
@@ -43,7 +52,7 @@ def complete_server_proposal(database_path,ctx,proposal_id):
     try:
         proposal=conn.execute('SELECT action_name,after_json,status FROM lia_action_proposals WHERE proposal_id=? AND usuario_id=?',(str(proposal_id),int(ctx.get('usuario_id') or 0))).fetchone()
         if not proposal:return False
-        after=_financial_state(json.loads(proposal['after_json'] or '{}'));now=datetime.now().isoformat(timespec='seconds')
+        after=_trusted_state(proposal['action_name'],json.loads(proposal['after_json'] or '{}'));now=datetime.now().isoformat(timespec='seconds')
         updated=conn.execute('''UPDATE liam_action_audit SET after_state=?,result=?,updated_at=? WHERE fundacion_id=? AND usuario_id=? AND trace_id=? AND requested_action=?''',(json.dumps(after,ensure_ascii=False,default=str),str(proposal['status'] or '').upper(),now,int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),str(proposal_id),proposal['action_name']))
         conn.commit();return int(getattr(updated,'rowcount',0) or 0)==1
     finally:conn.close()

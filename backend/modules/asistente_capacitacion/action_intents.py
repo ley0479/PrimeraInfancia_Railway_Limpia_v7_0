@@ -74,6 +74,13 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     technical_incident=re.search(r'\bINC-\d{8}-\d{6}-[A-Z0-9]{6}\b',str(question or '').upper())
     if technical_incident and any(text in q for text in ('diagnostico tecnico','detalle tecnico','ver la traza','mostrar la traza')):
         return {'id':'get_technical_diagnostic','label':'Consultar diagnóstico técnico','summary':'Consultaré el diagnóstico sanitizado dentro de la fundación activa.','arguments':{'incident_id':technical_incident.group(0)},'missing':[],'confirmation_required':False,'server_tool':'get_technical_diagnostic'}
+    if technical_incident and any(text in q for text in ('marca el incidente','cambia el incidente','actualiza el incidente','poner el incidente')):
+        target='RESOLVED' if 'resuelt' in q else ('CLOSED' if 'cerrad' in q else ('IN_PROGRESS' if 'en proceso' in q else ('IN_ANALYSIS' if 'en analisis' in q else '')))
+        resolution_match=re.search(r'(?:soluci[oó]n|resoluci[oó]n)\s*:\s*(.+)$',str(question or ''),re.IGNORECASE);resolution=_clean_unit(resolution_match.group(1)) if resolution_match else ''
+        missing=[]
+        if not target:missing.append('estado destino')
+        if target in {'RESOLVED','CLOSED'} and not resolution:missing.append('solución general')
+        return {'id':'transition_incident','label':'Cambiar estado de incidencia','summary':f"Prepararé el cambio de {technical_incident.group(0)} a {target or 'un estado válido'}.",'arguments':{'incident_id':technical_incident.group(0),'target_status':target,'resolution':resolution},'missing':missing,'confirmation_required':True,'server_confirmation':True}
     known_code=re.search(r'\b([A-Za-z][A-Za-z0-9-]*(?:_[A-Za-z0-9_-]+)+)\b',str(question or ''))
     if known_code and any(text in q for text in ('solucion conocida','solucion del error','buscar solucion','como se resolvio')):
         code=known_code.group(1).upper()

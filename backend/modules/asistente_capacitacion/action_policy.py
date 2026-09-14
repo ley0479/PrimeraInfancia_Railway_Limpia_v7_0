@@ -44,6 +44,7 @@ RULES = {
     'get_incident_center': ActionRule('get_incident_center','read',ALL_AUTHENTICATED),
     'get_known_solution': ActionRule('get_known_solution','read',ALL_AUTHENTICATED),
     'get_technical_diagnostic': ActionRule('get_technical_diagnostic','read',frozenset({'SUPERADMIN'})),
+    'transition_incident': ActionRule('transition_incident','modification',frozenset({'SUPERADMIN','GERENTE'}),'explicit'),
     'get_notification_center': ActionRule('get_notification_center','read',ALL_AUTHENTICATED),
     'prepare_communication_draft': ActionRule('prepare_communication_draft','generation',frozenset({'SUPERADMIN','GERENTE','COORDINADOR'})),
     'run_command_favorite': ActionRule('run_command_favorite','read',ALL_AUTHENTICATED),

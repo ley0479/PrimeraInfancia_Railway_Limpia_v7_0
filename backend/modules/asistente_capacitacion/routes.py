@@ -17,7 +17,7 @@ from .knowledge_base import manual_for_role, manual_for_question, build_manual_p
 from .privacy_service import redact, redact_credentials, redact_data
 from .local_speech import enabled as local_speech_enabled, status as local_speech_status, transcribe_wav
 from .action_intents import propose_action, propose_read_actions
-from .error_center import record as record_incident, get_authorized as get_incident, list_recent as list_incidents
+from .error_center import record as record_incident, get_authorized as get_incident, list_recent as list_incidents, create_transition_proposal, confirm_transition
 from .credit_agent import parse_credit_request, query as query_credits, create_proposal as create_credit_proposal, confirm as confirm_credit_proposal
 from .action_policy import decision as action_decision, public_policy
 from .system_prompt import realtime_instructions
@@ -496,7 +496,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             save_exchange(ctx,question=question,answer=result['message'],module=module,request_id=result['request_id'])
             return jsonify(result),200
         incident_match=re.search(r'\bINC-\d{8}-\d{6}-[A-Z0-9]{6}\b',question.upper())
-        if incident_match and not (proposal and proposal.get('server_tool')=='get_technical_diagnostic'):
+        if incident_match and not (proposal and (proposal.get('server_tool')=='get_technical_diagnostic' or proposal.get('id')=='transition_incident')):
             incident=get_incident(database_path,incident_match.group(0),int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),str(ctx.get('rol') or ''))
             if incident:
                 diagnostic_message=f"El incidente {incident['incident_id']} corresponde a {incident['error_type'].replace('_',' ')}. Causa: {incident['cause']} Solución: {incident['solution']}"
@@ -529,6 +529,11 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                     proposal=None;result.update({'message':'Las reparaciones de Liam están desactivadas por configuración.','speech_text':'Las reparaciones de Liam están desactivadas por configuración.','confidence':'forbidden','confirmation_required':False,'actions':[]})
                 if proposal and proposal.get('confirmation_required'):
                     proposal.setdefault('expires_at',(datetime.now()+timedelta(seconds=60)).isoformat(timespec='seconds'))
+        if proposal and proposal.get('id')=='transition_incident' and not proposal.get('missing'):
+            try:
+                prepared=create_transition_proposal(database_path,ctx,**proposal['arguments']);result.update({'message':prepared['summary']+' Revisa los datos y confirma para continuar.','speech_text':prepared['summary']+' Revisa los datos y confirma para continuar.','confirmation_required':True,'action_proposal':prepared,'actions':[]});proposal=None
+            except (PermissionError,LookupError,ValueError) as exc:
+                result.update({'message':str(exc),'speech_text':str(exc),'confidence':'insufficient','confirmation_required':False,'actions':[]});proposal=None
         if proposal:
             target_module=str((proposal.get('arguments') or {}).get('module') or '')
             if target_module and allowed and target_module not in allowed:
@@ -719,12 +724,14 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def confirm_server_action(proposal_id):
         if not public_liam_flags().get('actions_enabled'):return jsonify({'error':'Las acciones de Liam están desactivadas por configuración.'}),403
         ctx=get_request_user_context()
-        try:result=confirm_credit_proposal(database_path,proposal_id,int(ctx.get('usuario_id') or 0),str(ctx.get('rol') or ''))
+        conn=connect();kind=conn.execute('SELECT action_name FROM lia_action_proposals WHERE proposal_id=?',(proposal_id,)).fetchone();conn.close()
+        try:result=confirm_transition(database_path,proposal_id,ctx) if kind and kind[0]=='transition_incident' else confirm_credit_proposal(database_path,proposal_id,int(ctx.get('usuario_id') or 0),str(ctx.get('rol') or ''))
         except PermissionError as exc:return jsonify({'error':str(exc)}),403
         except LookupError as exc:return jsonify({'error':str(exc)}),404
         except ValueError as exc:return jsonify({'error':str(exc)}),422
         safe_action_audit(complete_server_proposal,ctx,proposal_id)
-        audit_lia(ctx,'CREDIT_ACTION_COMPLETED',module='facturacion',tool='credit_subscription_update',request_id=proposal_id,metadata={'confirmed':True})
+        is_incident=bool(kind and kind[0]=='transition_incident')
+        audit_lia(ctx,'INCIDENT_ACTION_COMPLETED' if is_incident else 'CREDIT_ACTION_COMPLETED',module='administracion' if is_incident else 'facturacion',tool='transition_incident' if is_incident else 'credit_subscription_update',request_id=proposal_id,metadata={'confirmed':True})
         return jsonify(result),200
 
     @bp.post('/voice/transcribe')

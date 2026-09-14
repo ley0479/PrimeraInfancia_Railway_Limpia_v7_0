@@ -43,7 +43,7 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 | 37 | Comunicaciones | VERIFICADO | Borradores sin envío automático. |
 | 38 | Correo/WhatsApp futuro | VERIFICADO | Adaptadores desacoplados y deshabilitados por defecto. |
 | 39 | Reuniones | VERIFICADO | Brief y compromisos como borradores. |
-| 40 | Incidencias | PARCIAL | Creación/consulta existen; falta transición administrativa de estados. |
+| 40 | Incidencias | VERIFICADO | Creación, consulta y transición confirmable de estados con auditoría. |
 | 41 | Base de conocimiento | VERIFICADO | Catálogo y soluciones conocidas tenant-scoped. |
 | 42 | Salud sistema | VERIFICADO | Estado sanitizado exclusivo de SUPERADMIN. |
 | 43 | Copias seguridad | PARCIAL | Estado visible; restauración continúa sin ejecutor confirmado. |
@@ -74,13 +74,12 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 | 68 | Implementación fases | VERIFICADO | Fases independientes documentadas. |
 | 69 | Detener ante regresión | VERIFICADO | Las fallas encontradas se corrigieron antes de avanzar. |
 | 70 | Entrega por fase | VERIFICADO | Documentos de cambios, pruebas, riesgo y rollback. |
-| 71 | Éxito final | PARCIAL | Funciones principales operan; depende del cierre de 20, 21, 40, 43, 60 y 64. |
+| 71 | Éxito final | PARCIAL | Funciones principales operan; depende del cierre de 20, 21, 43, 60 y 64. |
 | 72 | Instrucción final | VERIFICADO | Auditoría inicial, cambios pequeños, pruebas, commits y cero despliegue automático. |
 
 ## Orden de cierre restante
 
-1. Gestión administrativa segura del estado de incidencias (40).
-2. Flujo ADMIN/DEV de artefactos sandbox, pruebas y diff sin despliegue (20–21).
-3. Propuesta reforzada de restauración, todavía sin ejecución automática (43).
-4. Presupuesto y prueba cuantitativa de rendimiento (60).
-5. E2E autenticado en entorno objetivo cuando exista autorización y credenciales de prueba (64).
+1. Flujo ADMIN/DEV de artefactos sandbox, pruebas y diff sin despliegue (20–21).
+2. Propuesta reforzada de restauración, todavía sin ejecución automática (43).
+3. Presupuesto y prueba cuantitativa de rendimiento (60).
+4. E2E autenticado en entorno objetivo cuando exista autorización y credenciales de prueba (64).
