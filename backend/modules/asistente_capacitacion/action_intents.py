@@ -56,6 +56,11 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    if ('relacion del mes' in q or 'relacion mensual' in q) and any(word in q for word in ('genera','generar','descarga','descargar','saca','sacame')):
+        month=next((number for name,number in MONTHS.items() if re.search(rf'\b{name}\b',q)),None) or context.get('selected_month')
+        year_match=re.search(r'\b(20\d{2}|2100)\b',q);year=int(year_match.group(1)) if year_match else context.get('selected_year')
+        missing=[name for name,value in (('mes',month),('año',year)) if not value]
+        return {'id':'generate_monthly_reports','label':'Generar informes mensuales','summary':f"Generar la Relación del Mes y el informe nutricional con anexos del periodo {int(month):02d}/{int(year)}." if month and year else 'Generar la Relación del Mes y el informe nutricional con anexos.','arguments':{'month':month,'year':year,'module':'relacion-mes'},'missing':missing,'confirmation_required':True,'client_handler':'generate_monthly_reports'}
     if any(text in q for text in ('carne de salud','carnet de salud','crecimiento y desarrollo','control prenatal','registro civil','perimetro braquial','sobrepeso','desnutricion','estado nutricional')):
         return {'id':'get_monthly_health_indicators','label':'Consultar indicadores de salud','summary':'Consultaré los indicadores y el anexo nutricional de la fundación activa.','arguments':{'limit':100},'missing':[],'confirmation_required':False,'server_tool':'get_monthly_health_indicators'}
     search_words=('busca','buscar','consulta','consultar','muestra','dime quien','cual nino','cual nina')

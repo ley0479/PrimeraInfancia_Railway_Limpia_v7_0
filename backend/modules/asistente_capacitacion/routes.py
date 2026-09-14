@@ -337,7 +337,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def client_action_event():
         ctx=get_request_user_context();data=request.get_json(silent=True) or {}
         action=str(data.get('action') or '')
-        if action not in {'open_module','search_beneficiary','download_rpp','download_bienestarina','download_ram','publish_master_database','consolidate_master_database','create_user','update_user','create_foundation','update_foundation'}: return jsonify({'error':'Acción de cliente no registrada.'}),422
+        if action not in {'open_module','search_beneficiary','download_rpp','download_bienestarina','download_ram','generate_monthly_reports','publish_master_database','consolidate_master_database','create_user','update_user','create_foundation','update_foundation'}: return jsonify({'error':'Acción de cliente no registrada.'}),422
         status=str(data.get('status') or '')
         if status not in {'completed','failed','cancelled'}: return jsonify({'error':'Estado de acción no válido.'}),422
         audit_lia(ctx,'CLIENT_ACTION_'+status.upper(),module=str(data.get('module') or '')[:80],tool=action,success=status=='completed',request_id=str(data.get('request_id') or '')[:64],metadata={'detail':redact(str(data.get('detail') or ''))[:160]})

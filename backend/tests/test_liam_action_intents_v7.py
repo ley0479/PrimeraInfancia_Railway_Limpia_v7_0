@@ -63,6 +63,13 @@ def test_ram_master_user_and_foundation_proposals():
     assert create_foundation['id']=='create_foundation' and create_foundation['arguments']['name']=='Nuevo Amanecer'
 
 
+def test_monthly_relation_and_nutrition_report_requires_confirmation():
+    value=propose_action('Genera la Relación del Mes y el informe nutricional de septiembre de 2026')
+    assert value['id']=='generate_monthly_reports'
+    assert value['arguments']['month']==9 and value['arguments']['year']==2026
+    assert value['confirmation_required'] is True
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -71,4 +78,5 @@ if __name__=='__main__':
     test_non_action_does_not_create_proposal()
     test_navigation_and_read_only_intents_are_closed_actions()
     test_ram_master_user_and_foundation_proposals()
+    test_monthly_relation_and_nutrition_report_requires_confirmation()
     print('LIAM_ACTION_INTENTS_V7_PASS')

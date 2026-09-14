@@ -30,6 +30,7 @@ RULES = {
     'download_rpp': ActionRule('download_rpp','generation',ALL_AUTHENTICATED,'explicit'),
     'download_bienestarina': ActionRule('download_bienestarina','generation',ALL_AUTHENTICATED),
     'download_ram': ActionRule('download_ram','generation',ALL_AUTHENTICATED,'explicit'),
+    'generate_monthly_reports': ActionRule('generate_monthly_reports','generation',ALL_AUTHENTICATED,'explicit'),
     'publish_master_database': ActionRule('publish_master_database','modification',frozenset({'SUPERADMIN','GERENTE','AUXILIAR_ADMINISTRATIVO'}),'explicit'),
     'consolidate_master_database': ActionRule('consolidate_master_database','modification',frozenset({'SUPERADMIN','GERENTE','AUXILIAR_ADMINISTRATIVO','NUTRICIONISTA'}),'explicit'),
     'replace_master_database': ActionRule('replace_master_database','critical',frozenset({'SUPERADMIN'}),'reauthentication',False),
