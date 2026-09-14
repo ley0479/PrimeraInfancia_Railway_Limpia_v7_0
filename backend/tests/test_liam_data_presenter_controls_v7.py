@@ -12,5 +12,5 @@ assert 'prefers-reduced-motion: reduce' in controller and 'behavior: reduced ? "
 assert '.lia-data-point.lia-data-active' in styles and '.lia-data-point.lia-data-explained' in styles
 assert '.lia-presenter-controls' in styles and ':focus-visible' in styles
 assert 'lia-dynamic-ui.css?v=2.7.5-presenter-controls-1' in index
-assert 'liam-controller.js?v=2.7.5-action-history-1' in index
+assert 'liam-controller.js?v=2.7.5-action-history-2' in index
 print('LIAM_DATA_PRESENTER_CONTROLS_V7_PASS')

@@ -1369,9 +1369,9 @@
                     <section id="liam-action-history" class="bg-slate-950 border border-cyan-500/30 p-6 rounded-2xl" data-help-id="administracion.liam.action-history">
                         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                             <div><p class="text-xs uppercase tracking-[0.2em] text-cyan-300">Trazabilidad</p><h3 class="mt-1 text-lg font-semibold text-white">Historial de acciones LIAM</h3><p class="mt-2 text-sm text-slate-400">Órdenes autorizadas y su resultado dentro de la fundación activa.</p></div>
-                            <button type="button" data-action="liam-action-history" class="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500">Actualizar historial</button>
+                            <button type="button" data-action="liam-action-history" aria-controls="liam-action-history-content" class="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500">Actualizar historial</button>
                         </div>
-                        <div id="liam-action-history-content" class="mt-5 overflow-x-auto text-sm text-slate-300"><p class="text-slate-500">Pulsa actualizar para consultar el historial.</p></div>
+                        <div id="liam-action-history-content" role="status" aria-live="polite" aria-busy="false" class="mt-5 overflow-x-auto text-sm text-slate-300"><p class="text-slate-500">Pulsa actualizar para consultar el historial.</p></div>
                     </section>
 
                     <section id="elian-admin-config" class="bg-slate-950 border border-cyan-500/30 p-6 rounded-2xl" data-help-id="administracion.elian.visual-config">
@@ -3851,7 +3851,7 @@
     <script src="./js/lia-assistant/speech-controller.js?v=2.7.5-local-stt-1"></script>
     <script src="./js/liam/ian-avatar-renderer.js?v=2.7.5-liam-lia-2d-1"></script>
     <script src="./js/liam/liam-state-machine.js?v=2.7.3-ian-boot-4"></script>
-    <script src="./js/liam/liam-controller.js?v=2.7.5-action-history-1"></script>
+    <script src="./js/liam/liam-controller.js?v=2.7.5-action-history-2"></script>
     <script src="./js/liam/ian-visibility-guard.js?v=2.7.5-liam-lia-2d-2"></script>
     <script src="./js/liam/elian-admin-config.js?v=2.7.5-liam-lia-2d-2"></script>
     <script src="./js/modules/asistente-capacitacion.js?v=2.7.3-mic-diagnostics"></script>

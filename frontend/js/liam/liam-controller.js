@@ -496,13 +496,16 @@
     for (const item of [...(data.messages || [])].reverse()) add(item.role === "user" ? "user" : "liam", `${item.username || `Usuario ${item.usuario_id}`}: ${item.content_redacted}`);
   }
   async function viewActionHistory() {
-    const data = await request('/actions/history?limit=50'), host = document.getElementById('liam-action-history-content');
+    const host = document.getElementById('liam-action-history-content');
     if (!host) return;
+    host.setAttribute('aria-busy','true');host.textContent='Consultando historial de acciones…';
+    let data;
+    try { data=await request('/actions/history?limit=50'); } finally { host.setAttribute('aria-busy','false'); }
     host.textContent = '';
     if (!(data.actions || []).length) { const empty=document.createElement('p');empty.className='text-slate-500';empty.textContent='No hay acciones LIAM registradas.';host.appendChild(empty);return; }
-    const table=document.createElement('table');table.className='min-w-full text-left';
+    const table=document.createElement('table');table.className='min-w-full text-left';const caption=document.createElement('caption');caption.className='sr-only';caption.textContent='Acciones ejecutadas mediante LIAM en la fundación activa';table.appendChild(caption);
     const head=document.createElement('thead'),header=document.createElement('tr');
-    for (const label of ['Fecha','Usuario','Acción','Riesgo','Resultado']) { const cell=document.createElement('th');cell.className='border-b border-slate-700 px-3 py-2 text-cyan-200';cell.textContent=label;header.appendChild(cell); }
+    for (const label of ['Fecha','Usuario','Acción','Riesgo','Resultado']) { const cell=document.createElement('th');cell.scope='col';cell.className='border-b border-slate-700 px-3 py-2 text-cyan-200';cell.textContent=label;header.appendChild(cell); }
     head.appendChild(header);table.appendChild(head);const body=document.createElement('tbody');
     for (const item of data.actions) { const row=document.createElement('tr');for (const value of [item.created_at,item.usuario_id,item.approved_action||item.requested_action,item.risk_level||'—',item.result]) { const cell=document.createElement('td');cell.className='border-b border-slate-800 px-3 py-2';cell.textContent=String(value??'—');row.appendChild(cell); }body.appendChild(row); }
     table.appendChild(body);host.appendChild(table);
