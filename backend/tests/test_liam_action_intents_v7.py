@@ -108,6 +108,12 @@ def test_backup_status_intent_is_read_only():
     assert value['confirmation_required'] is False
 
 
+def test_module_usage_intent_is_read_only_and_bounded():
+    value=propose_action('Liam muéstrame los módulos poco usados en 60 días')
+    assert value['server_tool']=='get_module_usage' and value['arguments']['days']==60
+    assert value['confirmation_required'] is False
+
+
 def test_foundation_portfolio_intent_is_closed_tool():
     value = propose_action('Liam, cuáles fundaciones están próximas a vencer')
     assert value['server_tool'] == 'get_foundation_portfolio'
@@ -180,6 +186,7 @@ if __name__=='__main__':
     test_deliverable_supervisor_intent_uses_selected_period()
     test_system_health_intent_is_closed_tool()
     test_backup_status_intent_is_read_only()
+    test_module_usage_intent_is_read_only_and_bounded()
     test_foundation_portfolio_intent_is_closed_tool()
     test_master_quality_intent_never_requests_mutation()
     test_early_warning_intent_uses_risk_language()

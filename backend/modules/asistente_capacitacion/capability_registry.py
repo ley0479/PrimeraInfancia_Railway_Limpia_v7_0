@@ -27,6 +27,7 @@ CAPABILITIES = {
         Capability('supervise_deliverables','analiza','Calendario y Entregables'),
         Capability('get_system_health','admin','Diagnóstico interno'),
         Capability('get_backup_status','admin','Registro de Copias de Seguridad',False),
+        Capability('get_module_usage','admin','Auditoría funcional de LIAM'),
         Capability('get_foundation_portfolio','admin','Fundaciones y Suscripciones',False),
         Capability('analyze_master_data_quality','analiza','Base Maestra'),
         Capability('get_early_warnings','analiza','Entregables y Base Maestra'),

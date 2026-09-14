@@ -13,7 +13,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -436,6 +436,27 @@ def _system_health(database_path: str, tenant_id: int) -> dict:
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'overall_status':overall,'components':components,'failed_audit_events':error_count,'checked_at':started.isoformat(timespec='seconds'),'duration_ms':elapsed,'sanitized':True,'secrets_included':False,'read_only':True}
 
 
+def _module_usage(database_path: str,tenant_id: int,args: dict,user: dict) -> dict:
+    try:days=max(1,min(int(args.get('days') or 30),365))
+    except (TypeError,ValueError):raise ValueError('days debe ser un número entre 1 y 365.')
+    cutoff=(datetime.now(ZoneInfo('America/Bogota'))-timedelta(days=days)).isoformat(timespec='seconds')
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        rows=conn.execute('''SELECT modulo AS module,COUNT(*) AS uses,COUNT(DISTINCT usuario_id) AS users,MAX(created_at) AS last_used
+          FROM lia_audit_events WHERE fundacion_id=? AND created_at>=? AND modulo IS NOT NULL AND TRIM(modulo)<>''
+          GROUP BY modulo ORDER BY uses DESC,module''',(tenant_id,cutoff)).fetchall()
+    finally:conn.close()
+    observed={str(row['module']):dict(row) for row in rows};allowed=sorted(set(ROLE_MENU_PERMISSIONS.get('SUPERADMIN',[])))
+    items=[]
+    for module in allowed:
+        row=observed.get(module) or {};uses=int(row.get('uses') or 0)
+        category='SIN ACTIVIDAD' if uses==0 else ('POCO USADO' if uses<=2 else ('FRECUENTE' if uses>=10 else 'USO MODERADO'))
+        items.append({'module':module,'uses':uses,'users':int(row.get('users') or 0),'last_used':row.get('last_used'),'category':category})
+    order={'FRECUENTE':0,'USO MODERADO':1,'POCO USADO':2,'SIN ACTIVIDAD':3};items.sort(key=lambda x:(order[x['category']],-x['uses'],x['module']))
+    summary={'total_modules':len(items),'frequent':sum(x['category']=='FRECUENTE' for x in items),'moderate':sum(x['category']=='USO MODERADO' for x in items),'low_usage':sum(x['category']=='POCO USADO' for x in items),'without_activity':sum(x['category']=='SIN ACTIVIDAD' for x in items),'events':sum(x['uses'] for x in items)}
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'period_days':days,'summary':summary,'items':items,'source':'Auditoría funcional de LIAM','deletion_enabled':False,'read_only':True}
+
+
 def _backup_status(database_path: str) -> dict:
     conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
     try:
@@ -648,6 +669,10 @@ def _liam_center(database_path: str, tenant_id: int, user: dict) -> dict:
     backup=result.get('sections',{}).get('backups') or {}
     result.setdefault('metrics',[]).insert(1,{'label':'Último backup','value':(backup.get('latest') or {}).get('fecha_creacion') or 'NO DISPONIBLE','section':'backups'})
     result.setdefault('scope',{})['cross_foundation_sections']=['foundations','backups','changes']
+    try:
+        usage=_module_usage(database_path,tenant_id,{'days':30},user);result.setdefault('sections',{})['module_usage']=usage;result.setdefault('availability',{})['module_usage']=True
+        result.setdefault('metrics',[]).append({'label':'Módulos sin actividad','value':usage.get('summary',{}).get('without_activity',0),'section':'module_usage'})
+    except Exception:result.setdefault('sections',{})['module_usage']={};result.setdefault('availability',{})['module_usage']=False;result['partial']=True
     return result
 
 
@@ -710,6 +735,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)
     if tool_name=='get_system_health': return _system_health(database_path,tenant_id)
     if tool_name=='get_backup_status': return _backup_status(database_path)
+    if tool_name=='get_module_usage': return _module_usage(database_path,tenant_id,args,user)
     if tool_name=='get_foundation_portfolio': return _foundation_portfolio(database_path,args)
     if tool_name=='analyze_master_data_quality': return _master_data_quality(database_path,tenant_id,user)
     if tool_name=='get_early_warnings': return _early_warnings(database_path,tenant_id,args,user)

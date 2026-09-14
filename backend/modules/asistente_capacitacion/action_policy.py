@@ -31,6 +31,7 @@ RULES = {
     'supervise_deliverables': ActionRule('supervise_deliverables','read',ALL_AUTHENTICATED),
     'get_system_health': ActionRule('get_system_health','read',frozenset({'SUPERADMIN'})),
     'get_backup_status': ActionRule('get_backup_status','read',frozenset({'SUPERADMIN'})),
+    'get_module_usage': ActionRule('get_module_usage','read',frozenset({'SUPERADMIN','GERENTE'})),
     'get_foundation_portfolio': ActionRule('get_foundation_portfolio','read',frozenset({'SUPERADMIN'})),
     'analyze_master_data_quality': ActionRule('analyze_master_data_quality','read',ALL_AUTHENTICATED),
     'get_early_warnings': ActionRule('get_early_warnings','read',ALL_AUTHENTICATED),

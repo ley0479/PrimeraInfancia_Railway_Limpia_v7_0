@@ -84,6 +84,9 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
         return {'id':'get_system_health','label':'Consultar salud del sistema','summary':'Revisaré componentes internos sin exponer secretos.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_system_health'}
     if any(text in q for text in ('ultimo backup','ultima copia de seguridad','estado de los backups','estado de las copias de seguridad')):
         return {'id':'get_backup_status','label':'Consultar copias de seguridad','summary':'Consultaré el registro sanitizado de copias de seguridad sin exponer archivos, rutas ni hashes.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_backup_status'}
+    if any(text in q for text in ('modulos poco usados','modulos mas usados','uso de los modulos','modulos sin actividad')):
+        days_match=re.search(r'\b(\d{1,3})\s+dias?\b',q);days=int(days_match.group(1)) if days_match else 30
+        return {'id':'get_module_usage','label':'Consultar uso de módulos','summary':'Analizaré la actividad funcional de la fundación sin eliminar ni desactivar módulos.','arguments':{'days':days},'missing':[],'confirmation_required':False,'server_tool':'get_module_usage'}
     if 'fundacion' in q and any(text in q for text in ('proximas a vencer','proxima a vencer','sin usuarios','sin actividad','fundaciones activas','estado de las fundaciones')):
         return {'id':'get_foundation_portfolio','label':'Consultar fundaciones','summary':'Consultaré el portafolio global autorizado de fundaciones y suscripciones.','arguments':{'limit':100},'missing':[],'confirmation_required':False,'server_tool':'get_foundation_portfolio'}
     if any(text in q for text in ('calidad de la base maestra','duplicados de la base maestra','inconsistencias de la base maestra','uds inexistentes','docentes sin unidad')):
