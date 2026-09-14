@@ -102,7 +102,7 @@
         continue;
       await new Promise((resolve, reject) => {
         const script = document.createElement("script");
-        script.src = `./js/liam/${name}.js?v=2.7.5-liam-lia-2d-1`;
+        script.src = `./js/liam/${name}.js?v=2.7.5-guided-progress-1`;
         script.dataset.liamRuntime = name;
         script.onload = resolve;
         script.onerror = () => reject(new Error(`No se pudo cargar ${name}.`));

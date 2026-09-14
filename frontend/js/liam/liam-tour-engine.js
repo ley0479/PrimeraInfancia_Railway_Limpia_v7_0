@@ -109,13 +109,18 @@
       {control:'configuracion-institucional.logo.file',anchor:'liam.anchor.identity.logo',message:'Carga un archivo permitido. Si la fundación no configura uno, debe mantenerse la identidad global como respaldo.'},
       {control:'configuracion-institucional.assets',anchor:'liam.anchor.identity.assets',message:'Archivos de identidad visual conserva el historial y permite reactivar versiones autorizadas.'}
     ]
-  };let active=null,index=0,flags={},kind='tour';
+  };let active=null,index=0,flags={},kind='tour',activeId='';
+  const progressPrefix='liam-tour-progress:';
+  function progressKey(id){return `${progressPrefix}${String(id||'').replace(/[^a-z0-9._-]/gi,'').slice(0,80)}`}
+  function saveProgress(){if(kind!=='tour'||!activeId||!active)return;try{sessionStorage.setItem(progressKey(activeId),JSON.stringify({index,updated_at:new Date().toISOString()}))}catch(_error){}}
+  function readProgress(id,total){try{const saved=JSON.parse(sessionStorage.getItem(progressKey(id))||'null');const value=Number(saved?.index);return Number.isInteger(value)&&value>=0&&value<total?value:0}catch(_error){return 0}}
+  function clearProgress(id){try{sessionStorage.removeItem(progressKey(id))}catch(_error){}}
   const dashboardControlByModule={
     'base-maestra':'dashboard.cuentame.upload',talento:'dashboard.talent-human.open','salud-nutricion':'dashboard.nutrition.open',
     'calendario-inteligente':'dashboard.calendar.open','motor-documental':'dashboard.document-engine.open',formatos:'dashboard.formats.open'
   };
-  async function show(){const step=active?.[index];if(!step)return finish();window.LIAM_ANIMATION?.clear();if(step.anchor)await window.LIAM_MOVEMENT.move({mode:flags.walk_enabled?'walk':'teleport',destination:step.anchor,duration_ms:800},flags);window.LIAM_TABLET?.show(step.tablet||{type:'progress',title:`Paso ${index+1} de ${active.length}`,value:Math.round((index+1)*100/active.length)});window.LIAM?.announce?.(step.message);if(step.control)window.LIAM_ANIMATION?.highlight(step.control,step.message);document.dispatchEvent(new CustomEvent('liam:tour-step',{detail:{kind,index,total:active.length,control:step.control||null}}));return true}
-  function start(id,nextFlags={}){active=tours[id]||null;index=0;flags=nextFlags;kind='tour';if(!active)return false;show();return true}
+  async function show(){const step=active?.[index];if(!step)return finish();saveProgress();window.LIAM_ANIMATION?.clear();if(step.anchor)await window.LIAM_MOVEMENT.move({mode:flags.walk_enabled?'walk':'teleport',destination:step.anchor,duration_ms:800},flags);window.LIAM_TABLET?.show(step.tablet||{type:'progress',title:`Paso ${index+1} de ${active.length}`,value:Math.round((index+1)*100/active.length)});window.LIAM?.announce?.(step.message);if(step.control)window.LIAM_ANIMATION?.highlight(step.control,step.message);document.dispatchEvent(new CustomEvent('liam:tour-step',{detail:{kind,index,total:active.length,control:step.control||null,wait_for:step.wait_for||null,tour_id:activeId}}));return true}
+  function start(id,nextFlags={}){active=tours[id]||null;activeId=id;flags=nextFlags;kind='tour';if(!active){activeId='';return false}index=nextFlags.restart===true?0:readProgress(id,active.length);show();return true}
   function startPresentation(data,nextFlags={}){const profile=data?.profile||{},modules=Array.isArray(data?.modules)?data.modules:[],workflow=Array.isArray(data?.workflow)?data.workflow:[];const identity=profile.identity_confirmed?`Esta plataforma fue diseñada por ${profile.designer} y creada el ${profile.created_date}.`:'La autoría y la fecha de creación todavía no están confirmadas en la identidad institucional.';active=[
     {message:`Bienvenido a la presentación de ${profile.name||'la Plataforma Primera Infancia'}. ${profile.description||''}`,tablet:{type:'module_preview',title:'Plataforma Primera Infancia',value:`Versión ${profile.version||'no configurada'}`}},
     {message:identity,tablet:{type:'message',title:'Identidad institucional',value:profile.identity_confirmed?'Información confirmada':'Información pendiente'}},
@@ -123,11 +128,11 @@
     ...modules.map(item=>{const control=dashboardControlByModule[item.module];const anchor=control?`liam.anchor.dashboard.${item.module==='base-maestra'?'cuentame':item.module==='talento'?'talent-human':item.module==='salud-nutricion'?'nutrition':item.module==='calendario-inteligente'?'calendar':item.module==='motor-documental'?'document-engine':'formats'}`:null;return{control,anchor,message:`${item.title}. ${item.purpose||'Este módulo contiene funciones autorizadas para tu rol.'}`,tablet:{type:'module_preview',title:item.title,value:item.module}}}),
     {message:`El flujo general de trabajo es: ${workflow.map((step,i)=>`${i+1}. ${step}`).join(' ')}`,tablet:{type:'next_step',title:'Flujo general',value:`${workflow.length} etapas verificables`}},
     {message:'La presentación terminó. Puedes pedirme que explique esta pantalla o iniciar un recorrido guiado para realizar una tarea.',tablet:{type:'success',title:'Presentación completada',value:'LIAM sigue disponible'}}
-  ];index=0;flags=nextFlags;kind='presentation';show();return true}
-  function next(){if(!active)return false;index+=1;show();return true}
+  ];index=0;flags=nextFlags;kind='presentation';activeId='';show();return true}
+  function next(eventConfirmed=false){if(!active)return false;const expected=active[index]?.wait_for;if(expected&&!eventConfirmed){window.LIAM?.announce?.('Completa primero la acción indicada para continuar.');return false}index+=1;show();return true}
   function previous(){if(!active)return false;index=Math.max(0,index-1);show();return true}
-  function finish(){const completedKind=kind;window.LIAM_ANIMATION?.clear();window.LIAM_STATE?.set('success');active=null;index=0;kind='tour';document.dispatchEvent(new CustomEvent('liam:tour-completed',{detail:{kind:completedKind}}));return true}
-  function cancel(){window.LIAM_ANIMATION?.clear();active=null;index=0;kind='tour';window.LIAM_STATE?.set('idle')}
-  document.addEventListener('liam:business-event',(event)=>{const expected=active?.[index]?.wait_for;if(expected&&event.detail?.name===expected)next()});
+  function finish(){const completedKind=kind,completedId=activeId;if(completedKind==='tour')clearProgress(completedId);window.LIAM_ANIMATION?.clear();window.LIAM_STATE?.set('success');active=null;activeId='';index=0;kind='tour';document.dispatchEvent(new CustomEvent('liam:tour-completed',{detail:{kind:completedKind,tour_id:completedId}}));return true}
+  function cancel(){saveProgress();window.LIAM_ANIMATION?.clear();active=null;activeId='';index=0;kind='tour';window.LIAM_STATE?.set('idle')}
+  document.addEventListener('liam:business-event',(event)=>{const expected=active?.[index]?.wait_for;if(expected&&event.detail?.name===expected)next(true)});
   window.LIAM_TOURS=Object.freeze({start,startPresentation,next,previous,cancel,ids:Object.freeze(Object.keys(tours))});
 })();
