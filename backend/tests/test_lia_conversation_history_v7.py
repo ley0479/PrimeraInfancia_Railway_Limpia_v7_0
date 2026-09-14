@@ -23,6 +23,9 @@ def test_history_supports_search_export_paging_and_voice():
     assert "chat/history/export.xlsx" in routes and "CONVERSATION_HISTORY_AUDITED" in routes
     assert "date_from" in routes and "date_to" in routes and "module_filter" in routes and "role_filter" in routes
     assert 'data-action="history-audit"' in controller and "realtimeSessionId" in controller
+    assert "chat/history/export.pdf" in routes and "chat/history/stats" in routes and "chat/history/sessions" in routes
+    assert "lia_conversation_archives" in routes and 'data-action="history-sessions"' in controller and 'data-action="history-stats"' in controller
+    assert "chat/history/export.pdf" in routes and 'data-action="history-export-pdf"' in controller
 
 if __name__=='__main__':
     test_messages_are_append_only_and_tenant_scoped()

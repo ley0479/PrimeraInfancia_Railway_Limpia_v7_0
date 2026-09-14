@@ -10,7 +10,7 @@ from .config import public_flags, public_liam_flags, public_elian_flags
 from .elian_module_registry import authorized_modules
 from .assistant_service import respond
 from .platform_profile import get_platform_profile
-from .tool_registry import ALLOWED_TOOLS, execute
+from .tool_registry import ALLOWED_TOOLS, MODULE_DATASETS, execute
 from .rate_limit import allow
 from .provider_adapter import OpenAIResponsesProvider, ProviderUnavailable, provider_status
 from .knowledge_base import manual_for_role, manual_for_question, build_manual_pdf
@@ -81,7 +81,9 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         except (TypeError,ValueError):page=1
         search=str(request.args.get('search') or '').strip()[:120];module_filter=str(request.args.get('module') or '').strip()[:80];role_filter=str(request.args.get('role') or '').strip().lower();date_from=str(request.args.get('date_from') or '').strip()[:10];date_to=str(request.args.get('date_to') or '').strip()[:10]
         if role_filter and role_filter not in {'user','assistant'}:return jsonify({'error':'Tipo de mensaje no válido.'}),422
+        include_archived=str(request.args.get('include_archived') or '').lower() in {'1','true','yes'}
         where='fundacion_id=? AND usuario_id=?';params=[int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0)]
+        if not include_archived:where+=' AND NOT EXISTS (SELECT 1 FROM lia_conversation_archives a WHERE a.fundacion_id=lia_conversation_messages.fundacion_id AND a.usuario_id=lia_conversation_messages.usuario_id AND a.request_id=lia_conversation_messages.request_id)'
         if search:where+=' AND LOWER(content_redacted) LIKE LOWER(?)';params.append(f'%{search}%')
         if module_filter:where+=' AND module=?';params.append(module_filter)
         if role_filter:where+=' AND role=?';params.append(role_filter)
@@ -114,6 +116,49 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         sheet.column_dimensions['A'].width=22;sheet.column_dimensions['B'].width=12;sheet.column_dimensions['C'].width=28;sheet.column_dimensions['D'].width=90
         output=io.BytesIO();book.save(output);output.seek(0)
         return Response(output.getvalue(),200,{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':'attachment; filename="historial_lia.xlsx"','Cache-Control':'no-store'})
+
+    @bp.get('/chat/history/export.pdf')
+    def export_chat_history_pdf():
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        ctx=get_request_user_context();conn=connect();rows=conn.execute('''SELECT created_at,role,module,content_redacted FROM lia_conversation_messages
+          WHERE fundacion_id=? AND usuario_id=? ORDER BY id''',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0))).fetchall();conn.close()
+        output=io.BytesIO();doc=SimpleDocTemplate(output,pagesize=letter,title='Historial de Lía');styles=getSampleStyleSheet();story=[Paragraph('Historial de conversaciones con Lía',styles['Title']),Spacer(1,12)]
+        for row in rows:
+            heading=f"{row['created_at']} · {'Orden' if row['role']=='user' else 'Respuesta'} · {row['module'] or 'sin módulo'}"
+            story.extend([Paragraph(heading,styles['Heading4']),Paragraph(str(row['content_redacted']).replace('&','&amp;').replace('<','&lt;').replace('>','&gt;'),styles['BodyText']),Spacer(1,8)])
+        doc.build(story)
+        return Response(output.getvalue(),200,{'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="historial_lia.pdf"','Cache-Control':'no-store'})
+
+    @bp.get('/chat/history/sessions')
+    def conversation_sessions():
+        ctx=get_request_user_context();include_archived=str(request.args.get('include_archived') or '').lower() in {'1','true','yes'};fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0);conn=connect()
+        rows=conn.execute('''SELECT m.request_id,MIN(m.created_at) AS started_at,MAX(m.created_at) AS ended_at,COUNT(*) AS messages,
+          SUM(CASE WHEN m.role='user' THEN 1 ELSE 0 END) AS commands,MAX(m.module) AS module,MAX(CASE WHEN a.request_id IS NULL THEN 0 ELSE 1 END) AS archived
+          FROM lia_conversation_messages m LEFT JOIN lia_conversation_archives a ON a.fundacion_id=m.fundacion_id AND a.usuario_id=m.usuario_id AND a.request_id=m.request_id
+          WHERE m.fundacion_id=? AND m.usuario_id=? GROUP BY m.request_id ORDER BY MAX(m.id) DESC LIMIT 200''',(fid,uid)).fetchall();conn.close()
+        sessions=[dict(row) for row in rows if include_archived or not row['archived']]
+        return jsonify({'sessions':sessions,'total':len(sessions),'include_archived':include_archived}),200
+
+    @bp.post('/chat/history/sessions/<string:request_id>/archive')
+    def archive_conversation(request_id):
+        ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0);conn=connect();exists=conn.execute('SELECT 1 FROM lia_conversation_messages WHERE fundacion_id=? AND usuario_id=? AND request_id=?',(fid,uid,request_id)).fetchone()
+        if not exists:conn.close();return jsonify({'error':'Conversación no encontrada.'}),404
+        now=datetime.now().isoformat(timespec='seconds');conn.execute('INSERT INTO lia_conversation_archives(fundacion_id,usuario_id,request_id,archived_at) VALUES(?,?,?,?) ON CONFLICT(fundacion_id,usuario_id,request_id) DO UPDATE SET archived_at=excluded.archived_at',(fid,uid,request_id,now));conn.commit();conn.close()
+        return jsonify({'message':'Conversación archivada sin eliminar sus mensajes.','request_id':request_id,'archived':True}),200
+
+    @bp.delete('/chat/history/sessions/<string:request_id>/archive')
+    def restore_conversation(request_id):
+        ctx=get_request_user_context();conn=connect();conn.execute('DELETE FROM lia_conversation_archives WHERE fundacion_id=? AND usuario_id=? AND request_id=?',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),request_id));conn.commit();conn.close()
+        return jsonify({'message':'Conversación restaurada.','request_id':request_id,'archived':False}),200
+
+    @bp.get('/chat/history/stats')
+    def conversation_stats():
+        ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0);conn=connect()
+        totals=conn.execute('''SELECT COUNT(*) AS messages,SUM(CASE WHEN role='user' THEN 1 ELSE 0 END) AS commands,COUNT(DISTINCT request_id) AS sessions FROM lia_conversation_messages WHERE fundacion_id=? AND usuario_id=?''',(fid,uid)).fetchone()
+        modules=conn.execute('''SELECT COALESCE(NULLIF(module,''),'sin módulo') AS module,COUNT(*) AS total FROM lia_conversation_messages WHERE fundacion_id=? AND usuario_id=? GROUP BY module ORDER BY total DESC LIMIT 10''',(fid,uid)).fetchall();conn.close()
+        return jsonify({'messages':int(totals['messages'] or 0),'commands':int(totals['commands'] or 0),'sessions':int(totals['sessions'] or 0),'top_modules':[dict(row) for row in modules],'scope':{'foundation_id':fid,'user_id':uid}}),200
 
     @bp.get('/chat/history/admin')
     def admin_chat_history():
@@ -497,7 +542,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             {'type':'function','name':'get_foundation_data_summary','description':'Consulta el panorama institucional consolidado de la fundación activa: perfiles, coordinadores, equipos de talento humano, beneficiarios, grupos etarios, UDS, cargas vigentes por fuente, movimientos y campos incompletos. Nunca consulta otra fundación.','parameters':{'type':'object','properties':{},'additionalProperties':False}},
             {'type':'function','name':'list_foundation_profiles','description':'Lista perfiles de usuario de la fundación de la sesión activa. Puede filtrar por rol y paginar; nunca consulta otra fundación.','parameters':{'type':'object','properties':{'role':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':100},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
             {'type':'function','name':'search_foundation_beneficiaries','description':'Busca y filtra beneficiarios de la fundación de la sesión activa por nombre, documento, UDS, grupo etario o estado. Es de solo lectura y nunca cruza fundaciones.','parameters':{'type':'object','properties':{'query':{'type':'string'},'unit':{'type':'string'},'age_group':{'type':'string'},'status':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':50},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
-            {'type':'function','name':'get_platform_module_summary','description':'Consulta un resumen operativo autorizado de Salud y Nutrición, Talento Humano, Planeación, Gestión Pedagógica, Centro Documental, Reportes, Paquete Mensual o Familias y Redes.','parameters':{'type':'object','properties':{'module':{'type':'string','enum':['salud-nutricion','talento','planeacion-pedagogica','gestion-pedagogica','centro-documental','reportes-gerenciales','paquete-mensual','familias-redes']}},'required':['module'],'additionalProperties':False}},
+            {'type':'function','name':'get_platform_module_summary','description':'Consulta un resumen operativo autorizado de los módulos institucionales conectados.','parameters':{'type':'object','properties':{'module':{'type':'string','enum':sorted(MODULE_DATASETS)}},'required':['module'],'additionalProperties':False}},
             {'type':'function','name':'get_monthly_health_indicators','description':'Consulta indicadores mensuales de carné de salud, crecimiento y desarrollo, control prenatal, registro civil, perímetro braquial y devuelve anexo nominal autorizado de sobrepeso, desnutrición y riesgo.','parameters':{'type':'object','properties':{'unit':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':200}},'additionalProperties':False}},
             {'type':'function','name':'get_structured_error','description':'Explica un código de error de la plataforma.','parameters':{'type':'object','properties':{'code':{'type':'string'}},'required':['code'],'additionalProperties':False}},
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},

@@ -326,7 +326,7 @@
       document.head.appendChild(style);
     }
     const canAudit = ["SUPERADMIN", "GERENTE", "COORDINADOR"].includes(String(authenticatedUser().rol || "").toUpperCase());
-    box.insertAdjacentHTML("beforebegin", `<div id="liam-history-tools" class="liam-history-tools"><input id="liam-history-search" type="search" maxlength="120" placeholder="Buscar"><input id="liam-history-module" maxlength="80" placeholder="Módulo"><input id="liam-history-from" type="date" title="Desde"><input id="liam-history-to" type="date" title="Hasta"><select id="liam-history-role"><option value="">Todos</option><option value="user">Órdenes</option><option value="assistant">Respuestas</option></select><button type="button" data-action="history-search">Filtrar</button><button type="button" data-action="history-more" id="liam-history-more">Ver anteriores</button><button type="button" data-action="history-export">CSV</button><button type="button" data-action="history-export-xlsx">Excel</button>${canAudit ? '<button type="button" data-action="history-audit">Auditoría</button>' : ''}</div>`);
+    box.insertAdjacentHTML("beforebegin", `<div id="liam-history-tools" class="liam-history-tools"><input id="liam-history-search" type="search" maxlength="120" placeholder="Buscar"><input id="liam-history-module" maxlength="80" placeholder="Módulo"><input id="liam-history-from" type="date" title="Desde"><input id="liam-history-to" type="date" title="Hasta"><select id="liam-history-role"><option value="">Todos</option><option value="user">Órdenes</option><option value="assistant">Respuestas</option></select><button type="button" data-action="history-search">Filtrar</button><button type="button" data-action="history-more" id="liam-history-more">Ver anteriores</button><button type="button" data-action="history-sessions">Sesiones</button><button type="button" data-action="history-stats">Estadísticas</button><button type="button" data-action="history-export">CSV</button><button type="button" data-action="history-export-xlsx">Excel</button><button type="button" data-action="history-export-pdf">PDF</button>${canAudit ? '<button type="button" data-action="history-audit">Auditoría</button>' : ''}</div>`);
   }
   async function loadHistory({ page = 1, appendOlder = false } = {}) {
     if (state.historyLoaded && page === 1 && !state.historySearch) return;
@@ -370,6 +370,21 @@
     const box = document.getElementById("liam-conversation");
     if (box) box.innerHTML = "";
     for (const item of [...(data.messages || [])].reverse()) add(item.role === "user" ? "user" : "liam", `${item.username || `Usuario ${item.usuario_id}`}: ${item.content_redacted}`);
+  }
+  async function viewHistoryStats() {
+    const data = await request("/chat/history/stats"), detail = (data.top_modules || []).map((x) => `${x.module}: ${x.total}`).join(", ") || "sin actividad";
+    add("liam", `Historial: ${data.commands} órdenes, ${data.messages} mensajes y ${data.sessions} sesiones. Módulos principales: ${detail}.`);
+  }
+  async function viewHistorySessions() {
+    const data = await request("/chat/history/sessions"), box = document.getElementById("liam-conversation");
+    if (box) box.innerHTML = "";
+    for (const session of data.sessions || []) {
+      const node = document.createElement("div"); node.className = "liam";
+      const label = document.createElement("p"); label.textContent = `${session.started_at} · ${session.module || "sin módulo"} · ${session.commands} orden(es) · ${session.messages} mensaje(s)`;
+      const button = document.createElement("button"); button.type = "button"; button.textContent = "Archivar";
+      button.addEventListener("click", async () => { await request(`/chat/history/sessions/${encodeURIComponent(session.request_id)}/archive`, { method: "POST" }); node.remove(); });
+      node.append(label, button); box?.appendChild(node);
+    }
   }
   function saveVoiceTranscript(role, content) {
     return request("/voice/realtime/event", { method: "POST", body: JSON.stringify({ event: "transcript", role, content, module: state.module, request_id: state.realtimeSessionId }) }).catch(() => {});
@@ -1146,6 +1161,9 @@
     else if (action === "history-more") loadHistory({ page: state.historyPage + 1, appendOlder: true }).catch((error) => add("liam", error.message));
     else if (action === "history-export") exportHistory().catch((error) => add("liam", error.message));
     else if (action === "history-export-xlsx") exportHistory("xlsx").catch((error) => add("liam", error.message));
+    else if (action === "history-export-pdf") exportHistory("pdf").catch((error) => add("liam", error.message));
+    else if (action === "history-sessions") viewHistorySessions().catch((error) => add("liam", error.message));
+    else if (action === "history-stats") viewHistoryStats().catch((error) => add("liam", error.message));
     else if (action === "history-audit") auditHistory().catch((error) => add("liam", error.message));
     else if (action === "stop") {
       window.LIAM_REALTIME?.stop();

@@ -14,6 +14,21 @@ from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','list_foundation_profiles','search_foundation_beneficiaries','get_platform_module_summary','get_monthly_health_indicators','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
+    'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
+    'administrativo-financiero': [('presupuestos','af_presupuestos',None),('proveedores','af_proveedores',None),('compras','af_compras',None),('legalizaciones','af_legalizaciones',None)],
+    'backups': [('copias de seguridad','backups_sistema',None)],
+    'calidad-datos': [('análisis','cd_analisis',None),('hallazgos','cd_hallazgos',None)],
+    'importaciones-universales': [('importaciones','importaciones_universales',None),('perfiles de mapeo','perfiles_mapeo_universal',None)],
+    'integraciones-configuracion': [('parámetros','ic_parametros',None),('integraciones','ic_integraciones',None)],
+    'motor-plantillas': [('plantillas','mp_plantillas','estado'),('pruebas','mp_pruebas','estado'),('plantillas oficiales','plantillas_oficiales',None)],
+    'componente-psicosocial': [('expedientes','ps_expedientes',None),('planes','ps_planes_acompanamiento',None),('seguimientos','ps_seguimientos',None)],
+    'centro-planeacion': [('reglas','cpo_reglas_operativas',None),('documentos preparados','cpo_documentos_preparados',None),('notificaciones','cpo_notificaciones',None)],
+    'motor-gestion-proyecto': [('tareas','mgp_tareas',None),('productos','mgp_productos',None),('cierres mensuales','mgp_cierres_mensuales',None)],
+    'expediente-operativo-uca': [('expedientes UCA','giu_expedientes_uca',None),('planes UCA','giu_planes_uca',None),('paquetes de supervisión','giu_paquetes_supervision',None)],
+    'gestion-coordinador': [('asignaciones','gp_asignaciones_coordinador',None),('evidencias','gp_evidencias',None),('cumplimiento','gp_estado_cumplimiento',None)],
+    'panel-comercial': [('tickets','pc_tickets_soporte',None),('alertas de pago','pc_alertas_pago',None)],
+    'supervision-calidad': [('supervisiones','csc_supervisiones',None),('hallazgos','csc_hallazgos',None),('planes de mejora','csc_planes_mejora',None)],
+    'calendario-inteligente': [('entregables','calendario_entregables','estado'),('actividades','calendario_actividades','estado'),('alertas','calendario_alertas','estado')],
     'salud-nutricion': [('valoraciones','sn_valoraciones','estado'),('alertas','sn_alertas','estado'),('actividades','sn_actividades_integrales','estado'),('canalizaciones','sn_canalizaciones','estado')],
     'talento': [('personas','master_talento_humano','estado'),('documentos','th_documentos','estado'),('formaciones','th_formaciones','estado'),('evaluaciones','th_evaluaciones','estado')],
     'planeacion-pedagogica': [('planeaciones','pp_planeaciones','estado'),('actividades','pp_actividades','estado'),('documentos','pp_documentos_generados','estado')],
@@ -255,7 +270,10 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_foundation_data_summary': return _foundation_summary_complete(database_path,tenant_id)
     if tool_name=='list_foundation_profiles': return _foundation_profiles(database_path,tenant_id,args)
     if tool_name=='search_foundation_beneficiaries': return _beneficiaries(database_path,tenant_id,args)
-    if tool_name=='get_platform_module_summary': return _module_summary(database_path,tenant_id,args)
+    if tool_name=='get_platform_module_summary':
+        module=str(args.get('module') or '').strip().lower();allowed=set(ROLE_MENU_PERMISSIONS.get(str(user.get('rol') or ''),[]))
+        if allowed and module not in allowed:raise PermissionError('Tu rol no tiene permiso para consultar ese módulo.')
+        return _module_summary(database_path,tenant_id,args)
     if tool_name=='get_monthly_health_indicators': return _health_indicators(database_path,tenant_id,args)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
