@@ -71,6 +71,10 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    known_code=re.search(r'\b([A-Za-z][A-Za-z0-9-]*(?:_[A-Za-z0-9_-]+)+)\b',str(question or ''))
+    if known_code and any(text in q for text in ('solucion conocida','solucion del error','buscar solucion','como se resolvio')):
+        code=known_code.group(1).upper()
+        return {'id':'get_known_solution','label':'Consultar solución conocida','summary':'Buscaré una orientación sanitizada para ese código dentro de la fundación activa.','arguments':{'code':code},'missing':[],'confirmation_required':False,'server_tool':'get_known_solution'}
     favorite_match=re.match(r'^(?:liam|lian|lia)?\s*ejecuta\s+(?:el\s+comando\s+favorito\s+|el\s+favorito\s+)?(.+?)\s*$',q)
     if favorite_match:
         return {'id':'run_command_favorite','label':'Ejecutar comando favorito','summary':'Resolveré el favorito dentro de tu usuario y aplicaré sus permisos actuales.','arguments':{'name':_clean_unit(favorite_match.group(1)),'screen_context':context},'missing':[],'confirmation_required':False,'server_tool':'run_command_favorite'}

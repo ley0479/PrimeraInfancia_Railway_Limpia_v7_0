@@ -140,6 +140,13 @@ def test_incident_center_intent_filters_open_items():
     assert value['confirmation_required'] is False
 
 
+def test_known_solution_intent_requires_explicit_error_code():
+    value=propose_action('Liam busca una solución conocida para DOC_RPP_002')
+    assert value['server_tool']=='get_known_solution'
+    assert value['arguments']['code']=='DOC_RPP_002'
+    assert value['confirmation_required'] is False
+
+
 def test_notification_center_intent_is_read_only():
     value=propose_action('Liam qué notificaciones tengo')
     assert value['server_tool']=='get_notification_center'
@@ -224,6 +231,7 @@ if __name__=='__main__':
     test_master_quality_intent_never_requests_mutation()
     test_early_warning_intent_uses_risk_language()
     test_incident_center_intent_filters_open_items()
+    test_known_solution_intent_requires_explicit_error_code()
     test_notification_center_intent_is_read_only()
     test_communication_intent_creates_draft_not_send_action()
     test_favorite_intent_resolves_name_without_executing_locally()

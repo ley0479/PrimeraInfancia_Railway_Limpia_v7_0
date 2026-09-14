@@ -18,6 +18,7 @@ from services.relacion_mes_service import consolidar_por_unidad, docente_mas_fre
 
 ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard','prepare_meeting_brief','prepare_meeting_followup','prepare_dev_change_request','list_dev_change_requests','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_dev_change_review'})
+ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_known_solution'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -579,6 +580,22 @@ def _incident_center(database_path: str, tenant_id: int, args: dict, user: dict)
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'filters':{'incident_id':incident_id or None,'status':status or None},'summary':{'total':len(rows),**{key.lower():value for key,value in counts.items()}},'incidents':rows,'role_scope':'foundation' if role in {'SUPERADMIN','GERENTE'} else 'own_user','sanitized':True,'read_only':True}
 
 
+def _known_solution(database_path:str,tenant_id:int,args:dict)->dict:
+    code=re.sub(r'[^A-Z0-9_-]','',str(args.get('code') or '').strip().upper())[:80]
+    if not code:raise ValueError('Indica el código exacto del error que deseas consultar.')
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        summary=conn.execute('''SELECT COUNT(*) AS occurrences,MAX(created_at) AS last_seen,SUM(CASE WHEN UPPER(status) IN ('RESOLVED','CLOSED') THEN 1 ELSE 0 END) AS resolved FROM lia_error_incidents WHERE fundacion_id=? AND UPPER(error_code)=?''',(tenant_id,code)).fetchone()
+        latest=conn.execute('''SELECT solution,severity,status FROM lia_error_incidents WHERE fundacion_id=? AND UPPER(error_code)=? ORDER BY id DESC LIMIT 1''',(tenant_id,code)).fetchone()
+    finally:conn.close()
+    occurrences=int(summary['occurrences'] or 0);catalog=explain(code);catalog_confirmed=catalog.get('confidence')=='confirmed'
+    if not occurrences and not catalog_confirmed:raise LookupError('No encontré una solución conocida para ese código dentro de la fundación activa.')
+    solution=('; '.join(catalog.get('actions') or []) or catalog.get('message')) if catalog_confirmed else str(latest['solution'] or 'Conserva el incidente y solicita revisión técnica.')
+    cause=catalog.get('message') if catalog_confirmed else 'La causa todavía no está confirmada; consulta el incidente específico antes de actuar.'
+    item={'code':code,'title':catalog.get('title') if catalog_confirmed else code,'cause':cause,'solution':solution,'occurrences':occurrences,'resolved_occurrences':int(summary['resolved'] or 0),'last_seen':summary['last_seen'],'latest_status':latest['status'] if latest else None,'severity':latest['severity'] if latest else catalog.get('severity'),'catalog_confirmed':catalog_confirmed}
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'known_solution':item,'raw_messages_included':False,'technical_details_included':False,'source':'Base de Conocimiento LIAM','read_only':True}
+
+
 def _notification_center(database_path: str, tenant_id: int, args: dict, user: dict) -> dict:
     limit=max(1,min(int(args.get('limit') or 50),100));role=str(user.get('rol') or user.get('role') or '').strip().upper();uid=int(user.get('id') or user.get('usuario_id') or 0);items=[];sources=[]
     conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
@@ -844,6 +861,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='analyze_master_data_quality': return _master_data_quality(database_path,tenant_id,user)
     if tool_name=='get_early_warnings': return _early_warnings(database_path,tenant_id,args,user)
     if tool_name=='get_incident_center': return _incident_center(database_path,tenant_id,args,user)
+    if tool_name=='get_known_solution': return _known_solution(database_path,tenant_id,args)
     if tool_name=='get_notification_center': return _notification_center(database_path,tenant_id,args,user)
     if tool_name=='prepare_communication_draft': return _communication_draft(database_path,tenant_id,args,user)
     if tool_name=='run_command_favorite': return _run_favorite(database_path,tenant_id,args,user)
