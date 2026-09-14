@@ -17,7 +17,7 @@ from .knowledge_base import manual_for_role, manual_for_question, build_manual_p
 from .privacy_service import redact, redact_credentials, redact_data
 from .local_speech import enabled as local_speech_enabled, status as local_speech_status, transcribe_wav
 from .action_intents import propose_action, propose_read_actions
-from .error_center import record as record_incident, get as get_incident, list_recent as list_incidents
+from .error_center import record as record_incident, get_authorized as get_incident, list_recent as list_incidents
 from .credit_agent import parse_credit_request, query as query_credits, create_proposal as create_credit_proposal, confirm as confirm_credit_proposal
 from .action_policy import decision as action_decision, public_policy
 from .system_prompt import realtime_instructions
@@ -488,7 +488,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             return jsonify(result),200
         incident_match=re.search(r'\bINC-\d{8}-\d{6}-[A-Z0-9]{6}\b',question.upper())
         if incident_match:
-            incident=get_incident(database_path,incident_match.group(0),int(ctx.get('fundacion_id') or 1))
+            incident=get_incident(database_path,incident_match.group(0),int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),str(ctx.get('rol') or ''))
             if incident:
                 diagnostic_message=f"El incidente {incident['incident_id']} corresponde a {incident['error_type'].replace('_',' ')}. Causa: {incident['cause']} Solución: {incident['solution']}"
                 result.update({'message':diagnostic_message,'speech_text':diagnostic_message,'diagnostic':incident,'confidence':'confirmed','confirmation_required':False,'actions':[]})
@@ -833,7 +833,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.get('/errors/<string:incident_id>')
     def error_diagnosis(incident_id):
-        ctx=get_request_user_context();item=get_incident(database_path,incident_id,int(ctx.get('fundacion_id') or 1))
+        ctx=get_request_user_context();item=get_incident(database_path,incident_id,int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),str(ctx.get('rol') or ''))
         if not item:return jsonify({'error':'Incidente no encontrado o no autorizado.'}),404
         return jsonify({'incident':item}),200
 

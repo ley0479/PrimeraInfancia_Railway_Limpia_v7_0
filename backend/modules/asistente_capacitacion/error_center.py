@@ -43,6 +43,19 @@ def get(database_path,incident_id,tenant_id):
     row=conn.execute('SELECT * FROM lia_error_incidents WHERE incident_id=? AND fundacion_id=?',(str(incident_id),int(tenant_id or 1))).fetchone();conn.close()
     return dict(row) if row else None
 
+def get_authorized(database_path,incident_id,tenant_id,user_id,role):
+    """Devuelve solamente el diagnóstico funcional permitido para la sesión."""
+    normalized=str(role or '').strip().upper()
+    where='incident_id=? AND fundacion_id=?'
+    params=[str(incident_id),int(tenant_id or 1)]
+    if normalized not in {'SUPERADMIN','GERENTE'}:
+        where+=' AND usuario_id=?';params.append(int(user_id or 0))
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    row=conn.execute(f'''SELECT incident_id,module,action,http_status,error_code,error_type,cause,solution,severity,safe_retry,auto_correctable,status,created_at,updated_at
+        FROM lia_error_incidents WHERE {where}''',tuple(params)).fetchone();conn.close()
+    if not row:return None
+    return {**dict(row),'sanitized':True,'technical_details_included':False,'scope':'foundation' if normalized in {'SUPERADMIN','GERENTE'} else 'own_user'}
+
 def list_recent(database_path,tenant_id,limit=50):
     conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
     rows=conn.execute('SELECT incident_id,module,action,http_status,error_code,error_type,cause,solution,severity,status,created_at FROM lia_error_incidents WHERE fundacion_id=? ORDER BY id DESC LIMIT ?',(int(tenant_id or 1),max(1,min(100,int(limit or 50))))).fetchall();conn.close()
