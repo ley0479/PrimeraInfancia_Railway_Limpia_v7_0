@@ -17,6 +17,7 @@
     booting: false,
     booted: false,
     welcomed: false,
+    historyLoaded: false,
     history: [],
   };
   const apiBase = () => `${window.backendUrl || ""}/api/asistente-capacitacion`;
@@ -309,7 +310,20 @@
   }
   function remember(role, content) {
     state.history.push({ role, content: String(content || "").slice(0, 1200) });
-    state.history = state.history.slice(-6);
+  }
+  async function loadHistory() {
+    if (state.historyLoaded) return;
+    const data = await request("/chat/history?limit=100");
+    const messages = Array.isArray(data.messages) ? data.messages : [];
+    const box = document.getElementById("liam-conversation");
+    if (box) box.innerHTML = "";
+    state.history = [];
+    for (const item of messages) {
+      if (!["user", "assistant"].includes(item.role)) continue;
+      add(item.role === "user" ? "user" : "liam", item.content);
+      remember(item.role, item.content);
+    }
+    state.historyLoaded = true;
   }
   function auditClientAction(action, status, requestId, module, detail = "") {
     request("/actions/client-event", {
@@ -765,6 +779,11 @@
     window.LIAM_STATE.set(
       state.flags.hologram_enabled ? "teleport_in" : "greeting",
     );
+    try {
+      await loadHistory();
+    } catch (_) {
+      state.historyLoaded = false;
+    }
     await refreshContext();
     if (!state.welcomed) {
       state.welcomed = true;

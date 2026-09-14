@@ -51,6 +51,29 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         flags=public_flags();key=f"{ctx.get('fundacion_id')}:{ctx.get('usuario_id')}"
         return not allow(key,flags['rate_limit_per_minute'])
 
+    def save_exchange(ctx, *, question, answer, module, request_id):
+        """Conserva cada turno como filas independientes; nunca reemplaza turnos previos."""
+        now=datetime.now().isoformat(timespec='seconds');conn=connect()
+        try:
+            values=(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),module,request_id,now)
+            conn.execute('INSERT INTO lia_conversation_messages(fundacion_id,usuario_id,role,content_redacted,module,request_id,created_at) VALUES(?,?,?,?,?,?,?)',(values[0],values[1],'user',redact(question)[:5000],*values[2:]))
+            conn.execute('INSERT INTO lia_conversation_messages(fundacion_id,usuario_id,role,content_redacted,module,request_id,created_at) VALUES(?,?,?,?,?,?,?)',(values[0],values[1],'assistant',redact(answer)[:10000],*values[2:]))
+            conn.commit()
+        except Exception:
+            conn.rollback();raise
+        finally:conn.close()
+
+    @bp.get('/chat/history')
+    def chat_history():
+        ctx=get_request_user_context()
+        try:limit=max(1,min(int(request.args.get('limit') or 100),500))
+        except (TypeError,ValueError):limit=100
+        conn=connect();rows=conn.execute('''SELECT id,role,content_redacted,module,request_id,created_at
+          FROM lia_conversation_messages WHERE fundacion_id=? AND usuario_id=?
+          ORDER BY id DESC LIMIT ?''',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),limit)).fetchall();conn.close()
+        messages=[{'id':row['id'],'role':row['role'],'content':row['content_redacted'],'module':row['module'],'request_id':row['request_id'],'created_at':row['created_at']} for row in reversed(rows)]
+        return jsonify({'messages':messages,'total_returned':len(messages),'append_only':True}),200
+
     @bp.get('/config')
     def config_publica():
         return jsonify({'lia': public_flags(), 'liam': public_liam_flags(), 'elian': public_elian_flags(), 'platform_profile': get_platform_profile()}), 200
@@ -243,6 +266,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             message='. '.join(parts)+'.'
             result.update({'message':message,'speech_text':message,'confidence':'confirmed','confirmation_required':False,'actions':[],'tool_results':tool_results,'agentic':{'steps':len(tool_results),'max_steps':5,'read_only':True}})
             audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'multi_tool':True,'steps':len(tool_results)})
+            save_exchange(ctx,question=question,answer=result['message'],module=module,request_id=result['request_id'])
             return jsonify(result),200
         incident_match=re.search(r'\bINC-\d{8}-\d{6}-[A-Z0-9]{6}\b',question.upper())
         if incident_match:
@@ -339,6 +363,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             except ProviderUnavailable as exc:
                 app.logger.warning('LIAM usa recuperación local por indisponibilidad del proveedor: %s',str(exc))
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
+        save_exchange(ctx,question=question,answer=result['message'],module=module,request_id=result['request_id'])
         return jsonify(result), 200
 
     @bp.post('/actions/client-event')
