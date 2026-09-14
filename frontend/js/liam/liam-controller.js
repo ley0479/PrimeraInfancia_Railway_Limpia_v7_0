@@ -25,6 +25,7 @@
     realtimeSessionId: "",
     dataPresentation: null,
     lastUserCommand: "",
+    activeTask: "",
     history: [],
   };
   const apiBase = () => `${window.backendUrl || ""}/api/asistente-capacitacion`;
@@ -1023,6 +1024,7 @@
           screen_id: context.screen_id || "",
           help_id: context.active_help_id || "",
           screen_context: context,
+          active_task: state.activeTask || null,
           history: prior,
         }),
       });
@@ -1030,6 +1032,8 @@
       renderStructured(d.ui);
       remember("assistant", d.message);
       showProposal(d.action_proposal);
+      if (d.action_proposal?.label) state.activeTask = String(d.action_proposal.label).slice(0, 240);
+      else if (d.agentic?.steps) state.activeTask = `Consulta multitarea en ${context.module_id || state.module}`;
       window.LIAM_STATE?.set(
         d.avatar_state === "guiding" ? "guiding" : "speaking",
       );

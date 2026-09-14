@@ -22,6 +22,7 @@ from .credit_agent import parse_credit_request, query as query_credits, create_p
 from .action_policy import decision as action_decision, public_policy
 from .system_prompt import realtime_instructions
 from .orchestrator import LiamOrchestrator
+from .context_service import load as load_session_context, save as save_session_context, clear as clear_session_context
 import csv, io, json, uuid, os, tempfile, re, hashlib, requests
 
 
@@ -389,7 +390,12 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             if not isinstance(item,dict) or item.get('role') not in {'user','assistant'}: continue
             content=redact(str(item.get('content') or '').strip())[:1200]
             if content: history.append({'role':item['role'],'content':content})
-        screen_context=data.get('screen_context') if isinstance(data.get('screen_context'),dict) else {}
+        fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0)
+        stored_context=load_session_context(database_path,fid,uid)
+        received_context=dict(data.get('screen_context')) if isinstance(data.get('screen_context'),dict) else {}
+        received_context['module_id']=module
+        persisted=save_session_context(database_path,fid,uid,received_context,active_task=data.get('active_task'))
+        screen_context={**stored_context.get('context',{}),**persisted.get('context',{})}
         proposal=propose_action(question,screen_context=screen_context)
         read_plan=propose_read_actions(question,screen_context=screen_context)
         credit_request=parse_credit_request(question)
@@ -744,6 +750,13 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if not public_flags()['enabled']: return jsonify({'error':'LÍA está desactivada.'}),404
         get_request_user_context()
         return jsonify({'tools':sorted(ALLOWED_TOOLS),'write_tools':[],'proposal_tools':['propose_platform_action']}),200
+
+    @bp.route('/session-context',methods=['GET','PUT','DELETE'])
+    def session_context():
+        ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0)
+        if request.method=='GET':return jsonify(load_session_context(database_path,fid,uid)),200
+        if request.method=='DELETE':clear_session_context(database_path,fid,uid);audit_lia(ctx,'SESSION_CONTEXT_CLEARED');return jsonify({'cleared':True}),200
+        data=request.get_json(silent=True) or {};result=save_session_context(database_path,fid,uid,data.get('context'),data.get('active_task'));audit_lia(ctx,'SESSION_CONTEXT_UPDATED',module=(result.get('context') or {}).get('module_id'),metadata={'fields':sorted((result.get('context') or {}).keys()),'has_active_task':bool(result.get('active_task'))});return jsonify(result),200
 
     @bp.post('/tools/<string:tool_name>')
     def run_tool(tool_name: str):

@@ -43,6 +43,18 @@ CREATE TABLE IF NOT EXISTS lia_command_favorites (
 );
 CREATE INDEX IF NOT EXISTS idx_lia_favorites_tenant_user
 ON lia_command_favorites(fundacion_id, usuario_id, updated_at);
+CREATE TABLE IF NOT EXISTS lia_session_context (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER NOT NULL,
+    usuario_id INTEGER NOT NULL,
+    context_json TEXT NOT NULL DEFAULT '{}',
+    active_task TEXT,
+    updated_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    UNIQUE(fundacion_id, usuario_id)
+);
+CREATE INDEX IF NOT EXISTS idx_lia_context_tenant_user_expiry
+ON lia_session_context(fundacion_id, usuario_id, expires_at);
 CREATE TABLE IF NOT EXISTS lia_conversation_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fundacion_id INTEGER NOT NULL,

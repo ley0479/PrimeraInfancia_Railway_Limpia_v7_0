@@ -103,6 +103,9 @@ def bootstrap_core_schema(config_class) -> None:
     from migrations.migrate_liam_command_favorites_v7 import migrate as migrate_liam_favorites
     favorites_migration = migrate_liam_favorites(str(config_class.DATABASE_PATH))
     print('[MIGRATION] LIAM command favorites: ' + json.dumps(favorites_migration, ensure_ascii=False), flush=True)
+    from migrations.migrate_liam_session_context_v7 import migrate as migrate_liam_context
+    context_migration = migrate_liam_context(str(config_class.DATABASE_PATH))
+    print('[MIGRATION] LIAM session context: ' + json.dumps(context_migration, ensure_ascii=False), flush=True)
     from modules.panel_comercial.services import PanelComercialService
     PanelComercialService(config_class.DATABASE_PATH).init_schema()
 
