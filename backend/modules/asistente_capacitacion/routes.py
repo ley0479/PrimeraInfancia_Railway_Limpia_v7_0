@@ -399,7 +399,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             tool_results=[];parts=[]
             for step in read_plan[:5]:
                 try:
-                    value=execute(step['server_tool'],args=step.get('arguments') or {},database_path=database_path,tenant_id=int(ctx.get('fundacion_id') or 1),user=user)
+                    outcome=orchestrator.run(step['server_tool'],args=step.get('arguments') or {},tenant_id=int(ctx.get('fundacion_id') or 1),user=user,module=module,request_id=f"{result['request_id']}:{len(tool_results)+1}")
+                    value=outcome.result
                     tool_results.append({'tool':step['server_tool'],'result':value})
                     if step['server_tool']=='get_foundation_data_summary':
                         p=value['profiles'];b=value['beneficiaries'];u=value['units']
@@ -420,7 +421,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                         x=value['indicators'];parts.append(f"Salud: {x['carne_salud']} con carné, {x['crecimiento_desarrollo']} con crecimiento y desarrollo, {x['registro_civil']} con registro civil, {x['perimetro_braquial']} con perímetro braquial, {x['gestantes_control_prenatal']} gestantes con control prenatal, {x['sobrepeso']} con sobrepeso, {x['desnutricion']} con desnutrición y {x['riesgo_desnutricion']} en riesgo")
                     elif step['server_tool']=='get_monthly_relation_summary':
                         metrics={x['label']:x['value'] for x in value.get('metrics') or []};parts.append(f"Relación del Mes {value.get('period')}: {metrics.get('Unidades de atención',0)} unidades, {metrics.get('Total usuarios',0)} usuarios, {metrics.get('Total huevos',0)} huevos, {metrics.get('Cubetas de 30',0)} cubetas, {metrics.get('Panales completos',0)} panales y {metrics.get('Total verduras',0)} verduras")
-                    audit_lia(ctx,'TOOL_COMPLETED',module=module,tool=step['server_tool'],request_id=result['request_id'],metadata={'read_only':True,'agentic_step':len(tool_results)})
+                    audit_lia(ctx,'TOOL_COMPLETED',module=module,tool=step['server_tool'],request_id=result['request_id'],metadata={'read_only':outcome.telemetry['read_only'],'agentic_step':len(tool_results),'trace_id':outcome.telemetry['trace_id'],'duration_ms':outcome.telemetry['duration_ms'],'engine':outcome.telemetry['engine']})
                 except (PermissionError,LookupError,ValueError) as exc:parts.append(f"{step['server_tool']}: {exc}")
             message='. '.join(parts)+'.'
             result.update({'message':message,'speech_text':message,'confidence':'confirmed','confirmation_required':False,'actions':[],'tool_results':tool_results,'agentic':{'steps':len(tool_results),'max_steps':5,'read_only':True}})
@@ -466,7 +467,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             elif proposal.get('server_tool'):
                 try:
                     user=dict(getattr(g,'current_user',None) or {}) or {'id':ctx.get('usuario_id'),'rol':ctx.get('rol')}
-                    tool_result=execute(proposal['server_tool'],args=proposal.get('arguments') or {},database_path=database_path,tenant_id=int(ctx.get('fundacion_id') or 1),user=user)
+                    outcome=orchestrator.run(proposal['server_tool'],args=proposal.get('arguments') or {},tenant_id=int(ctx.get('fundacion_id') or 1),user=user,module=module,request_id=result['request_id'])
+                    tool_result=outcome.result
                     if proposal['server_tool']=='get_foundation_data_summary':
                         profiles=tool_result.get('profiles') or {};beneficiaries=tool_result.get('beneficiaries') or {};units=tool_result.get('units') or {}
                         groups=', '.join(f"{item['age_group']}: {item['total']}" for item in beneficiaries.get('by_age_group') or []) or 'sin grupos registrados'
@@ -553,7 +555,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                         message=f'Encontré {total} actividades {scope_label}{period_label}: {overdue} vencidas, {today} para hoy, {upcoming} próximas y {undated} sin fecha.'
                         actions=[{'type':'navigate','module':'calendario-inteligente','period':query.get('period'),'scope':query.get('scope'),'target':'calendario.pending.list'}]
                     result.update({'message':message,'speech_text':message,'confidence':'confirmed','confirmation_required':False,'tool_result':tool_result,'actions':actions})
-                    audit_lia(ctx,'TOOL_COMPLETED',module=module,tool=proposal['server_tool'],request_id=result['request_id'],metadata={'read_only':True,'total':total})
+                    audit_lia(ctx,'TOOL_COMPLETED',module=module,tool=proposal['server_tool'],request_id=result['request_id'],metadata={'read_only':outcome.telemetry['read_only'],'total':total,'trace_id':outcome.telemetry['trace_id'],'duration_ms':outcome.telemetry['duration_ms'],'engine':outcome.telemetry['engine']})
                 except (PermissionError,LookupError,ValueError) as exc:
                     result.update({'message':str(exc),'speech_text':str(exc),'confidence':'insufficient','confirmation_required':False})
             elif proposal['missing']:
