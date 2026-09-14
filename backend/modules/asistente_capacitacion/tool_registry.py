@@ -11,7 +11,18 @@ from .action_policy import decision as action_decision
 from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','list_foundation_profiles','search_foundation_beneficiaries','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','list_foundation_profiles','search_foundation_beneficiaries','get_platform_module_summary','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+
+MODULE_DATASETS = {
+    'salud-nutricion': [('valoraciones','sn_valoraciones','estado'),('alertas','sn_alertas','estado'),('actividades','sn_actividades_integrales','estado'),('canalizaciones','sn_canalizaciones','estado')],
+    'talento': [('personas','master_talento_humano','estado'),('documentos','th_documentos','estado'),('formaciones','th_formaciones','estado'),('evaluaciones','th_evaluaciones','estado')],
+    'planeacion-pedagogica': [('planeaciones','pp_planeaciones','estado'),('actividades','pp_actividades','estado'),('documentos','pp_documentos_generados','estado')],
+    'gestion-pedagogica': [('entregables','gp_entregables','estado'),('documentos','gp_documentos','estado'),('alertas','gp_alertas','estado')],
+    'centro-documental': [('documentos','doc_instancias','estado'),('evidencias','doc_evidencias',None),('revisiones','doc_revisiones','accion')],
+    'reportes-gerenciales': [('reportes','rg_reportes','estado'),('informes','rg9_informes','estado'),('hallazgos','rg9_hallazgos','estado')],
+    'paquete-mensual': [('paquetes','pm_paquetes','estado'),('archivos','pm_archivos','estado')],
+    'familias-redes': [('expedientes','fcr_expedientes_familiares','estado'),('actividades','fcr_actividades','estado'),('compromisos','fcr_compromisos','estado'),('alertas','fcr_alertas','estado')],
+}
 
 def _foundation_summary(database_path: str, tenant_id: int) -> dict:
     """Resumen de solo lectura. El tenant siempre proviene de la sesión autenticada."""
@@ -82,6 +93,25 @@ def _beneficiaries(database_path: str, tenant_id: int, args: dict) -> dict:
       'filters':{'query':query or None,'unit':unit or None,'age_group':age_group or None,'status':status or None},
       'total':int(total['total'] or 0),'limit':limit,'offset':offset,'beneficiaries':[dict(row) for row in rows],'read_only':True}
 
+def _module_summary(database_path: str, tenant_id: int, args: dict) -> dict:
+    module=str(args.get('module') or '').strip().lower()
+    if module not in MODULE_DATASETS:raise ValueError('Módulo no reconocido para consulta operativa.')
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row;datasets=[]
+    try:
+        for label,table,state_column in MODULE_DATASETS[module]:
+            try:
+                total=conn.execute(f'SELECT COUNT(*) AS total FROM {table} WHERE fundacion_id=?',(tenant_id,)).fetchone()
+                states=[]
+                if state_column:
+                    rows=conn.execute(f'''SELECT COALESCE(NULLIF(TRIM({state_column}),''),'SIN_ESTADO') AS estado,COUNT(*) AS total
+                      FROM {table} WHERE fundacion_id=? GROUP BY COALESCE(NULLIF(TRIM({state_column}),''),'SIN_ESTADO') ORDER BY estado''',(tenant_id,)).fetchall()
+                    states=[{'status':row['estado'],'total':int(row['total'] or 0)} for row in rows]
+                datasets.append({'name':label,'total':int(total['total'] or 0),'by_status':states})
+            except Exception:
+                datasets.append({'name':label,'total':0,'by_status':[],'available':False})
+    finally:conn.close()
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'module':module,'datasets':datasets,'total_records':sum(x['total'] for x in datasets),'read_only':True}
+
 def _int_arg(args, name, minimum=1):
     try: value=int(args.get(name))
     except (TypeError,ValueError): raise ValueError(f'{name} debe ser un entero válido.')
@@ -110,6 +140,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_foundation_data_summary': return _foundation_summary(database_path,tenant_id)
     if tool_name=='list_foundation_profiles': return _foundation_profiles(database_path,tenant_id,args)
     if tool_name=='search_foundation_beneficiaries': return _beneficiaries(database_path,tenant_id,args)
+    if tool_name=='get_platform_module_summary': return _module_summary(database_path,tenant_id,args)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')

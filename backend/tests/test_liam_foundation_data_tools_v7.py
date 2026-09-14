@@ -15,6 +15,7 @@ def _database(path):
           fecha_nacimiento TEXT, edad_meses INTEGER, grupo_etario TEXT, sexo TEXT, unidad_servicio TEXT,
           codigo_unidad TEXT, coordinador TEXT, docente TEXT, modalidad TEXT, estado TEXT, activo INTEGER, fundacion_id INTEGER);
         CREATE TABLE master_unidades(id INTEGER PRIMARY KEY, nombre TEXT, activo INTEGER, fundacion_id INTEGER);
+        CREATE TABLE sn_valoraciones(id INTEGER PRIMARY KEY, estado TEXT, fundacion_id INTEGER);
         """
     )
     conn.executemany("INSERT INTO fundaciones VALUES(?,?)", [(1, "Uno"), (2, "Dos")])
@@ -31,6 +32,7 @@ def _database(path):
          (3,"999","Otro Tenant","2021-01-01",60,"3 A 5 AÑOS","M","UDS Ajena","X","Coord Dos","Doc Dos","FAMILIAR","ACTIVO",1,2)],
     )
     conn.executemany("INSERT INTO master_unidades VALUES(?,?,?,?)", [(1,"UDS Norte",1,1),(2,"UDS Sur",1,1),(3,"UDS Ajena",1,2)])
+    conn.executemany("INSERT INTO sn_valoraciones VALUES(?,?,?)", [(1,"VALIDADA",1),(2,"PENDIENTE",1),(3,"CRITICA",2)])
     conn.commit();conn.close()
 
 
@@ -66,3 +68,12 @@ def test_beneficiary_search_and_multitask_plan_are_tenant_scoped(tmp_path):
     assert all(item['documento']!='999' for item in found['beneficiaries'])
     plan=propose_read_actions('¿Cuántos niños hay y cuáles son mis tareas pendientes?')
     assert [item['server_tool'] for item in plan]==['get_foundation_data_summary','get_pending_activities_summary']
+
+
+def test_module_summary_is_scoped_and_can_join_multitask_plan(tmp_path):
+    db=tmp_path/'liam.db';_database(db)
+    result=execute('get_platform_module_summary',args={'module':'salud-nutricion','foundation_id':2},database_path=str(db),tenant_id=1,user={'rol':'DOCENTE'})
+    assert result['datasets'][0]['total']==2
+    assert sum(x['total'] for x in result['datasets'][0]['by_status'])==2
+    plan=propose_read_actions('Dime cuántos niños hay y el resumen de salud y nutrición')
+    assert {x['server_tool'] for x in plan}=={'get_foundation_data_summary','get_platform_module_summary'}

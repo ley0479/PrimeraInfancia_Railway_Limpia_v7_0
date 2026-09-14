@@ -30,6 +30,16 @@ MODULE_ALIASES = (
     (('manual',), 'manual-operativo', 'Manual Operativo'),
     (('dashboard', 'inicio'), 'dashboard', 'Inicio'),
 )
+DATA_MODULE_ALIASES = (
+    (('salud','nutricion','valoraciones nutricionales'),'salud-nutricion'),
+    (('talento humano','colaboradores','personal'),'talento'),
+    (('planeacion pedagogica','planeaciones'),'planeacion-pedagogica'),
+    (('gestion pedagogica','entregables pedagogicos'),'gestion-pedagogica'),
+    (('centro documental','documentos','evidencias'),'centro-documental'),
+    (('reportes gerenciales','informes gerenciales'),'reportes-gerenciales'),
+    (('paquete mensual','paquetes mensuales'),'paquete-mensual'),
+    (('familias y redes','familias redes','compromisos familiares'),'familias-redes'),
+)
 
 
 def _plain(value: object) -> str:
@@ -52,6 +62,10 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
         name_match=re.search(r'\b(?:nino|nina|beneficiario|participante)\s+(?:llamad[oa]\s+|de nombre\s+)?([a-z][a-z ]{2,80}?)(?=\s+(?:en|de|con|por)\b|$)',q)
         query=document_match.group(1) if document_match else (_clean_unit(name_match.group(1)) if name_match else '')
         return {'id':'search_foundation_beneficiaries','label':'Consultar beneficiarios','summary':'Consultaré los beneficiarios autorizados de la fundación de tu sesión.','arguments':{'query':query,'limit':20,'offset':0},'missing':[],'confirmation_required':False,'server_tool':'search_foundation_beneficiaries'}
+    if any(word in q for word in ('cuantos','cuantas','resumen','estado','pendientes','alertas','informacion')):
+        for aliases,module_id in DATA_MODULE_ALIASES:
+            if any(alias in q for alias in aliases):
+                return {'id':'get_platform_module_summary','label':'Consultar módulo','summary':f'Consultaré el resumen autorizado de {module_id}.','arguments':{'module':module_id},'missing':[],'confirmation_required':False,'server_tool':'get_platform_module_summary'}
     if any(text in q for text in ('cuantos ninos','cuantas ninas','cuantos beneficiarios','cuantos perfiles','grupo etario','grupos etarios','cuantos coordinadores','ninos por unidad','beneficiarios por unidad','unidades activas','uds activas','ods activas','cuales son las uds','cuales son las ods','informacion de la base de datos','resumen de la base de datos','datos de la fundacion','base maestra incompleta','campos incompletos')):
         return {'id':'get_foundation_data_summary','label':'Consultar información de la fundación','summary':'Consultaré la información autorizada de la fundación de tu sesión.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_foundation_data_summary'}
     if any(text in q for text in ('perfiles de la fundacion','usuarios de la fundacion','lista de perfiles','lista de usuarios')):
@@ -171,6 +185,9 @@ def propose_read_actions(question: str, *, screen_context: dict | None = None) -
     if any(word in q for word in ('busca','buscar','consulta','consultar')) and any(word in q for word in ('nino','nina','beneficiario','participante')):
         action=propose_action(question,screen_context=screen_context)
         if action and action.get('server_tool')=='search_foundation_beneficiaries':actions.append(action)
+    for aliases,module_id in DATA_MODULE_ALIASES:
+        if any(alias in q for alias in aliases) and any(word in q for word in ('cuantos','cuantas','resumen','estado','pendientes','alertas','informacion')):
+            actions.append({'id':'get_platform_module_summary','arguments':{'module':module_id},'server_tool':'get_platform_module_summary'})
     unique=[];seen=set()
     for action in actions:
         key=(action['server_tool'],repr(sorted((action.get('arguments') or {}).items())))

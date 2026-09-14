@@ -229,6 +229,9 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                         names=', '.join(str(x.get('nombre_completo') or x.get('documento')) for x in value.get('beneficiaries',[])[:5]) or 'sin coincidencias'
                         parts.append(f"Beneficiarios encontrados: {value['total']} ({names})")
                     elif step['server_tool']=='get_pending_activities_summary':parts.append(f"Tareas pendientes: {value['total']}, de ellas {value['overdue']} vencidas y {value['due_today']} para hoy")
+                    elif step['server_tool']=='get_platform_module_summary':
+                        detail=', '.join(f"{item['name']}: {item['total']}" for item in value.get('datasets') or [])
+                        parts.append(f"{value['module']}: {detail}")
                     audit_lia(ctx,'TOOL_COMPLETED',module=module,tool=step['server_tool'],request_id=result['request_id'],metadata={'read_only':True,'agentic_step':len(tool_results)})
                 except (PermissionError,LookupError,ValueError) as exc:parts.append(f"{step['server_tool']}: {exc}")
             message='. '.join(parts)+'.'
@@ -288,6 +291,11 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                         total=int(tool_result.get('total') or 0);items=tool_result.get('beneficiaries') or []
                         detail=', '.join(f"{item.get('nombre_completo') or 'Sin nombre'} ({item.get('documento') or 'sin documento'}, {item.get('unidad_servicio') or 'sin UDS'})" for item in items[:10]) or 'sin coincidencias'
                         message=f"Encontré {total} beneficiarios autorizados: {detail}."
+                        actions=[]
+                    elif proposal['server_tool']=='get_platform_module_summary':
+                        total=int(tool_result.get('total_records') or 0)
+                        detail=', '.join(f"{item['name']}: {item['total']}" for item in tool_result.get('datasets') or []) or 'sin registros'
+                        message=f"Resumen de {tool_result.get('module')}: {detail}."
                         actions=[]
                     else:
                         total=int(tool_result.get('total') or 0); overdue=int(tool_result.get('overdue') or 0); today=int(tool_result.get('due_today') or 0); upcoming=int(tool_result.get('upcoming') or 0); undated=int(tool_result.get('undated') or 0)
@@ -393,6 +401,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             {'type':'function','name':'get_foundation_data_summary','description':'Consulta estadísticas completas de la fundación de la sesión activa: perfiles, coordinadores, beneficiarios, grupos etarios, unidades o UDS y campos incompletos. Nunca consulta otra fundación.','parameters':{'type':'object','properties':{},'additionalProperties':False}},
             {'type':'function','name':'list_foundation_profiles','description':'Lista perfiles de usuario de la fundación de la sesión activa. Puede filtrar por rol y paginar; nunca consulta otra fundación.','parameters':{'type':'object','properties':{'role':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':100},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
             {'type':'function','name':'search_foundation_beneficiaries','description':'Busca y filtra beneficiarios de la fundación de la sesión activa por nombre, documento, UDS, grupo etario o estado. Es de solo lectura y nunca cruza fundaciones.','parameters':{'type':'object','properties':{'query':{'type':'string'},'unit':{'type':'string'},'age_group':{'type':'string'},'status':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':50},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
+            {'type':'function','name':'get_platform_module_summary','description':'Consulta un resumen operativo autorizado de Salud y Nutrición, Talento Humano, Planeación, Gestión Pedagógica, Centro Documental, Reportes, Paquete Mensual o Familias y Redes.','parameters':{'type':'object','properties':{'module':{'type':'string','enum':['salud-nutricion','talento','planeacion-pedagogica','gestion-pedagogica','centro-documental','reportes-gerenciales','paquete-mensual','familias-redes']}},'required':['module'],'additionalProperties':False}},
             {'type':'function','name':'get_structured_error','description':'Explica un código de error de la plataforma.','parameters':{'type':'object','properties':{'code':{'type':'string'}},'required':['code'],'additionalProperties':False}},
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
             {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},
