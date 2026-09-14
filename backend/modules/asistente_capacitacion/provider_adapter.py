@@ -1,7 +1,7 @@
 """Frontera opcional del modelo; la clave nunca sale del servidor."""
 from __future__ import annotations
 from abc import ABC, abstractmethod
-import json, os
+import json, os, re, unicodedata
 import requests
 from .system_prompt import LIA_SYSTEM_PROMPT
 from .privacy_service import redact_data
@@ -16,6 +16,15 @@ def provider_status()->dict:
     configured=bool(os.getenv('OPENAI_API_KEY','').strip() and os.getenv('LIAM_OPENAI_MODEL','').strip())
     enabled=os.getenv('LIAM_AI_ENABLED','').strip().lower() in {'1','true','yes','on','si','sí'}
     return {'configured':configured,'ready':configured and enabled,'reason':None if configured and enabled else 'Configure OPENAI_API_KEY, LIAM_OPENAI_MODEL y LIAM_AI_ENABLED en el servidor.'}
+
+def guard_model_output(text: str, fallback: str, confidence: str = '') -> dict:
+    value=str(text or '').strip();base=str(fallback or '').strip()
+    normalized=''.join(c for c in unicodedata.normalize('NFKD',value.casefold()) if not unicodedata.combining(c))
+    execution_claim=re.search(r'\b(?:guarde|publique|elimine|modifique|envie|ejecute|cree|desplegue|restaure|asigne|suspendi)\b',normalized)
+    unverified_count=re.search(r'\b\d[\d.,]*\s+(?:ninos?|ninas?|beneficiarios?|uds|unidades?|coordinadores?|docentes?|fundaciones?)\b',normalized)
+    if execution_claim:return {'message':base,'accepted':False,'reason':'unverified_execution_claim'}
+    if str(confidence or '')!='confirmed' and unverified_count:return {'message':base,'accepted':False,'reason':'unverified_data_count'}
+    return {'message':value,'accepted':True,'reason':None}
 
 class OpenAIResponsesProvider(AssistantProvider):
     endpoint='https://api.openai.com/v1/responses'
@@ -37,4 +46,5 @@ class OpenAIResponsesProvider(AssistantProvider):
         if not text:
             text=''.join(part.get('text','') for item in data.get('output',[]) for part in item.get('content',[]) if part.get('type')=='output_text')
         if not text.strip(): raise ProviderUnavailable('El proveedor no devolvió texto.')
-        return {'message':text.strip()[:6000],'provider':'openai_responses','model':self.model,'response_id':data.get('id')}
+        guarded=guard_model_output(text.strip()[:6000],str(context.get('verified_draft') or ''),str(context.get('required_confidence') or ''))
+        return {'message':guarded['message'],'provider':'openai_responses' if guarded['accepted'] else 'institutional_guarded','model':self.model,'response_id':data.get('id'),'output_guard':guarded}

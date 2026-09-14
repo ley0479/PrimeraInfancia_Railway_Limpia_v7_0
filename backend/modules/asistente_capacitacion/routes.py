@@ -658,7 +658,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 safe_generated=redact(generated['message'])
                 result.update({'message':safe_generated,'speech_text':safe_generated,
                     'provider':generated['provider'],'model':generated['model'],
-                    'provider_response_id':generated.get('response_id')})
+                    'provider_response_id':generated.get('response_id'),'output_guard':generated.get('output_guard')})
             except ProviderUnavailable as exc:
                 app.logger.warning('LIAM usa recuperación local por indisponibilidad del proveedor: %s',str(exc))
         audit_lia(ctx,'QUESTION_COMPLETED',module=module,request_id=result['request_id'],metadata={'length':len(question),'provider':result['provider']})
