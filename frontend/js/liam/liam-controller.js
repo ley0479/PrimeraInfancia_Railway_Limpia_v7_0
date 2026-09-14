@@ -365,6 +365,17 @@
       document.querySelector("[data-lia-presenter-avatar]")?.setAttribute("data-state", "success");
     }
   }
+  function configureDataDrawer(drawer) {
+    const ratios = ["40", "50", "60"], saved = localStorage.getItem("lia-data-panel-ratio");
+    drawer.dataset.ratio = ratios.includes(saved) ? saved : "50";
+    drawer.dataset.maximized = "false";
+    const applyLabel = () => { const button=drawer.querySelector('[data-lia-drawer-action="ratio"]'); if(button)button.textContent=`${drawer.dataset.ratio}%`; };
+    drawer.querySelector('[data-lia-drawer-action="close"]')?.addEventListener("click", () => drawer.dataset.open = "false");
+    drawer.querySelector('[data-lia-drawer-action="minimize"]')?.addEventListener("click", (event) => { const minimized=drawer.dataset.minimized!=="true"; drawer.dataset.minimized=String(minimized); event.currentTarget.textContent=minimized?"▢":"—"; });
+    drawer.querySelector('[data-lia-drawer-action="maximize"]')?.addEventListener("click", () => drawer.dataset.maximized=String(drawer.dataset.maximized!=="true"));
+    drawer.querySelector('[data-lia-drawer-action="ratio"]')?.addEventListener("click", () => { const index=ratios.indexOf(drawer.dataset.ratio); drawer.dataset.ratio=ratios[(index+1)%ratios.length]; localStorage.setItem("lia-data-panel-ratio",drawer.dataset.ratio); applyLabel(); });
+    applyLabel();
+  }
   function richContent(payload) {
     const type = payload?.componentType, data = payload?.data || {};
     if (!["metric-card", "table", "list", "spotlight"].includes(type)) return null;
@@ -394,7 +405,8 @@
     const content = richContent(payload);
     if (payload.display === "drawer" && content) {
       let drawer = document.getElementById("lia-data-drawer");
-      if (!drawer) { drawer = document.createElement("aside"); drawer.id = "lia-data-drawer"; drawer.className = "lia-data-drawer"; drawer.innerHTML = '<header><strong>Datos consultados por Lía</strong><button type="button" aria-label="Cerrar panel">×</button></header><div class="lia-data-layout"><div class="lia-data-presenter"><div data-lia-presenter-avatar></div><span data-lia-presenter-status>Preparando explicación…</span></div><div data-lia-drawer-content></div></div>'; drawer.querySelector("button").onclick = () => drawer.dataset.open = "false"; document.body.appendChild(drawer); }
+      if (!drawer) { drawer = document.createElement("aside"); drawer.id = "lia-data-drawer"; drawer.className = "lia-data-drawer"; drawer.setAttribute("aria-label","Panel visual de Lía"); drawer.innerHTML = '<header><strong>Datos consultados por Lía</strong><div class="lia-drawer-controls"><button type="button" data-lia-drawer-action="minimize" aria-label="Minimizar panel">—</button><button type="button" data-lia-drawer-action="ratio" aria-label="Cambiar proporción del panel">50%</button><button type="button" data-lia-drawer-action="maximize" aria-label="Maximizar panel">□</button><button type="button" data-lia-drawer-action="close" aria-label="Cerrar panel">×</button></div></header><div class="lia-data-layout"><div class="lia-data-presenter"><div data-lia-presenter-avatar></div><span data-lia-presenter-status>Preparando explicación…</span></div><div data-lia-drawer-content></div></div>'; document.body.appendChild(drawer); configureDataDrawer(drawer); }
+      drawer.dataset.minimized = "false";
       const destination = drawer.querySelector("[data-lia-drawer-content]"); destination.replaceChildren(content); drawer.dataset.open = "true";
       window.IAN_AVATAR?.render("[data-lia-presenter-avatar]", { gender: state.visual?.avatar_gender || "female", variant: state.visual?.avatar_variant });
       const items = Array.from(destination.querySelectorAll(".lia-data-point"));
