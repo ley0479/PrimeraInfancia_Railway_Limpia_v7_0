@@ -104,9 +104,6 @@
             flyout.dataset.flyoutLabel = label;
             toggle.setAttribute('aria-label', `Abrir ${label}`);
             toggle.title = label;
-            group.addEventListener('pointerleave', (event) => {
-                if (!group.contains(event.relatedTarget)) closeFlyout(group);
-            });
             toggle.addEventListener('click', (event) => {
                 if (window.matchMedia('(max-width: 1024px)').matches) return;
                 event.preventDefault();
@@ -140,9 +137,6 @@
         addToggle();
         configureDock(nav);
         applyTheme(savedTheme(), false);
-        document.addEventListener('click', (event) => {
-            if (openGroup && !openGroup.contains(event.target)) closeFlyout(openGroup);
-        });
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && openGroup) {
                 const toggle = openGroup.querySelector('.pi-menu-group-toggle');

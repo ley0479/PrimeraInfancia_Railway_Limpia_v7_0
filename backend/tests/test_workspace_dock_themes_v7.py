@@ -6,8 +6,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_workspace_dock_assets_are_loaded_with_cachebuster():
     html = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
-    assert "workspace-dock-themes.css?v=2.7.5-dock-themes-5" in html
-    assert "workspace-dock-themes.js?v=2.7.5-dock-themes-5" in html
+    assert "workspace-dock-themes.css?v=2.7.5-dock-themes-6" in html
+    assert "workspace-dock-themes.js?v=2.7.5-dock-themes-6" in html
     assert html.index("responsive-mobile.css") < html.index("workspace-dock-themes.css")
 
 
@@ -19,6 +19,8 @@ def test_workspace_theme_is_persistent_and_accessible():
     assert "event.key === 'Escape'" in js
     assert "item.addEventListener('dblclick', execute)" in js
     assert "data-dock-selected" in js
+    assert "pointerleave" not in js
+    assert "!openGroup.contains(event.target)" not in js
     assert "max-width: 1024px" in js
 
 
