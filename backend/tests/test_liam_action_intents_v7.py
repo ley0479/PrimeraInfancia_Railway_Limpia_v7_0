@@ -102,6 +102,12 @@ def test_system_health_intent_is_closed_tool():
     assert value['confirmation_required'] is False
 
 
+def test_foundation_portfolio_intent_is_closed_tool():
+    value = propose_action('Liam, cuáles fundaciones están próximas a vencer')
+    assert value['server_tool'] == 'get_foundation_portfolio'
+    assert value['confirmation_required'] is False
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -115,4 +121,5 @@ if __name__=='__main__':
     test_custom_report_intent_maps_only_predefined_fields()
     test_deliverable_supervisor_intent_uses_selected_period()
     test_system_health_intent_is_closed_tool()
+    test_foundation_portfolio_intent_is_closed_tool()
     print('LIAM_ACTION_INTENTS_V7_PASS')

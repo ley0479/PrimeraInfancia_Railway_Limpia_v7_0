@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -434,6 +434,40 @@ def _system_health(database_path: str, tenant_id: int) -> dict:
     elapsed = round((datetime.now(ZoneInfo('America/Bogota'))-started).total_seconds()*1000,2)
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'overall_status':overall,'components':components,'failed_audit_events':error_count,'checked_at':started.isoformat(timespec='seconds'),'duration_ms':elapsed,'sanitized':True,'secrets_included':False,'read_only':True}
 
+
+def _foundation_portfolio(database_path: str, args: dict) -> dict:
+    limit = max(1, min(int(args.get('limit') or 100), 200))
+    conn = sqlite3.connect(database_path);conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute('''SELECT f.id,f.nombre,f.estado,
+          COALESCE(sf.estado,'SIN SUSCRIPCION') AS subscription_status,
+          sf.fecha_vencimiento,sf.creditos_disponibles,sf.creditos_incluidos_periodo,
+          COALESCE(p.nombre,f.plan,'SIN PLAN') AS plan,
+          (SELECT COUNT(*) FROM usuarios_app u WHERE u.fundacion_id=f.id AND COALESCE(u.activo,1)=1) AS active_users,
+          (SELECT MAX(s.fecha_creacion) FROM sesiones_usuario s WHERE s.fundacion_id=f.id) AS last_activity
+          FROM fundaciones f
+          LEFT JOIN suscripciones_fundacion sf ON sf.fundacion_id=f.id
+          LEFT JOIN planes_suscripcion p ON p.id=sf.plan_id
+          WHERE f.eliminado_en IS NULL ORDER BY f.nombre LIMIT ?''',(limit,)).fetchall()
+    finally: conn.close()
+    today = datetime.now(ZoneInfo('America/Bogota')).date();items=[]
+    summary={'total':0,'active':0,'expiring':0,'expired':0,'without_users':0,'without_activity':0,'low_credit':0,'exhausted_credit':0}
+    for raw in rows:
+        row=dict(raw);expiry=None;days=None
+        if row.get('fecha_vencimiento'):
+            try: expiry=date.fromisoformat(str(row['fecha_vencimiento'])[:10]);days=(expiry-today).days
+            except ValueError: pass
+        included=int(row.get('creditos_incluidos_periodo') or 0);available=int(row.get('creditos_disponibles') or 0)
+        credit_percent=round((available/included)*100,2) if included>0 else None
+        state=str(row.get('estado') or '').upper();substate=str(row.get('subscription_status') or '').upper()
+        expired=bool(days is not None and days<0) or substate in {'VENCIDA','SUSPENDIDA','CANCELADA'}
+        expiring=not expired and days is not None and days<=30
+        summary['total']+=1;summary['active']+=int(state=='ACTIVA' and not expired);summary['expired']+=int(expired);summary['expiring']+=int(expiring)
+        summary['without_users']+=int(int(row.get('active_users') or 0)==0);summary['without_activity']+=int(not row.get('last_activity'))
+        summary['exhausted_credit']+=int(available<=0);summary['low_credit']+=int(included>0 and 0<available<=included*.2)
+        items.append({'foundation_id':row.get('id'),'foundation':row.get('nombre'),'status':state or 'SIN ESTADO','subscription_status':substate,'plan':row.get('plan'),'expiry_date':row.get('fecha_vencimiento'),'days_remaining':days,'credits_available':available,'credits_included':included,'credit_available_percent':credit_percent,'active_users':int(row.get('active_users') or 0),'last_activity':row.get('last_activity'),'alert':'CRITICA' if expired or available<=0 else ('ALTA' if expiring or (credit_percent is not None and credit_percent<=20) else 'NORMAL')})
+    return {'scope':{'type':'authorized_global','cross_foundation':True,'role':'SUPERADMIN'},'summary':summary,'items':items,'limit':limit,'source':'Fundaciones y Suscripciones','read_only':True}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -492,6 +526,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)
     if tool_name=='get_system_health': return _system_health(database_path,tenant_id)
+    if tool_name=='get_foundation_portfolio': return _foundation_portfolio(database_path,args)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')
