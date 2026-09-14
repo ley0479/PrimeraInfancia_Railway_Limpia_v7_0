@@ -261,15 +261,18 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.get('/chat/history/admin')
     def admin_chat_history():
+        if not public_liam_flags().get('admin_enabled'):return jsonify({'error':'La administración de Liam está desactivada por configuración.'}),403
         ctx=get_request_user_context()
         if str(ctx.get('rol') or '').upper() not in {'SUPERADMIN','GERENTE','COORDINADOR'}:return jsonify({'error':'No tienes permiso para auditar conversaciones.'}),403
         try:limit=max(1,min(int(request.args.get('limit') or 100),500))
         except (TypeError,ValueError):limit=100
         target=request.args.get('user_id',type=int);where='m.fundacion_id=?';params=[int(ctx.get('fundacion_id') or 1)]
         if target:where+=' AND m.usuario_id=?';params.append(target)
-        conn=connect();rows=conn.execute(f'''SELECT m.id,m.usuario_id,u.username,m.role,m.content_redacted,m.module,m.request_id,m.created_at
+        conn=connect()
+        try:rows=conn.execute(f'''SELECT m.id,m.usuario_id,u.username,m.role,m.content_redacted,m.module,m.request_id,m.created_at
           FROM lia_conversation_messages m LEFT JOIN usuarios_app u ON u.id=m.usuario_id AND u.fundacion_id=m.fundacion_id
-          WHERE {where} ORDER BY m.id DESC LIMIT ?''',tuple([*params,limit])).fetchall();conn.close()
+          WHERE {where} ORDER BY m.id DESC LIMIT ?''',tuple([*params,limit])).fetchall()
+        finally:conn.close()
         audit_lia(ctx,'CONVERSATION_HISTORY_AUDITED',module='administracion',metadata={'target_user_id':target,'rows':len(rows)})
         return jsonify({'messages':[dict(row) for row in rows],'scope':{'foundation_id':int(ctx.get('fundacion_id') or 1),'cross_foundation':False},'read_only':True}),200
 
@@ -368,6 +371,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.route('/elian/visual-config',methods=['GET','PUT'])
     def elian_visual_config():
+        if request.method=='PUT' and not public_liam_flags().get('admin_enabled'):return jsonify({'error':'La administración de Liam está desactivada por configuración.'}),403
         ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0)
         variants={
             'afro_colombian_institutional':{'label':'Afrocolombiano institucional','assets':{'male':'./assets/lia/elian-afro-institutional-male-v1.png','female':'./assets/lia/liam-afro-institutional-fullbody-v2.png'},'ready_genders':['male','female']},
@@ -829,6 +833,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.get('/errors')
     def error_center_list():
+        if not public_liam_flags().get('admin_enabled'):return jsonify({'error':'La administración de Liam está desactivada por configuración.'}),403
         ctx=get_request_user_context()
         if str(ctx.get('rol') or '') not in {'SUPERADMIN','GERENTE','COORDINADOR'}:return jsonify({'error':'No tienes permiso para consultar el centro de diagnóstico.'}),403
         return jsonify({'incidents':list_incidents(database_path,int(ctx.get('fundacion_id') or 1),request.args.get('limit',50,type=int))}),200
@@ -848,7 +853,9 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.get('/notification-providers')
     def notification_provider_status():
-        get_request_user_context()
+        if not public_liam_flags().get('admin_enabled'):return jsonify({'error':'La administración de Liam está desactivada por configuración.'}),403
+        ctx=get_request_user_context()
+        if str(ctx.get('rol') or '').upper()!='SUPERADMIN':return jsonify({'error':'Solo SUPERADMIN puede consultar adaptadores de notificación.'}),403
         return jsonify({'providers':provider_catalog(),'send_enabled':False,'approval_required':True}),200
 
     @bp.route('/session-context',methods=['GET','PUT','DELETE'])

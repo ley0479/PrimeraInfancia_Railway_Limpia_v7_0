@@ -30,6 +30,10 @@ try:
         assert client.get('/api/asistente-capacitacion/elian/platform-tour').status_code==404
         assert client.get('/api/asistente-capacitacion/elian/platform-tour/progress').status_code==404
         assert client.post('/api/asistente-capacitacion/progreso',json={'modulo':'dashboard'}).status_code==404
+        assert client.get('/api/asistente-capacitacion/chat/history/admin').status_code==403
+        assert client.get('/api/asistente-capacitacion/errors').status_code==403
+        assert client.get('/api/asistente-capacitacion/notification-providers').status_code==403
+        assert client.put('/api/asistente-capacitacion/elian/visual-config',json={'avatar_gender':'female'}).status_code==403
         safe=client.post('/api/asistente-capacitacion/tools/get_structured_error',json={'code':'PARTICIPANTES_REQUERIDOS'})
         assert safe.status_code==200 and safe.get_json()['ui']['disabledByFeatureFlag'] is True
 finally:
