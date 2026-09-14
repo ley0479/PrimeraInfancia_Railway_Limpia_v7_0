@@ -81,6 +81,14 @@ def test_period_comparison_uses_two_explicit_months_and_context_year():
     assert value['confirmation_required'] is False
 
 
+def test_custom_report_intent_maps_only_predefined_fields():
+    value = propose_action('Liam crea un reporte con unidad, docente y número de niños')
+    assert value['server_tool'] == 'build_custom_report_preview'
+    assert value['arguments']['report'] == 'unit_coverage'
+    assert value['arguments']['fields'] == ['unit', 'teacher', 'children_count']
+    assert value['confirmation_required'] is False
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -91,4 +99,5 @@ if __name__=='__main__':
     test_ram_master_user_and_foundation_proposals()
     test_monthly_relation_and_nutrition_report_requires_confirmation()
     test_period_comparison_uses_two_explicit_months_and_context_year()
+    test_custom_report_intent_maps_only_predefined_fields()
     print('LIAM_ACTION_INTENTS_V7_PASS')

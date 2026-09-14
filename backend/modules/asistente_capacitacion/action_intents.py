@@ -71,6 +71,25 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    if any(text in q for text in ('reporte personalizado', 'crea un reporte con', 'crear un reporte con', 'vista previa del reporte')):
+        report = 'age_distribution' if 'grupo etario' in q else ('coordinator_coverage' if 'coordinador' in q and 'docente' not in q else 'unit_coverage')
+        aliases = (
+            ('unit', ('unidad', 'uds', 'uca')),
+            ('coordinator', ('coordinador',)),
+            ('teacher', ('docente', 'agente educativo')),
+            ('children_count', ('numero de ninos', 'cantidad de ninos', 'beneficiarios', 'ninos')),
+            ('age_group', ('grupo etario',)),
+            ('units_count', ('numero de unidades', 'cantidad de unidades')),
+        )
+        fields = [field for field, words in aliases if any(word in q for word in words)]
+        return {
+            'id': 'build_custom_report_preview',
+            'label': 'Vista previa del reporte',
+            'summary': 'Construiré una vista previa de solo lectura con campos permitidos.',
+            'arguments': {'report': report, 'fields': fields or None, 'limit': 100},
+            'missing': [], 'confirmation_required': False,
+            'server_tool': 'build_custom_report_preview',
+        }
     if any(word in q for word in ('compara', 'comparar', 'comparacion')):
         months = [number for name, number in MONTHS.items() if re.search(rf'\b{name}\b', q)]
         years = [int(x) for x in re.findall(r'\b(20\d{2}|2100)\b', q)]

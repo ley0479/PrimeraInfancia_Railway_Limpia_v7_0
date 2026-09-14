@@ -27,6 +27,7 @@ RULES = {
     'get_platform_module_summary': ActionRule('get_platform_module_summary','read',ALL_AUTHENTICATED),
     'get_monthly_health_indicators': ActionRule('get_monthly_health_indicators','read',ALL_AUTHENTICATED),
     'compare_periods': ActionRule('compare_periods','read',ALL_AUTHENTICATED),
+    'build_custom_report_preview': ActionRule('build_custom_report_preview','read',ALL_AUTHENTICATED),
     'get_document_processing_status': ActionRule('get_document_processing_status','read',ALL_AUTHENTICATED),
     'get_format_generation_status': ActionRule('get_format_generation_status','read',ALL_AUTHENTICATED),
     'get_structured_error': ActionRule('get_structured_error','read',ALL_AUTHENTICATED),

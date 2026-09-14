@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -289,6 +289,75 @@ def _compare_periods(database_path: str, tenant_id: int, args: dict) -> dict:
         a=found[0].get(key);b=found[1].get(key);metrics.append({'indicator':label,'period_a':a,'period_b':b,'variation':(int(b)-int(a)) if a is not None and b is not None else None,'available':a is not None and b is not None})
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'period_a':periods[0],'period_b':periods[1],'snapshots':found,'comparison':metrics,'complete':all(x.get('available',True) for x in found),'read_only':True,'disclaimer':'Solo se comparan cruces existentes; los valores ausentes no se estiman.'}
 
+
+REPORT_BUILDERS = {
+    'unit_coverage': {
+        'title': 'Cobertura por unidad',
+        'columns': ('unit', 'coordinator', 'teacher', 'children_count'),
+        'sql': '''SELECT COALESCE(NULLIF(TRIM(unidad_servicio),''),'SIN UNIDAD') AS unit,
+          COALESCE(NULLIF(TRIM(coordinador),''),'SIN COORDINADOR') AS coordinator,
+          COALESCE(NULLIF(TRIM(docente),''),'SIN DOCENTE') AS teacher,COUNT(*) AS children_count
+          FROM master_ninos WHERE fundacion_id=? AND COALESCE(activo,1)=1
+          GROUP BY unit,coordinator,teacher ORDER BY unit,teacher''',
+    },
+    'age_distribution': {
+        'title': 'Beneficiarios por grupo etario',
+        'columns': ('age_group', 'children_count'),
+        'sql': '''SELECT COALESCE(NULLIF(TRIM(grupo_etario),''),'SIN GRUPO ETARIO') AS age_group,
+          COUNT(*) AS children_count FROM master_ninos
+          WHERE fundacion_id=? AND COALESCE(activo,1)=1 GROUP BY age_group ORDER BY age_group''',
+    },
+    'coordinator_coverage': {
+        'title': 'Cobertura por coordinador',
+        'columns': ('coordinator', 'units_count', 'children_count'),
+        'sql': '''SELECT COALESCE(NULLIF(TRIM(coordinador),''),'SIN COORDINADOR') AS coordinator,
+          COUNT(DISTINCT COALESCE(NULLIF(TRIM(unidad_servicio),''),'SIN UNIDAD')) AS units_count,
+          COUNT(*) AS children_count FROM master_ninos
+          WHERE fundacion_id=? AND COALESCE(activo,1)=1 GROUP BY coordinator ORDER BY coordinator''',
+    },
+}
+
+
+def _custom_report_preview(database_path: str, tenant_id: int, args: dict, user: dict) -> dict:
+    report = str(args.get('report') or '').strip().lower()
+    builder = REPORT_BUILDERS.get(report)
+    if not builder:
+        raise ValueError('El tipo de reporte no está permitido.')
+    requested = args.get('fields') or list(builder['columns'])
+    if not isinstance(requested, list) or not requested:
+        raise ValueError('fields debe ser una lista no vacía.')
+    fields = []
+    for field in requested:
+        clean = str(field or '').strip()
+        if clean not in builder['columns']:
+            raise ValueError(f'El campo {clean or "vacío"} no está permitido para este reporte.')
+        if clean not in fields:
+            fields.append(clean)
+    limit = max(1, min(int(args.get('limit') or 100), 200))
+    role = str(user.get('rol') or user.get('role') or '').strip().upper()
+    identity = str(user.get('nombre_completo') or user.get('username') or '').strip()
+    sql = builder['sql']
+    params = [tenant_id]
+    if role in {'DOCENTE', 'COORDINADOR'}:
+        if not identity:
+            raise PermissionError('Tu perfil no tiene una identidad verificable para limitar el reporte.')
+        column = 'docente' if role == 'DOCENTE' else 'coordinador'
+        sql = sql.replace('GROUP BY', f'AND UPPER(TRIM({column}))=UPPER(?) GROUP BY', 1)
+        params.append(identity)
+    conn = sqlite3.connect(database_path);conn.row_factory = sqlite3.Row
+    try:
+        source_rows = [dict(row) for row in conn.execute(sql, tuple(params)).fetchall()]
+    finally:
+        conn.close()
+    rows = [{field: row.get(field) for field in fields} for row in source_rows[:limit]]
+    return {
+        'scope': {'foundation_id': tenant_id, 'source': 'authenticated_session', 'cross_foundation': False},
+        'report': report, 'title': builder['title'], 'fields': fields, 'rows': rows,
+        'total_rows': len(source_rows), 'shown_rows': len(rows), 'preview_only': True,
+        'read_only': True, 'source': 'Base Maestra activa',
+        'role_scope': 'assigned_records' if role in {'DOCENTE', 'COORDINADOR'} else 'active_foundation',
+    }
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -344,6 +413,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
         return _module_summary(database_path,tenant_id,args)
     if tool_name=='get_monthly_health_indicators': return _health_indicators(database_path,tenant_id,args)
     if tool_name=='compare_periods': return _compare_periods(database_path,tenant_id,args)
+    if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')
