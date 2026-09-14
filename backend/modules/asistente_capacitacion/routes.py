@@ -496,6 +496,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 result.update({'message':'Tu rol no tiene permiso para abrir o consultar ese módulo.','speech_text':'Tu rol no tiene permiso para abrir o consultar ese módulo.','confidence':'forbidden','confirmation_required':False,'actions':[]})
             elif proposal.get('server_tool'):
                 try:
+                    if proposal['server_tool'] in {'prepare_dev_change_request','list_dev_change_requests','get_dev_change_review'} and not public_liam_flags()['dev_enabled']:
+                        raise PermissionError('La capacidad ADMIN/DEV de Liam está desactivada por configuración.')
                     user=dict(getattr(g,'current_user',None) or {}) or {'id':ctx.get('usuario_id'),'rol':ctx.get('rol')}
                     outcome=orchestrator.run(proposal['server_tool'],args=proposal.get('arguments') or {},tenant_id=int(ctx.get('fundacion_id') or 1),user=user,module=module,request_id=result['request_id'])
                     tool_result=outcome.result
