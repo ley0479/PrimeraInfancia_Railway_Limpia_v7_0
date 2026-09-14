@@ -114,6 +114,13 @@ def test_master_quality_intent_never_requests_mutation():
     assert value['confirmation_required'] is False
 
 
+def test_early_warning_intent_uses_risk_language():
+    value=propose_action('Liam muéstrame las alertas tempranas de septiembre de 2026')
+    assert value['server_tool']=='get_early_warnings'
+    assert value['arguments']['period']=='2026-09'
+    assert value['confirmation_required'] is False
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -129,4 +136,5 @@ if __name__=='__main__':
     test_system_health_intent_is_closed_tool()
     test_foundation_portfolio_intent_is_closed_tool()
     test_master_quality_intent_never_requests_mutation()
+    test_early_warning_intent_uses_risk_language()
     print('LIAM_ACTION_INTENTS_V7_PASS')

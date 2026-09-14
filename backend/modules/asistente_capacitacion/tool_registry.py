@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -499,6 +499,25 @@ def _master_data_quality(database_path: str, tenant_id: int, user: dict) -> dict
     alerts=sum(1 for item in findings if item['total']>0)
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'total_records':total,'findings':findings,'summary':{'alerts':alerts,'duplicate_document_groups':duplicate_groups,'duplicate_excess_records':duplicate_excess,'unregistered_units':unregistered,'units_without_responsible':units_without,'teachers_without_unit':teachers_without,'open_registered_inconsistencies':open_issues},'role_scope':'assigned_records' if role in {'DOCENTE','COORDINADOR'} else 'active_foundation','source':'Base Maestra activa','read_only':True,'automatic_corrections':False}
 
+
+def _early_warnings(database_path: str, tenant_id: int, args: dict, user: dict) -> dict:
+    deliverables=_deliverable_supervision(database_path,tenant_id,{'period':args.get('period')},user)
+    quality=_master_data_quality(database_path,tenant_id,user)
+    d=deliverables['summary'];q=quality['summary'];warnings=[]
+    def add(code,title,total,level,source,reason):
+        if int(total or 0)>0:warnings.append({'code':code,'title':title,'total':int(total),'level':level,'source':source,'reason':reason})
+    add('DELIVERABLE_OVERDUE','Riesgo de incumplimiento por entregables vencidos',d.get('overdue'),'CRITICO','Calendario Inteligente','La fecha límite ya pasó y el entregable no figura como recibido.')
+    add('DELIVERABLE_PENDING','Riesgo de acumulación de entregables pendientes',d.get('pending'),'ALTO','Calendario Inteligente','Existen entregables esperados todavía pendientes.')
+    add('DELIVERABLE_RETURNED','Entregables devueltos requieren corrección',d.get('returned'),'ALTO','Calendario Inteligente','El estado confirmado es devuelto o rechazado.')
+    add('DELIVERABLE_INCOMPLETE','Entregables incompletos requieren evidencia',d.get('incomplete'),'ALTO','Calendario Inteligente','Falta evidencia obligatoria o el estado es incompleto.')
+    add('MASTER_DUPLICATES','Riesgo de doble conteo por documentos duplicados',q.get('duplicate_document_groups'),'CRITICO','Base Maestra activa','Se detectaron documentos repetidos en el alcance autorizado.')
+    add('MASTER_UNIT','Registros requieren revisión de UDS',q.get('unregistered_units'),'ALTO','Base Maestra activa','La UDS informada no coincide con el catálogo activo.')
+    missing=sum(item.get('total',0) for item in quality['findings'] if str(item.get('code','')).startswith('MISSING_'))
+    add('MASTER_MISSING','Registros con campos faltantes',missing,'PREVENTIVO','Base Maestra activa','Hay valores obligatorios vacíos que pueden afectar reportes posteriores.')
+    order={'CRITICO':0,'ALTO':1,'PREVENTIVO':2,'NORMAL':3};warnings.sort(key=lambda x:(order.get(x['level'],9),x['title']))
+    counts={level:sum(1 for item in warnings if item['level']==level) for level in ('CRITICO','ALTO','PREVENTIVO')}
+    return {'scope':deliverables['scope'],'period':args.get('period') or None,'summary':{'total_warnings':len(warnings),**{key.lower():value for key,value in counts.items()}},'warnings':warnings,'sources':['Calendario Inteligente','Base Maestra activa'],'role_scope':deliverables['role_scope'],'read_only':True,'predictive_language':'risk_only','disclaimer':'Estas alertas describen riesgos según los datos disponibles; no son predicciones ni diagnósticos.'}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -559,6 +578,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_system_health': return _system_health(database_path,tenant_id)
     if tool_name=='get_foundation_portfolio': return _foundation_portfolio(database_path,args)
     if tool_name=='analyze_master_data_quality': return _master_data_quality(database_path,tenant_id,user)
+    if tool_name=='get_early_warnings': return _early_warnings(database_path,tenant_id,args,user)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')

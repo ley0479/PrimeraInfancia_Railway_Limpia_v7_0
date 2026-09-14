@@ -5,7 +5,7 @@ BACKEND=Path(__file__).resolve().parents[1];sys.path.insert(0,str(BACKEND))
 from modules.dbapi_compat import sqlite3
 from modules.asistente_capacitacion.tool_registry import ALLOWED_TOOLS,execute
 
-assert ALLOWED_TOOLS==frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+assert ALLOWED_TOOLS==frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 try: execute('run_sql',args={},database_path='none',tenant_id=1,user={})
 except PermissionError: pass
 else: raise AssertionError('Una herramienta fuera de lista fue aceptada.')
