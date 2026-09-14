@@ -10,6 +10,7 @@ from .error_catalog import explain
 from .action_policy import require as require_action
 from .action_policy import decision as action_decision
 from .action_intents import propose_action
+from .notification_providers import provider_catalog
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
@@ -613,7 +614,7 @@ def _communication_draft(database_path: str, tenant_id: int, args: dict, user: d
     recipients.sort(key=lambda x:x['responsible'].upper())
     period=str(args.get('period') or '').strip();subject=f"Recordatorio de entregables pendientes{f' · {period}' if period else ''}"
     body=f"Cordial saludo. Se identificaron {len(pending)} entregables que requieren atención dentro del alcance autorizado. Por favor revisa el Calendario Inteligente, valida fechas y soportes, y actualiza cada registro en su módulo de origen."
-    return {'scope':supervision['scope'],'audience':audience,'period':period or None,'recipients':recipients,'recipient_count':len(recipients),'subject':subject,'message':body,'pending_count':len(pending),'source':'Calendario Inteligente','draft_only':True,'send_enabled':False,'requires_approval_before_send':True,'read_only':True}
+    return {'scope':supervision['scope'],'audience':audience,'period':period or None,'recipients':recipients,'recipient_count':len(recipients),'subject':subject,'message':body,'pending_count':len(pending),'source':'Calendario Inteligente','delivery_channels':provider_catalog(),'draft_only':True,'send_enabled':False,'requires_approval_before_send':True,'read_only':True}
 
 
 def _run_favorite(database_path: str, tenant_id: int, args: dict, user: dict) -> dict:

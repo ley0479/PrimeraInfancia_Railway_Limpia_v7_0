@@ -24,6 +24,7 @@ from .system_prompt import realtime_instructions
 from .orchestrator import LiamOrchestrator
 from .context_service import load as load_session_context, save as save_session_context, clear as clear_session_context
 from .repair_registry import public_registry
+from .notification_providers import provider_catalog
 import csv, io, json, uuid, os, tempfile, re, hashlib, requests
 
 
@@ -95,7 +96,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             if isinstance(value.get('warnings'),list) and value.get('predictive_language')=='risk_only':return {'title':'Alertas tempranas','note':value.get('disclaimer'),'metrics':[{'label':'Alertas','value':(value.get('summary') or {}).get('total_warnings',0)},{'label':'Críticas','value':(value.get('summary') or {}).get('critico',0)},{'label':'Altas','value':(value.get('summary') or {}).get('alto',0)},{'label':'Preventivas','value':(value.get('summary') or {}).get('preventivo',0)}],'columns':['Nivel','Riesgo','Registros','Fuente','Motivo'],'rows':[[x.get('level'),x.get('title'),x.get('total'),x.get('source'),x.get('reason')] for x in value['warnings']]}
             if isinstance(value.get('incidents'),list) and value.get('sanitized') is True:return {'title':'Centro de incidencias','metrics':[{'label':'Incidencias','value':(value.get('summary') or {}).get('total',0)},{'label':'Abiertas','value':(value.get('summary') or {}).get('open',0)},{'label':'En análisis','value':(value.get('summary') or {}).get('in_analysis',0)},{'label':'Resueltas','value':(value.get('summary') or {}).get('resolved',0)}],'columns':['Incidencia','Módulo','Código','Tipo','Estado','Severidad','Fecha'],'rows':[[x.get('incident_id'),x.get('module'),x.get('error_code'),x.get('error_type'),x.get('status'),x.get('severity'),x.get('created_at')] for x in value['incidents']]}
             if isinstance(value.get('notifications'),list) and value.get('send_actions') is False:return {'title':'Centro de notificaciones','metrics':[{'label':'Pendientes','value':(value.get('summary') or {}).get('total',0)},{'label':'Críticas','value':(value.get('summary') or {}).get('critical',0)},{'label':'Advertencias','value':(value.get('summary') or {}).get('warning',0)},{'label':'Información','value':(value.get('summary') or {}).get('information',0)}],'columns':['Prioridad','Origen','Notificación','Estado','Fecha'],'rows':[[x.get('priority'),x.get('source'),x.get('title'),x.get('status'),x.get('date')] for x in value['notifications']]}
-            if isinstance(value.get('recipients'),list) and value.get('draft_only') is True:return {'title':'Borrador de comunicación','note':'Este borrador no ha sido enviado.','metrics':[{'label':'Destinatarios','value':value.get('recipient_count',0)},{'label':'Entregables pendientes','value':value.get('pending_count',0)}],'columns':['Responsable','Unidades','Pendientes','Vencidos'],'rows':[[x.get('responsible'),', '.join(x.get('units') or []),x.get('pending'),x.get('overdue')] for x in value['recipients']],'sections':[{'title':'Asunto','text':value.get('subject')},{'title':'Mensaje','text':value.get('message')} ]}
+            if isinstance(value.get('recipients'),list) and value.get('draft_only') is True:return {'title':'Borrador de comunicación','note':'Este borrador no ha sido enviado. Los canales permanecen deshabilitados hasta configurar proveedor y aprobación.','metrics':[{'label':'Destinatarios','value':value.get('recipient_count',0)},{'label':'Entregables pendientes','value':value.get('pending_count',0)},{'label':'Canales habilitados','value':sum(1 for x in value.get('delivery_channels') or [] if x.get('enabled'))}],'columns':['Responsable','Unidades','Pendientes','Vencidos'],'rows':[[x.get('responsible'),', '.join(x.get('units') or []),x.get('pending'),x.get('overdue')] for x in value['recipients']],'sections':[{'title':'Asunto','text':value.get('subject')},{'title':'Mensaje','text':value.get('message')} ]}
             if isinstance(value.get('profiles'),list):return {'columns':['Nombre','Usuario','Rol','Estado'],'rows':[[x.get('nombre_completo'),x.get('username'),x.get('rol'),'Activo' if x.get('activo') else 'Inactivo'] for x in value['profiles'][:30]]}
             if isinstance(value.get('indicators'),dict):
                 metrics=[{'label':str(k).replace('_',' ').title(),'value':v} for k,v in value['indicators'].items() if isinstance(v,(int,float))]
@@ -796,6 +797,11 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def repairs_available():
         ctx=get_request_user_context()
         return jsonify({'repairs':public_registry(str(ctx.get('rol') or '')),'arbitrary_commands':False}),200
+
+    @bp.get('/notification-providers')
+    def notification_provider_status():
+        get_request_user_context()
+        return jsonify({'providers':provider_catalog(),'send_enabled':False,'approval_required':True}),200
 
     @bp.route('/session-context',methods=['GET','PUT','DELETE'])
     def session_context():
