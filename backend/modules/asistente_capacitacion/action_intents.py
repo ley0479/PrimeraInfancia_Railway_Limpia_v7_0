@@ -71,6 +71,9 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    technical_incident=re.search(r'\bINC-\d{8}-\d{6}-[A-Z0-9]{6}\b',str(question or '').upper())
+    if technical_incident and any(text in q for text in ('diagnostico tecnico','detalle tecnico','ver la traza','mostrar la traza')):
+        return {'id':'get_technical_diagnostic','label':'Consultar diagnóstico técnico','summary':'Consultaré el diagnóstico sanitizado dentro de la fundación activa.','arguments':{'incident_id':technical_incident.group(0)},'missing':[],'confirmation_required':False,'server_tool':'get_technical_diagnostic'}
     known_code=re.search(r'\b([A-Za-z][A-Za-z0-9-]*(?:_[A-Za-z0-9_-]+)+)\b',str(question or ''))
     if known_code and any(text in q for text in ('solucion conocida','solucion del error','buscar solucion','como se resolvio')):
         code=known_code.group(1).upper()

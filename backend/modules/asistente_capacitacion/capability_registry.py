@@ -39,6 +39,7 @@ CAPABILITIES = {
         Capability('get_early_warnings','analiza','Entregables y Base Maestra'),
         Capability('get_incident_center','admin','Centro de Incidencias'),
         Capability('get_known_solution','guia','Base de Conocimiento LIAM'),
+        Capability('get_technical_diagnostic','admin_dev','Centro de Incidencias LIAM'),
         Capability('get_notification_center','consulta','Centro de Notificaciones'),
         Capability('prepare_communication_draft','ejecuta','Calendario y Entregables'),
         Capability('run_command_favorite','ejecuta','Comandos Favoritos'),

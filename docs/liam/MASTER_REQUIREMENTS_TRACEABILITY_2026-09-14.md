@@ -21,7 +21,7 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 | 15 | Calidad documental | VERIFICADO | Motor documental e integridad existentes; regresiones dedicadas. |
 | 16 | Auditor de plantillas | VERIFICADO | Motor de Plantillas y preservación de oficiales. |
 | 17 | Diagnóstico automático | VERIFICADO | Incidencias con código, contexto sanitizado y tenant. |
-| 18 | Explicación por audiencia | PARCIAL | Diagnóstico funcional y administrativo; falta vista técnica elevada separada. |
+| 18 | Explicación por audiencia | VERIFICADO | Diagnóstico funcional, administrativo y técnico elevado sanitizado. |
 | 19 | Autorreparación controlada | VERIFICADO | Registro cerrado, flag, SUPERADMIN y confirmación explícita. |
 | 20 | Asistente de desarrollo | PARCIAL | Solicitud y revisión existen; faltan sandbox, pruebas y diff generados por flujo aislado. |
 | 21 | Protección de código | PARCIAL | Compuertas y no despliegue existen; falta ejecutor sandbox/rollback integrado. |
@@ -74,14 +74,13 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 | 68 | Implementación fases | VERIFICADO | Fases independientes documentadas. |
 | 69 | Detener ante regresión | VERIFICADO | Las fallas encontradas se corrigieron antes de avanzar. |
 | 70 | Entrega por fase | VERIFICADO | Documentos de cambios, pruebas, riesgo y rollback. |
-| 71 | Éxito final | PARCIAL | Funciones principales operan; depende del cierre de 18, 20, 21, 40, 43, 60 y 64. |
+| 71 | Éxito final | PARCIAL | Funciones principales operan; depende del cierre de 20, 21, 40, 43, 60 y 64. |
 | 72 | Instrucción final | VERIFICADO | Auditoría inicial, cambios pequeños, pruebas, commits y cero despliegue automático. |
 
 ## Orden de cierre restante
 
 1. Gestión administrativa segura del estado de incidencias (40).
-2. Vista técnica elevada y sanitizada (18).
-3. Flujo ADMIN/DEV de artefactos sandbox, pruebas y diff sin despliegue (20–21).
-4. Propuesta reforzada de restauración, todavía sin ejecución automática (43).
-5. Presupuesto y prueba cuantitativa de rendimiento (60).
-6. E2E autenticado en entorno objetivo cuando exista autorización y credenciales de prueba (64).
+2. Flujo ADMIN/DEV de artefactos sandbox, pruebas y diff sin despliegue (20–21).
+3. Propuesta reforzada de restauración, todavía sin ejecución automática (43).
+4. Presupuesto y prueba cuantitativa de rendimiento (60).
+5. E2E autenticado en entorno objetivo cuando exista autorización y credenciales de prueba (64).

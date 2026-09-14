@@ -147,6 +147,13 @@ def test_known_solution_intent_requires_explicit_error_code():
     assert value['confirmation_required'] is False
 
 
+def test_technical_diagnostic_intent_requires_incident_id():
+    value=propose_action('Liam muéstrame el diagnóstico técnico de INC-20260914-150000-AAAAAA')
+    assert value['server_tool']=='get_technical_diagnostic'
+    assert value['arguments']['incident_id']=='INC-20260914-150000-AAAAAA'
+    assert value['confirmation_required'] is False
+
+
 def test_notification_center_intent_is_read_only():
     value=propose_action('Liam qué notificaciones tengo')
     assert value['server_tool']=='get_notification_center'
@@ -232,6 +239,7 @@ if __name__=='__main__':
     test_early_warning_intent_uses_risk_language()
     test_incident_center_intent_filters_open_items()
     test_known_solution_intent_requires_explicit_error_code()
+    test_technical_diagnostic_intent_requires_incident_id()
     test_notification_center_intent_is_read_only()
     test_communication_intent_creates_draft_not_send_action()
     test_favorite_intent_resolves_name_without_executing_locally()

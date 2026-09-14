@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-import re,uuid
+import re,uuid,json
 from modules.dbapi_compat import sqlite3
 from modules.calendario_inteligente.repository import CalendarioInteligenteRepository
 from modules.idp_documental.repository import IDPRepository
@@ -19,6 +19,7 @@ from services.relacion_mes_service import consolidar_por_unidad, docente_mas_fre
 ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard','prepare_meeting_brief','prepare_meeting_followup','prepare_dev_change_request','list_dev_change_requests','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_dev_change_review'})
 ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_known_solution'})
+ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_technical_diagnostic'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -596,6 +597,22 @@ def _known_solution(database_path:str,tenant_id:int,args:dict)->dict:
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'known_solution':item,'raw_messages_included':False,'technical_details_included':False,'source':'Base de Conocimiento LIAM','read_only':True}
 
 
+def _technical_diagnostic(database_path:str,tenant_id:int,args:dict)->dict:
+    incident_id=str(args.get('incident_id') or '').strip().upper()[:80]
+    if not re.fullmatch(r'INC-\d{8}-\d{6}-[A-Z0-9]{6}',incident_id):raise ValueError('Indica un identificador de incidencia válido.')
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:row=conn.execute('''SELECT incident_id,module,action,http_status,error_code,error_type,technical_message_redacted,severity,status,request_id,context_redacted,created_at,updated_at FROM lia_error_incidents WHERE fundacion_id=? AND incident_id=?''',(tenant_id,incident_id)).fetchone()
+    finally:conn.close()
+    if not row:raise LookupError('No encontré esa incidencia dentro de la fundación activa.')
+    item=dict(row);context={}
+    try:context=json.loads(item.pop('context_redacted') or '{}')
+    except Exception:context={}
+    item['exception_sanitized']=redact(str(item.pop('technical_message_redacted') or ''))[:800]
+    item['trace_id']=redact(str(item.pop('request_id') or ''))[:80]
+    item['context']={key:redact(str(value))[:120] for key,value in context.items() if key in {'period','screen','method'}}
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'diagnostic':item,'source':'Centro de Incidencias LIAM','sanitized':True,'secrets_included':False,'read_only':True}
+
+
 def _notification_center(database_path: str, tenant_id: int, args: dict, user: dict) -> dict:
     limit=max(1,min(int(args.get('limit') or 50),100));role=str(user.get('rol') or user.get('role') or '').strip().upper();uid=int(user.get('id') or user.get('usuario_id') or 0);items=[];sources=[]
     conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
@@ -862,6 +879,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_early_warnings': return _early_warnings(database_path,tenant_id,args,user)
     if tool_name=='get_incident_center': return _incident_center(database_path,tenant_id,args,user)
     if tool_name=='get_known_solution': return _known_solution(database_path,tenant_id,args)
+    if tool_name=='get_technical_diagnostic': return _technical_diagnostic(database_path,tenant_id,args)
     if tool_name=='get_notification_center': return _notification_center(database_path,tenant_id,args,user)
     if tool_name=='prepare_communication_draft': return _communication_draft(database_path,tenant_id,args,user)
     if tool_name=='run_command_favorite': return _run_favorite(database_path,tenant_id,args,user)
