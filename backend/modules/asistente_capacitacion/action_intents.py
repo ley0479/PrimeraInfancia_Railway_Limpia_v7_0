@@ -76,6 +76,10 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
         return {'id':'run_command_favorite','label':'Ejecutar comando favorito','summary':'Resolveré el favorito dentro de tu usuario y aplicaré sus permisos actuales.','arguments':{'name':_clean_unit(favorite_match.group(1)),'screen_context':context},'missing':[],'confirmation_required':False,'server_tool':'run_command_favorite'}
     if any(text in q for text in ('centro liam','centro de liam','centro inteligente')):
         return {'id':'get_liam_center','label':'Consultar Centro Liam','summary':'Consolidaré el centro administrativo autorizado con datos sanitizados y disponibilidad por fuente.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_liam_center'}
+    if any(text in q for text in ('plan de reparacion','analiza reparaciones','vista previa de reparacion')):
+        return {'id':'safe_repair_preview','label':'Analizar reparación segura','summary':'Iniciaré un diagnóstico de reparación sin aplicar cambios.','arguments':{'repair_id':'integrity_safe_repair'},'missing':[],'confirmation_required':False,'client_handler':'safe_repair_preview'}
+    if any(text in q for text in ('repara el sistema','aplica la reparacion','ejecuta la reparacion segura')):
+        return {'id':'safe_repair_apply','label':'Confirmar reparación segura','summary':'Aplicar el plan cerrado del Motor de Integridad. No ejecuta comandos arbitrarios ni modifica reglas de negocio.','arguments':{'repair_id':'integrity_safe_repair'},'missing':[],'confirmation_required':True,'client_handler':'safe_repair_apply'}
     if any(text in q for text in ('salud del sistema', 'estado del sistema', 'diagnostico del sistema')):
         return {'id':'get_system_health','label':'Consultar salud del sistema','summary':'Revisaré componentes internos sin exponer secretos.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_system_health'}
     if 'fundacion' in q and any(text in q for text in ('proximas a vencer','proxima a vencer','sin usuarios','sin actividad','fundaciones activas','estado de las fundaciones')):

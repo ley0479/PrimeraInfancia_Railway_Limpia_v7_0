@@ -23,6 +23,7 @@ from .action_policy import decision as action_decision, public_policy
 from .system_prompt import realtime_instructions
 from .orchestrator import LiamOrchestrator
 from .context_service import load as load_session_context, save as save_session_context, clear as clear_session_context
+from .repair_registry import public_registry
 import csv, io, json, uuid, os, tempfile, re, hashlib, requests
 
 
@@ -592,7 +593,10 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def client_action_event():
         ctx=get_request_user_context();data=request.get_json(silent=True) or {}
         action=str(data.get('action') or '')
+        requested_action=action
+        if action in {'safe_repair_preview','safe_repair_apply'}:action='open_module'
         if action not in {'open_module','search_beneficiary','download_rpp','download_bienestarina','download_ram','generate_monthly_reports','publish_master_database','consolidate_master_database','create_user','update_user','create_foundation','update_foundation'}: return jsonify({'error':'Acción de cliente no registrada.'}),422
+        action=requested_action
         status=str(data.get('status') or '')
         if status not in {'completed','failed','cancelled'}: return jsonify({'error':'Estado de acción no válido.'}),422
         audit_lia(ctx,'CLIENT_ACTION_'+status.upper(),module=str(data.get('module') or '')[:80],tool=action,success=status=='completed',request_id=str(data.get('request_id') or '')[:64],metadata={'detail':redact(str(data.get('detail') or ''))[:160]})
@@ -750,6 +754,11 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if not public_flags()['enabled']: return jsonify({'error':'LÍA está desactivada.'}),404
         get_request_user_context()
         return jsonify({'tools':sorted(ALLOWED_TOOLS),'write_tools':[],'proposal_tools':['propose_platform_action']}),200
+
+    @bp.get('/repairs')
+    def repairs_available():
+        ctx=get_request_user_context()
+        return jsonify({'repairs':public_registry(str(ctx.get('rol') or '')),'arbitrary_commands':False}),200
 
     @bp.route('/session-context',methods=['GET','PUT','DELETE'])
     def session_context():

@@ -153,6 +153,13 @@ def test_liam_center_intent_is_closed_read_only_tool():
     assert value['confirmation_required'] is False
 
 
+def test_safe_repair_requires_confirmation_but_preview_does_not():
+    preview=propose_action('Liam muéstrame el plan de reparación')
+    assert preview['client_handler']=='safe_repair_preview' and preview['confirmation_required'] is False
+    apply=propose_action('Liam repara el sistema')
+    assert apply['client_handler']=='safe_repair_apply' and apply['confirmation_required'] is True
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -174,4 +181,5 @@ if __name__=='__main__':
     test_communication_intent_creates_draft_not_send_action()
     test_favorite_intent_resolves_name_without_executing_locally()
     test_liam_center_intent_is_closed_read_only_tool()
+    test_safe_repair_requires_confirmation_but_preview_does_not()
     print('LIAM_ACTION_INTENTS_V7_PASS')

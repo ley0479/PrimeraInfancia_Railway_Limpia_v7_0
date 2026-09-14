@@ -611,6 +611,16 @@
       );
       return `Bienestarina está lista para descargar: ${result.filename}.`;
     }
+    if (action.type === "safe_repair_preview") {
+      const registry = await request("/repairs");
+      if (!(registry.repairs || []).some((item) => item.id === action.repair_id))
+        throw new Error("La reparación no está autorizada para tu sesión.");
+      const result = await platformRequest("/api/integrity/safe-repair", {
+        method: "POST",
+        body: JSON.stringify({ apply: false }),
+      });
+      return result.message || "El plan de reparación segura fue iniciado sin aplicar cambios.";
+    }
     return false;
   }
   async function runProtectedAction(proposal) {
@@ -752,6 +762,16 @@
         d.message ||
         `La fundación ${a.foundation_id} fue ${a.active ? "reactivada" : "suspendida"}.`
       );
+    }
+    if (handler === "safe_repair_apply") {
+      const registry = await request("/repairs");
+      if (!(registry.repairs || []).some((item) => item.id === a.repair_id && item.preview_first))
+        throw new Error("La reparación no está autorizada para tu sesión.");
+      const result = await platformRequest("/api/integrity/safe-repair", {
+        method: "POST",
+        body: JSON.stringify({ apply: true }),
+      });
+      return result.message || "La reparación segura fue iniciada y quedará auditada.";
     }
     throw new Error("La acción protegida no tiene un ejecutor registrado.");
   }
