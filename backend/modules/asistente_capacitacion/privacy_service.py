@@ -13,3 +13,19 @@ def redact(text: str) -> str:
     for pattern, replacement in PATTERNS:
         value = pattern.sub(replacement, value)
     return value
+
+
+def redact_data(value, depth: int = 0):
+    """Redacta estructuras destinadas a persistencia sin ejecutar ni interpretar su contenido."""
+    if depth>6:return '[CONTENIDO OMITIDO]'
+    if isinstance(value,dict):
+        result={}
+        for key,item in list(value.items())[:100]:
+            safe_key=str(key)[:80]
+            if re.search(r'(?i)(password|contraseña|secret|token|api[_ -]?key|authorization)',safe_key):result[safe_key]='[SECRETO REDACTADO]'
+            else:result[safe_key]=redact_data(item,depth+1)
+        return result
+    if isinstance(value,(list,tuple)):return [redact_data(item,depth+1) for item in list(value)[:200]]
+    if isinstance(value,str):return redact(value)[:2000]
+    if value is None or isinstance(value,(bool,int,float)):return value
+    return redact(str(value))[:2000]

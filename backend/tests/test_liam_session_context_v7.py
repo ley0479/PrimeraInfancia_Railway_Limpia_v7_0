@@ -20,6 +20,10 @@ def test_context_is_minimized_merged_and_isolated():
         second=save(database,1,10,{'selected_unit':'UCA ALTO NECORA'})
         assert second['context']['module_id']=='base-maestra' and second['active_task']=='Publicar Base Maestra'
         assert load(database,1,10)['context']['selected_unit']=='UCA ALTO NECORA'
+        protected=save(database,1,10,{'active_document':'token=abc123456789'},'Revisar password=clave-super-secreta')
+        assert 'abc123456789' not in protected['context']['active_document'] and 'clave-super-secreta' not in protected['active_task']
+        inspect_conn=sqlite3.connect(database);raw=inspect_conn.execute('SELECT context_json,active_task FROM lia_session_context WHERE fundacion_id=1 AND usuario_id=10').fetchone();inspect_conn.close()
+        assert 'abc123456789' not in raw[0] and 'clave-super-secreta' not in raw[1]
         assert load(database,2,10)['available'] is False
         assert load(database,1,11)['available'] is False
         clear(database,1,10)

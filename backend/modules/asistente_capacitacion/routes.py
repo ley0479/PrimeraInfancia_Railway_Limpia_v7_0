@@ -14,7 +14,7 @@ from .tool_registry import ALLOWED_TOOLS, MODULE_DATASETS, execute
 from .rate_limit import allow
 from .provider_adapter import OpenAIResponsesProvider, ProviderUnavailable, provider_status
 from .knowledge_base import manual_for_role, manual_for_question, build_manual_pdf
-from .privacy_service import redact
+from .privacy_service import redact, redact_data
 from .local_speech import enabled as local_speech_enabled, status as local_speech_status, transcribe_wav
 from .action_intents import propose_action, propose_read_actions
 from .error_center import record as record_incident, get as get_incident, list_recent as list_incidents
@@ -41,7 +41,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         try:
             conn=connect();conn.execute('''INSERT INTO lia_audit_events
               (fundacion_id,usuario_id,event_type,modulo,tool_name,success,request_id,metadata_redacted,created_at)
-              VALUES(?,?,?,?,?,?,?,?,?)''',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),event_type,module,tool,1 if success else 0,request_id,json.dumps(metadata or {},ensure_ascii=False),datetime.now().isoformat(timespec='seconds')));conn.commit()
+              VALUES(?,?,?,?,?,?,?,?,?)''',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),redact(str(event_type or ''))[:80],redact(str(module or ''))[:80] or None,redact(str(tool or ''))[:100] or None,1 if success else 0,redact(str(request_id or ''))[:80] or None,json.dumps(redact_data(metadata or {}),ensure_ascii=False),datetime.now().isoformat(timespec='seconds')));conn.commit()
         except Exception as exc:
             if conn:
                 try: conn.rollback()

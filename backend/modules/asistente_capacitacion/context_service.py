@@ -6,6 +6,7 @@ import json
 import re
 
 from modules.dbapi_compat import sqlite3
+from .privacy_service import redact
 
 FIELDS=('module_id','view_id','tab_id','modal_id','active_help_id','selected_unit','selected_month','selected_year','selected_period','active_document')
 
@@ -24,7 +25,7 @@ def sanitize(value: dict | None) -> dict:
             except (TypeError,ValueError):continue
             if not 2000<=item<=2100:continue
         else:
-            item=re.sub(r'\s+',' ',str(item)).strip()[:160]
+            item=redact(re.sub(r'\s+',' ',str(item)).strip())[:160]
         result[key]=item
     if 'selected_period' not in result and result.get('selected_year') and result.get('selected_month'):
         result['selected_period']=f"{result['selected_year']:04d}-{result['selected_month']:02d}"
@@ -47,7 +48,7 @@ def load(database_path: str,tenant_id: int,user_id: int) -> dict:
 
 def save(database_path: str,tenant_id: int,user_id: int,value: dict | None,active_task: object=None) -> dict:
     current=load(database_path,tenant_id,user_id);merged={**current.get('context',{}),**sanitize(value)}
-    task=re.sub(r'\s+',' ',str(active_task or current.get('active_task') or '')).strip()[:240] or None
+    task=redact(re.sub(r'\s+',' ',str(active_task or current.get('active_task') or '')).strip())[:240] or None
     now=datetime.now(timezone.utc);updated=now.isoformat(timespec='seconds');expires=(now+timedelta(hours=8)).isoformat(timespec='seconds')
     conn=sqlite3.connect(database_path)
     try:
