@@ -21,7 +21,7 @@ from .error_center import record as record_incident, get as get_incident, list_r
 from .credit_agent import parse_credit_request, query as query_credits, create_proposal as create_credit_proposal, confirm as confirm_credit_proposal
 from .action_policy import decision as action_decision, public_policy
 from .system_prompt import realtime_instructions
-import json, uuid, os, tempfile, re, hashlib, requests
+import csv, io, json, uuid, os, tempfile, re, hashlib, requests
 
 
 def register_asistente_capacitacion(app, database_path: str) -> None:
@@ -51,6 +51,15 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         flags=public_flags();key=f"{ctx.get('fundacion_id')}:{ctx.get('usuario_id')}"
         return not allow(key,flags['rate_limit_per_minute'])
 
+    def save_message(ctx, *, role, content, module, request_id):
+        if role not in {'user','assistant'}:raise ValueError('Rol de conversación no válido.')
+        conn=connect()
+        try:
+            conn.execute('INSERT INTO lia_conversation_messages(fundacion_id,usuario_id,role,content_redacted,module,request_id,created_at) VALUES(?,?,?,?,?,?,?)',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),role,redact(content)[:10000],module,request_id,datetime.now().isoformat(timespec='seconds')))
+            conn.commit()
+        except Exception:conn.rollback();raise
+        finally:conn.close()
+
     def save_exchange(ctx, *, question, answer, module, request_id):
         """Conserva cada turno como filas independientes; nunca reemplaza turnos previos."""
         now=datetime.now().isoformat(timespec='seconds');conn=connect()
@@ -68,11 +77,24 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         ctx=get_request_user_context()
         try:limit=max(1,min(int(request.args.get('limit') or 100),500))
         except (TypeError,ValueError):limit=100
-        conn=connect();rows=conn.execute('''SELECT id,role,content_redacted,module,request_id,created_at
-          FROM lia_conversation_messages WHERE fundacion_id=? AND usuario_id=?
-          ORDER BY id DESC LIMIT ?''',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),limit)).fetchall();conn.close()
+        try:page=max(1,int(request.args.get('page') or 1))
+        except (TypeError,ValueError):page=1
+        search=str(request.args.get('search') or '').strip()[:120];where='fundacion_id=? AND usuario_id=?';params=[int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0)]
+        if search:where+=' AND LOWER(content_redacted) LIKE LOWER(?)';params.append(f'%{search}%')
+        conn=connect();total=int(conn.execute(f'SELECT COUNT(*) FROM lia_conversation_messages WHERE {where}',tuple(params)).fetchone()[0] or 0)
+        rows=conn.execute(f'''SELECT id,role,content_redacted,module,request_id,created_at
+          FROM lia_conversation_messages WHERE {where}
+          ORDER BY id DESC LIMIT ? OFFSET ?''',tuple([*params,limit,(page-1)*limit])).fetchall();conn.close()
         messages=[{'id':row['id'],'role':row['role'],'content':row['content_redacted'],'module':row['module'],'request_id':row['request_id'],'created_at':row['created_at']} for row in reversed(rows)]
-        return jsonify({'messages':messages,'total_returned':len(messages),'append_only':True}),200
+        return jsonify({'messages':messages,'total':total,'page':page,'limit':limit,'has_more':page*limit<total,'search':search or None,'append_only':True}),200
+
+    @bp.get('/chat/history/export.csv')
+    def export_chat_history():
+        ctx=get_request_user_context();conn=connect();rows=conn.execute('''SELECT created_at,role,module,content_redacted FROM lia_conversation_messages
+          WHERE fundacion_id=? AND usuario_id=? ORDER BY id''',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0))).fetchall();conn.close()
+        stream=io.StringIO();writer=csv.writer(stream);writer.writerow(['fecha','rol','modulo','mensaje'])
+        for row in rows:writer.writerow([row['created_at'],row['role'],row['module'],row['content_redacted']])
+        return Response('\ufeff'+stream.getvalue(),200,{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="historial_lia.csv"','Cache-Control':'no-store'})
 
     @bp.get('/config')
     def config_publica():
@@ -250,7 +272,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                         p=value['profiles'];b=value['beneficiaries'];u=value['units']
                         coord_names=', '.join(x.get('name') or '' for x in p.get('coordinator_items') or []) or 'sin nombres registrados'
                         unit_names=', '.join(x.get('unit') or '' for x in u.get('items') or []) or 'sin nombres registrados'
-                        parts.append(f"Base Maestra: {b['total']} beneficiarios, {u['registered_active']} UDS activas ({unit_names}), {p['total']} perfiles, {p['coordinators']} coordinadores ({coord_names}) y {p.get('interdisciplinary_team_total',0)} integrantes de talento humano")
+                        check=value.get('consistency') or {};warning=' '.join(check.get('warnings') or [])
+                        parts.append(f"Base Maestra: {b['total']} beneficiarios, {u['registered_active']} UDS activas ({unit_names}), {p['total']} perfiles, {p['coordinators']} coordinadores ({coord_names}) y {p.get('interdisciplinary_team_total',0)} integrantes de talento humano. Consistencia: {check.get('status','sin validar')}"+(f"; {warning}" if warning else ''))
                     elif step['server_tool']=='list_foundation_profiles':parts.append(f"Perfiles encontrados: {value['total']}")
                     elif step['server_tool']=='search_foundation_beneficiaries':
                         names=', '.join(str(x.get('nombre_completo') or x.get('documento')) for x in value.get('beneficiaries',[])[:5]) or 'sin coincidencias'
@@ -313,7 +336,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                         unit_names=', '.join(x.get('unit') or '' for x in units.get('items') or []) or 'sin nombres registrados'
                         sources=', '.join(f"{x.get('source')}: {x.get('valid',0)} válidos" for x in (tool_result.get('sources') or {}).get('active_loads') or []) or 'sin cargas registradas'
                         moves=', '.join(f"{x.get('type')}: {x.get('total',0)}" for x in (tool_result.get('movements') or {}).get('by_type') or []) or 'sin movimientos'
-                        message=f"Resumen de la fundación activa: {profiles.get('total',0)} perfiles; {profiles.get('coordinators',0)} coordinadores ({coord_names}); {profiles.get('interdisciplinary_team_total',0)} integrantes de talento humano; {beneficiaries.get('total',0)} beneficiarios; y {units.get('registered_active',0)} UDS ({unit_names}). Por grupo etario: {groups}. Cargas vigentes: {sources}. Movimientos de la versión maestra: {moves}."
+                        check=tool_result.get('consistency') or {};warning=' '.join(check.get('warnings') or [])
+                        message=f"Resumen de la fundación activa: {profiles.get('total',0)} perfiles; {profiles.get('coordinators',0)} coordinadores ({coord_names}); {profiles.get('interdisciplinary_team_total',0)} integrantes de talento humano; {beneficiaries.get('total',0)} beneficiarios; y {units.get('registered_active',0)} UDS ({unit_names}). Por grupo etario: {groups}. Cargas vigentes: {sources}. Movimientos de la versión maestra: {moves}. Consistencia: {check.get('status','sin validar')}."+(f" Advertencia: {warning}" if warning else '')
                         actions=[];total=int(beneficiaries.get('total') or 0)
                     elif proposal['server_tool']=='list_foundation_profiles':
                         roles={}
@@ -470,6 +494,11 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     @bp.post('/voice/realtime/event')
     def realtime_voice_event():
         ctx=get_request_user_context();data=request.get_json(silent=True) or {};event=str(data.get('event') or '')
+        if event=='transcript':
+            role=str(data.get('role') or '');content=str(data.get('content') or '').strip();module=str(data.get('module') or 'dashboard')[:80]
+            if role not in {'user','assistant'} or not content:return jsonify({'error':'Transcripción de voz no válida.'}),422
+            save_message(ctx,role=role,content=content,module=module,request_id=str(data.get('request_id') or uuid.uuid4().hex)[:64])
+            return jsonify({'ok':True,'saved':True}),201
         if event not in {'ended','failed'}:return jsonify({'error':'Evento de voz no válido.'}),422
         duration=max(0,min(600,int(data.get('duration') or 0)));reason=str(data.get('reason') or '')[:60]
         audit_lia(ctx,'REALTIME_VOICE_'+event.upper(),module=str(data.get('module') or 'dashboard')[:80],success=event=='ended',metadata={'duration_seconds':duration,'reason':reason})

@@ -1,6 +1,7 @@
 """Contrato de historial acumulativo y aislado de Lía."""
 from modules.asistente_capacitacion.schema import SCHEMA_SQL
 from modules.dbapi_compat import sqlite3
+from pathlib import Path
 
 def test_messages_are_append_only_and_tenant_scoped():
     conn=sqlite3.connect(':memory:');conn.row_factory=sqlite3.Row;conn.executescript(SCHEMA_SQL)
@@ -12,6 +13,15 @@ def test_messages_are_append_only_and_tenant_scoped():
     assert conn.execute('SELECT COUNT(*) FROM lia_conversation_messages').fetchone()[0]==5
     conn.close()
 
+def test_history_supports_search_export_paging_and_voice():
+    root=Path(__file__).resolve().parents[2]
+    routes=(root/'backend/modules/asistente_capacitacion/routes.py').read_text(encoding='utf-8')
+    controller=(root/'frontend/js/liam/liam-controller.js').read_text(encoding='utf-8')
+    assert "chat/history/export.csv" in routes and "LOWER(content_redacted) LIKE LOWER(?)" in routes
+    assert "event=='transcript'" in routes and "saveVoiceTranscript(\"user\"" in controller and "saveVoiceTranscript(\"assistant\"" in controller
+    assert 'data-action="history-more"' in controller and 'data-action="history-search"' in controller and 'data-action="history-export"' in controller
+
 if __name__=='__main__':
     test_messages_are_append_only_and_tenant_scoped()
+    test_history_supports_search_export_paging_and_voice()
     print('LIA_CONVERSATION_HISTORY_V7_PASS')

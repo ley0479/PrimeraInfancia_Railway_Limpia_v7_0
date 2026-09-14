@@ -131,6 +131,12 @@ def _foundation_summary_complete(database_path: str, tenant_id: int) -> dict:
         summary['units']['items']=[{'unit':row.get('nombre'),'code':row.get('codigo_unidad'),'beneficiaries':int(row.get('total_ninos') or 0),'coordinator':row.get('coordinador'),'talent_total':int(row.get('total_talento') or 0),'modality':row.get('modalidad')} for row in units]
     summary['sources']={'active_loads':list(latest_loads.values()),'total_sources':len(latest_loads)}
     summary['movements']={'by_type':[{'type':row.get('tipo_movimiento'),'total':int(row.get('total') or 0)} for row in movements],'total':sum(int(row.get('total') or 0) for row in movements)}
+    beneficiary_total=int(summary['beneficiaries'].get('total') or 0)
+    declared_unit_total=sum(int(item.get('beneficiaries') or 0) for item in summary['units'].get('items') or [])
+    warnings=[]
+    if units and declared_unit_total!=beneficiary_total:warnings.append(f'La suma declarada en UDS ({declared_unit_total}) no coincide con los beneficiarios activos ({beneficiary_total}).')
+    if not version_id:warnings.append('No existe una versión maestra activa identificable.')
+    summary['consistency']={'status':'consistent' if not warnings else 'review_required','beneficiaries_active':beneficiary_total,'beneficiaries_declared_by_units':declared_unit_total,'active_units':int(summary['units'].get('registered_active') or 0),'coordinators_consolidated':len(coordinator_items),'warnings':warnings,'checked_sources':['master_ninos','master_unidades','master_talento_humano','usuarios_app','master_versiones']}
     return summary
 
 def _beneficiaries(database_path: str, tenant_id: int, args: dict) -> dict:

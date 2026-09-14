@@ -18,6 +18,9 @@
     booted: false,
     welcomed: false,
     historyLoaded: false,
+    historyPage: 1,
+    historyHasMore: false,
+    historySearch: "",
     history: [],
   };
   const apiBase = () => `${window.backendUrl || ""}/api/asistente-capacitacion`;
@@ -311,19 +314,54 @@
   function remember(role, content) {
     state.history.push({ role, content: String(content || "").slice(0, 1200) });
   }
-  async function loadHistory() {
-    if (state.historyLoaded) return;
-    const data = await request("/chat/history?limit=100");
+  function ensureHistoryTools() {
+    const box = document.getElementById("liam-conversation");
+    if (!box || document.getElementById("liam-history-tools")) return;
+    if (!document.getElementById("liam-history-tools-style")) {
+      const style = document.createElement("style");
+      style.id = "liam-history-tools-style";
+      style.textContent = ".liam-history-tools{display:grid;grid-template-columns:minmax(100px,1fr) auto auto auto;gap:5px;margin-top:10px}.liam-history-tools input{min-width:0;border:1px solid #475569;border-radius:8px;background:#fff;color:#172033;padding:7px;font-size:11px}.liam-history-tools button{border:1px solid #64748b;border-radius:8px;background:#0f766e;color:#fff;padding:6px;font-size:10px;font-weight:700}@media(max-width:520px){.liam-history-tools{grid-template-columns:1fr 1fr}.liam-history-tools input{grid-column:1/-1}}";
+      document.head.appendChild(style);
+    }
+    box.insertAdjacentHTML("beforebegin", `<div id="liam-history-tools" class="liam-history-tools"><input id="liam-history-search" type="search" maxlength="120" placeholder="Buscar en el historial"><button type="button" data-action="history-search">Buscar</button><button type="button" data-action="history-more" id="liam-history-more">Ver anteriores</button><button type="button" data-action="history-export">Exportar</button></div>`);
+  }
+  async function loadHistory({ page = 1, appendOlder = false } = {}) {
+    if (state.historyLoaded && page === 1 && !state.historySearch) return;
+    ensureHistoryTools();
+    const query = new URLSearchParams({ limit: "100", page: String(page) });
+    if (state.historySearch) query.set("search", state.historySearch);
+    const data = await request(`/chat/history?${query}`);
     const messages = Array.isArray(data.messages) ? data.messages : [];
     const box = document.getElementById("liam-conversation");
+    const currentMarkup = appendOlder && box ? box.innerHTML : "";
     if (box) box.innerHTML = "";
-    state.history = [];
+    if (!appendOlder && !state.historySearch) state.history = [];
     for (const item of messages) {
       if (!["user", "assistant"].includes(item.role)) continue;
       add(item.role === "user" ? "user" : "liam", item.content);
-      remember(item.role, item.content);
+      if (!appendOlder && !state.historySearch) remember(item.role, item.content);
     }
+    if (appendOlder && box) box.insertAdjacentHTML("beforeend", currentMarkup);
+    state.historyPage = Number(data.page || page);
+    state.historyHasMore = Boolean(data.has_more);
+    const more = document.getElementById("liam-history-more");
+    if (more) more.hidden = !state.historyHasMore;
     state.historyLoaded = true;
+  }
+  async function searchHistory() {
+    state.historySearch = String(document.getElementById("liam-history-search")?.value || "").trim();
+    state.historyLoaded = false;
+    await loadHistory({ page: 1 });
+  }
+  async function exportHistory() {
+    const response = await fetch(`${apiBase()}/chat/history/export.csv`, { headers: headers() });
+    if (!response.ok) throw new Error("No se pudo exportar el historial.");
+    const url = URL.createObjectURL(await response.blob()), link = document.createElement("a");
+    link.href = url; link.download = "historial_lia.csv"; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  function saveVoiceTranscript(role, content) {
+    return request("/voice/realtime/event", { method: "POST", body: JSON.stringify({ event: "transcript", role, content, module: state.module }) }).catch(() => {});
   }
   function auditClientAction(action, status, requestId, module, detail = "") {
     request("/actions/client-event", {
@@ -1093,6 +1131,9 @@
     } else if (action === "where") showWhere();
     else if (action === "voice") listen();
     else if (action === "realtime") realtime();
+    else if (action === "history-search") searchHistory().catch((error) => add("liam", error.message));
+    else if (action === "history-more") loadHistory({ page: state.historyPage + 1, appendOlder: true }).catch((error) => add("liam", error.message));
+    else if (action === "history-export") exportHistory().catch((error) => add("liam", error.message));
     else if (action === "stop") {
       window.LIAM_REALTIME?.stop();
       window.LIA_SPEECH?.stop();
@@ -1270,6 +1311,7 @@
     if (text) {
       add("user", text);
       remember("user", text);
+      saveVoiceTranscript("user", text);
       const input = document.getElementById("liam-question");
       if (input) input.value = text;
     }
@@ -1286,6 +1328,7 @@
     if (text) {
       add("liam", text);
       remember("assistant", text);
+      saveVoiceTranscript("assistant", text);
     }
     window.LIAM_LIP_SYNC?.stop();
     window.LIAM_STATE?.set("listening");
