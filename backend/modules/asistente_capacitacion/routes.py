@@ -56,8 +56,27 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         flags=public_flags();key=f"{ctx.get('fundacion_id')}:{ctx.get('usuario_id')}"
         return not allow(key,flags['rate_limit_per_minute'])
 
+    def tool_feature_available(tool_name):
+        flags=public_liam_flags();tool=str(tool_name or '')
+        groups={
+            'search_enabled':{'universal_search','list_foundation_profiles','search_foundation_beneficiaries'},
+            'actions_enabled':{'prepare_meeting_followup','prepare_communication_draft','run_command_favorite','propose_platform_action'},
+            'admin_enabled':{'get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','get_liam_center'},
+            'dev_enabled':{'prepare_dev_change_request','list_dev_change_requests','get_dev_change_review'},
+        }
+        for flag,tools in groups.items():
+            if tool in tools and not flags.get(flag):return False,flag
+        return True,None
+
+    def require_tool_feature(tool_name):
+        available,flag=tool_feature_available(tool_name)
+        if not available:raise PermissionError(f"La capacidad {flag.removesuffix('_enabled').replace('_',' ')} de Liam está desactivada por configuración.")
+        return True
+
     def visual_payload(result, module):
         """Contrato visual cerrado; el cliente nunca interpreta HTML procedente del modelo."""
+        if not public_liam_flags().get('visual_panel_enabled'):
+            return {'text':str(result.get('message') or '')[:2000],'componentType':'spotlight','data':{},'targetSelector':None,'display':'inline','commands':[],'disabledByFeatureFlag':True}
         tool='';component='spotlight';data={};display='inline'
         def table_for(value):
             if not isinstance(value,dict):return None
@@ -429,6 +448,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             tool_results=[];parts=[]
             for step in read_plan[:5]:
                 try:
+                    require_tool_feature(step['server_tool'])
                     outcome=orchestrator.run(step['server_tool'],args=step.get('arguments') or {},tenant_id=int(ctx.get('fundacion_id') or 1),user=user,module=module,request_id=f"{result['request_id']}:{len(tool_results)+1}")
                     value=outcome.result
                     tool_results.append({'tool':step['server_tool'],'result':value})
@@ -487,7 +507,9 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 result.update({'message':policy.get('reason'),'speech_text':policy.get('reason'),'confidence':'forbidden','confirmation_required':False,'actions':[]})
             else:
                 proposal.update({'risk':policy['risk'],'confirmation_type':policy['confirmation']})
-                if proposal.get('confirmation_required'):
+                if proposal.get('id') in {'safe_repair_preview','safe_repair_apply'} and not public_liam_flags().get('repair_enabled'):
+                    proposal=None;result.update({'message':'Las reparaciones de Liam están desactivadas por configuración.','speech_text':'Las reparaciones de Liam están desactivadas por configuración.','confidence':'forbidden','confirmation_required':False,'actions':[]})
+                if proposal and proposal.get('confirmation_required'):
                     proposal.setdefault('expires_at',(datetime.now()+timedelta(seconds=60)).isoformat(timespec='seconds'))
         if proposal:
             target_module=str((proposal.get('arguments') or {}).get('module') or '')
@@ -496,8 +518,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 result.update({'message':'Tu rol no tiene permiso para abrir o consultar ese módulo.','speech_text':'Tu rol no tiene permiso para abrir o consultar ese módulo.','confidence':'forbidden','confirmation_required':False,'actions':[]})
             elif proposal.get('server_tool'):
                 try:
-                    if proposal['server_tool'] in {'prepare_dev_change_request','list_dev_change_requests','get_dev_change_review'} and not public_liam_flags()['dev_enabled']:
-                        raise PermissionError('La capacidad ADMIN/DEV de Liam está desactivada por configuración.')
+                    require_tool_feature(proposal['server_tool'])
                     user=dict(getattr(g,'current_user',None) or {}) or {'id':ctx.get('usuario_id'),'rol':ctx.get('rol')}
                     outcome=orchestrator.run(proposal['server_tool'],args=proposal.get('arguments') or {},tenant_id=int(ctx.get('fundacion_id') or 1),user=user,module=module,request_id=result['request_id'])
                     tool_result=outcome.result
@@ -659,6 +680,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
 
     @bp.post('/actions/confirm/<string:proposal_id>')
     def confirm_server_action(proposal_id):
+        if not public_liam_flags().get('actions_enabled'):return jsonify({'error':'Las acciones de Liam están desactivadas por configuración.'}),403
         ctx=get_request_user_context()
         try:result=confirm_credit_proposal(database_path,proposal_id,int(ctx.get('usuario_id') or 0),str(ctx.get('rol') or ''))
         except PermissionError as exc:return jsonify({'error':str(exc)}),403
@@ -744,6 +766,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
             {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},
         ]
+        realtime_tools=[item for item in realtime_tools if tool_feature_available(item.get('name'))[0]]
         voice_policy='; '.join(f"{item['action']}={item['risk']}/{item['confirmation']}" for item in public_policy(str(ctx.get('rol') or '')) if item.get('allowed') and item.get('connected'))
         session={'type':'realtime','model':model,'instructions':realtime_instructions(
             action_policy=voice_policy, authorized_context=safe_context
@@ -811,11 +834,13 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
     def tools_available():
         if not public_flags()['enabled']: return jsonify({'error':'LÍA está desactivada.'}),404
         get_request_user_context()
-        return jsonify({'tools':sorted(ALLOWED_TOOLS),'write_tools':[],'proposal_tools':['propose_platform_action']}),200
+        enabled_tools=sorted(tool for tool in ALLOWED_TOOLS if tool_feature_available(tool)[0])
+        return jsonify({'tools':enabled_tools,'write_tools':[],'proposal_tools':['propose_platform_action'] if 'propose_platform_action' in enabled_tools else []}),200
 
     @bp.get('/repairs')
     def repairs_available():
         ctx=get_request_user_context()
+        if not public_liam_flags().get('repair_enabled'):return jsonify({'error':'Las reparaciones de Liam están desactivadas por configuración.','repairs':[],'arbitrary_commands':False}),403
         return jsonify({'repairs':public_registry(str(ctx.get('rol') or '')),'arbitrary_commands':False}),200
 
     @bp.get('/notification-providers')
@@ -838,6 +863,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         if not user.get('id'): user={'id':ctx.get('usuario_id'),'rol':ctx.get('rol')}
         request_id=uuid.uuid4().hex
         try:
+            require_tool_feature(tool_name)
             outcome=orchestrator.run(tool_name,args=request.get_json(silent=True) or {},tenant_id=int(ctx.get('fundacion_id') or 1),user=user,module=str(request.headers.get('X-Liam-Module') or 'dashboard'),request_id=request_id);result=outcome.result
         except PermissionError as exc: audit_lia(ctx,'TOOL_REJECTED',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),403
         except LookupError as exc: audit_lia(ctx,'TOOL_NOT_FOUND',tool=tool_name,success=False,request_id=request_id);return jsonify({'error':str(exc),'request_id':request_id}),404
