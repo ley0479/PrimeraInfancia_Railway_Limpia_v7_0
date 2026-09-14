@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -518,6 +518,26 @@ def _early_warnings(database_path: str, tenant_id: int, args: dict, user: dict) 
     counts={level:sum(1 for item in warnings if item['level']==level) for level in ('CRITICO','ALTO','PREVENTIVO')}
     return {'scope':deliverables['scope'],'period':args.get('period') or None,'summary':{'total_warnings':len(warnings),**{key.lower():value for key,value in counts.items()}},'warnings':warnings,'sources':['Calendario Inteligente','Base Maestra activa'],'role_scope':deliverables['role_scope'],'read_only':True,'predictive_language':'risk_only','disclaimer':'Estas alertas describen riesgos según los datos disponibles; no son predicciones ni diagnósticos.'}
 
+
+def _incident_center(database_path: str, tenant_id: int, args: dict, user: dict) -> dict:
+    limit=max(1,min(int(args.get('limit') or 50),100));incident_id=str(args.get('incident_id') or '').strip().upper()[:40];status=str(args.get('status') or '').strip().upper()
+    allowed_status={'','OPEN','IN_ANALYSIS','IN_PROGRESS','RESOLVED','CLOSED'}
+    if status not in allowed_status:raise ValueError('El estado de incidencia no está permitido.')
+    role=str(user.get('rol') or user.get('role') or '').strip().upper();user_id=int(user.get('id') or user.get('usuario_id') or 0)
+    where=['fundacion_id=?'];params=[tenant_id]
+    if role not in {'SUPERADMIN','GERENTE'}:
+        if not user_id:raise PermissionError('No fue posible verificar el usuario de la sesión.')
+        where.append('usuario_id=?');params.append(user_id)
+    if incident_id:where.append('incident_id=?');params.append(incident_id)
+    if status:where.append('status=?');params.append(status)
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        rows=[dict(row) for row in conn.execute(f'''SELECT incident_id,module,http_status,error_code,error_type,cause,solution,severity,safe_retry,auto_correctable,status,request_id,created_at,updated_at
+          FROM lia_error_incidents WHERE {' AND '.join(where)} ORDER BY id DESC LIMIT ?''',tuple([*params,limit])).fetchall()]
+    finally:conn.close()
+    counts={key:sum(1 for row in rows if str(row.get('status') or '').upper()==key) for key in ('OPEN','IN_ANALYSIS','IN_PROGRESS','RESOLVED','CLOSED')}
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'filters':{'incident_id':incident_id or None,'status':status or None},'summary':{'total':len(rows),**{key.lower():value for key,value in counts.items()}},'incidents':rows,'role_scope':'foundation' if role in {'SUPERADMIN','GERENTE'} else 'own_user','sanitized':True,'read_only':True}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -579,6 +599,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_foundation_portfolio': return _foundation_portfolio(database_path,args)
     if tool_name=='analyze_master_data_quality': return _master_data_quality(database_path,tenant_id,user)
     if tool_name=='get_early_warnings': return _early_warnings(database_path,tenant_id,args,user)
+    if tool_name=='get_incident_center': return _incident_center(database_path,tenant_id,args,user)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')
