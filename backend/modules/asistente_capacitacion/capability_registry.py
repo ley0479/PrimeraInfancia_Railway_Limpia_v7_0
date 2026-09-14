@@ -21,6 +21,7 @@ CAPABILITIES = {
         Capability('prepare_meeting_followup','ejecuta','Compromisos proporcionados por el usuario'),
         Capability('prepare_dev_change_request','admin','Centro Liam ADMIN/DEV',True,False),
         Capability('list_dev_change_requests','admin','Centro Liam ADMIN/DEV'),
+        Capability('get_dev_change_review','admin','Registro de módulos y Centro Liam ADMIN/DEV'),
         Capability('get_monthly_relation_summary','analiza','Base Maestra'),
         Capability('list_foundation_profiles','consulta','Usuarios'),
         Capability('search_foundation_beneficiaries','consulta','Base Maestra'),

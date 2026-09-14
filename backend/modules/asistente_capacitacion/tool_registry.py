@@ -12,10 +12,12 @@ from .action_policy import decision as action_decision
 from .action_intents import propose_action
 from .notification_providers import provider_catalog
 from .privacy_service import redact
+from .elian_module_registry import ELIAN_MODULE_REGISTRY
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
 ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard','prepare_meeting_brief','prepare_meeting_followup','prepare_dev_change_request','list_dev_change_requests','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_dev_change_review'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -667,6 +669,20 @@ def _list_dev_changes(database_path:str,tenant_id:int,args:dict,user:dict)->dict
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'requests':rows,'total':len(rows),'source':'Centro Liam ADMIN/DEV','read_only':True}
 
 
+def _dev_change_review(database_path:str,tenant_id:int,args:dict,user:dict)->dict:
+    request_id=str(args.get('request_id') or '').strip().upper()[:40];uid=int(user.get('id') or user.get('usuario_id') or 0)
+    if not re.fullmatch(r'DEV-\d{8}-[A-F0-9]{8}',request_id):raise ValueError('Indica un identificador técnico válido, por ejemplo DEV-20260914-ABC12345.')
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:row=conn.execute('''SELECT request_id,module,objective,impact_summary,status,created_at,updated_at FROM lia_dev_change_requests WHERE request_id=? AND fundacion_id=? AND usuario_id=?''',(request_id,tenant_id,uid)).fetchone()
+    finally:conn.close()
+    if not row:raise LookupError('No encontré esa solicitud dentro de tu usuario y fundación activa.')
+    request_item=dict(row);module=next((dict(item) for item in ELIAN_MODULE_REGISTRY if item['module_id']==request_item['module']),None)
+    if not module:raise LookupError('El módulo de la solicitud ya no está disponible en el registro autorizado.')
+    review={'module':module['module_id'],'title':module['title'],'route':module['route'],'purpose':module['purpose'],'data_source':module['data_source'],'validations':module['validations'],'outputs':module['outputs'],'downstream_use':module['downstream_use'],'registered_controls':bool(module['controls_registered'])}
+    gates=[{'gate':'Arquitectura','status':'PENDING','requirement':'Identificar servicios, endpoints, tablas, frontend, permisos y tenant afectados.'},{'gate':'Riesgo','status':'PENDING','requirement':'Clasificar impacto, compatibilidad, seguridad y rollback.'},{'gate':'Pruebas','status':'PENDING','requirement':'Definir pruebas unitarias, integración, permisos, tenant y regresión.'},{'gate':'Diff','status':'PENDING','requirement':'Preparar cambios pequeños y mostrar el diff antes de aprobación.'},{'gate':'Aprobación','status':'BLOCKED','requirement':'Requiere aprobación explícita después de pruebas satisfactorias.'},{'gate':'Despliegue','status':'DISABLED','requirement':'No se despliega automáticamente a producción.'}]
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'request':request_item,'module_review':review,'gates':gates,'facts_verified_from_registry':True,'files_inferred':False,'code_modified':False,'tests_executed':False,'deployment_started':False,'source':'Centro Liam ADMIN/DEV','read_only':True}
+
+
 def _meeting_followup(tenant_id: int,args: dict,user: dict) -> dict:
     role=str(user.get('rol') or user.get('role') or '').upper()
     if role not in {'SUPERADMIN','GERENTE','COORDINADOR'}:raise PermissionError('Tu rol no tiene permiso para preparar seguimientos de reunión.')
@@ -817,6 +833,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='prepare_meeting_followup': return _meeting_followup(tenant_id,args,user)
     if tool_name=='prepare_dev_change_request': return _prepare_dev_change(database_path,tenant_id,args,user)
     if tool_name=='list_dev_change_requests': return _list_dev_changes(database_path,tenant_id,args,user)
+    if tool_name=='get_dev_change_review': return _dev_change_review(database_path,tenant_id,args,user)
     if tool_name=='compare_periods': return _compare_periods(database_path,tenant_id,args)
     if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)

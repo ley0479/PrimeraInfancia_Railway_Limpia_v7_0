@@ -76,6 +76,10 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
         return {'id':'run_command_favorite','label':'Ejecutar comando favorito','summary':'Resolveré el favorito dentro de tu usuario y aplicaré sus permisos actuales.','arguments':{'name':_clean_unit(favorite_match.group(1)),'screen_context':context},'missing':[],'confirmation_required':False,'server_tool':'run_command_favorite'}
     if any(text in q for text in ('centro liam','centro de liam','centro inteligente')):
         return {'id':'get_liam_center','label':'Consultar Centro Liam','summary':'Consolidaré el centro administrativo autorizado con datos sanitizados y disponibilidad por fuente.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_liam_center'}
+    dev_review=re.search(r'\bdev-\d{8}-[a-f0-9]{8}\b',q)
+    if dev_review and any(text in q for text in ('revisa','revisar','analiza','analizar','impacto','estado')):
+        request_id=dev_review.group(0).upper()
+        return {'id':'get_dev_change_review','label':'Revisar solicitud técnica','summary':'Prepararé el paquete de revisión con hechos registrados y compuertas pendientes. No inferiré archivos ni modificaré código.','arguments':{'request_id':request_id},'missing':[],'confirmation_required':False,'server_tool':'get_dev_change_review'}
     if any(text in q for text in ('mis solicitudes tecnicas','cambios tecnicos pendientes','solicitudes admin dev')):
         return {'id':'list_dev_change_requests','label':'Consultar solicitudes técnicas','summary':'Consultaré tus borradores técnicos dentro de la fundación activa.','arguments':{'limit':50},'missing':[],'confirmation_required':False,'server_tool':'list_dev_change_requests'}
     if any(text in q for text in ('solicitud tecnica','cambio tecnico','necesito agregar','necesito cambiar')):

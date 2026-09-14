@@ -191,6 +191,13 @@ def test_admin_dev_request_is_a_draft_not_code_execution():
     assert value['arguments']['module']=='base-maestra' and value['confirmation_required'] is False
 
 
+def test_admin_dev_review_requires_an_explicit_scoped_request_id():
+    value=propose_action('Liam revisa el impacto de DEV-20260914-ABC12345')
+    assert value['server_tool']=='get_dev_change_review'
+    assert value['arguments']['request_id']=='DEV-20260914-ABC12345'
+    assert value['confirmation_required'] is False
+
+
 def test_safe_repair_requires_confirmation_but_preview_does_not():
     preview=propose_action('Liam muéstrame el plan de reparación')
     assert preview['client_handler']=='safe_repair_preview' and preview['confirmation_required'] is False
@@ -225,5 +232,6 @@ if __name__=='__main__':
     test_meeting_brief_uses_context_without_creating_tasks()
     test_meeting_followup_extracts_only_a_draft()
     test_admin_dev_request_is_a_draft_not_code_execution()
+    test_admin_dev_review_requires_an_explicit_scoped_request_id()
     test_safe_repair_requires_confirmation_but_preview_does_not()
     print('LIAM_ACTION_INTENTS_V7_PASS')
