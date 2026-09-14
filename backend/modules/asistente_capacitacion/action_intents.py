@@ -71,6 +71,22 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    if any(word in q for word in ('compara', 'comparar', 'comparacion')):
+        months = [number for name, number in MONTHS.items() if re.search(rf'\b{name}\b', q)]
+        years = [int(x) for x in re.findall(r'\b(20\d{2}|2100)\b', q)]
+        year = years[-1] if years else context.get('selected_year')
+        period_a = f'{int(year):04d}-{months[0]:02d}' if year and len(months) > 0 else None
+        period_b = f'{int(year):04d}-{months[1]:02d}' if year and len(months) > 1 else None
+        missing = [name for name, value in (('primer periodo', period_a), ('segundo periodo', period_b)) if not value]
+        return {
+            'id': 'compare_periods',
+            'label': 'Comparar periodos',
+            'summary': 'Compararé únicamente los cruces mensuales disponibles.',
+            'arguments': {'period_a': period_a, 'period_b': period_b},
+            'missing': missing,
+            'confirmation_required': False,
+            'server_tool': 'compare_periods',
+        }
     if ('relacion del mes' in q or 'relacion mensual' in q) and any(word in q for word in ('explica','explicar','muestra','mostrar','visualiza','visualizar','resumen','consulta','consultar')):
         month=next((number for name,number in MONTHS.items() if re.search(rf'\b{name}\b',q)),None) or context.get('selected_month')
         year_match=re.search(r'\b(20\d{2}|2100)\b',q);year=int(year_match.group(1)) if year_match else context.get('selected_year')

@@ -70,6 +70,17 @@ def test_monthly_relation_and_nutrition_report_requires_confirmation():
     assert value['confirmation_required'] is True
 
 
+def test_period_comparison_uses_two_explicit_months_and_context_year():
+    value = propose_action(
+        'Liam compara agosto contra septiembre',
+        screen_context={'selected_year': 2026},
+    )
+    assert value['server_tool'] == 'compare_periods'
+    assert value['arguments'] == {'period_a': '2026-08', 'period_b': '2026-09'}
+    assert value['missing'] == []
+    assert value['confirmation_required'] is False
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -79,4 +90,5 @@ if __name__=='__main__':
     test_navigation_and_read_only_intents_are_closed_actions()
     test_ram_master_user_and_foundation_proposals()
     test_monthly_relation_and_nutrition_report_requires_confirmation()
+    test_period_comparison_uses_two_explicit_months_and_context_year()
     print('LIAM_ACTION_INTENTS_V7_PASS')

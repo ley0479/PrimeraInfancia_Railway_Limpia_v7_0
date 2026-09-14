@@ -12,7 +12,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -274,6 +274,21 @@ def _int_arg(args, name, minimum=1):
     if value<minimum: raise ValueError(f'{name} no es válido.')
     return value
 
+def _compare_periods(database_path: str, tenant_id: int, args: dict) -> dict:
+    periods=[str(args.get(key) or '').strip() for key in ('period_a','period_b')]
+    if any(len(x)!=7 or x[4]!='-' or not x[:4].isdigit() or not x[5:].isdigit() or not 1<=int(x[5:])<=12 for x in periods):raise ValueError('Los periodos deben tener formato AAAA-MM.')
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        found=[]
+        for period in periods:
+            row=conn.execute('''SELECT periodo,total_anterior,total_actual,nuevos,retirados,cambios_unidad,cambios_docente,cambios_total,fecha_cruce FROM cb_cruces WHERE fundacion_id=? AND periodo=? ORDER BY fecha_cruce DESC,id DESC LIMIT 1''',(tenant_id,period)).fetchone()
+            found.append(dict(row) if row else {'periodo':period,'available':False})
+    finally:conn.close()
+    metrics=[]
+    for key,label in (('total_actual','Niños activos'),('nuevos','Ingresos'),('retirados','Retiros'),('cambios_unidad','Cambios de unidad'),('cambios_docente','Cambios de docente'),('cambios_total','Cambios totales')):
+        a=found[0].get(key);b=found[1].get(key);metrics.append({'indicator':label,'period_a':a,'period_b':b,'variation':(int(b)-int(a)) if a is not None and b is not None else None,'available':a is not None and b is not None})
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'period_a':periods[0],'period_b':periods[1],'snapshots':found,'comparison':metrics,'complete':all(x.get('available',True) for x in found),'read_only':True,'disclaimer':'Solo se comparan cruces existentes; los valores ausentes no se estiman.'}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -328,6 +343,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
         if allowed and module not in allowed:raise PermissionError('Tu rol no tiene permiso para consultar ese módulo.')
         return _module_summary(database_path,tenant_id,args)
     if tool_name=='get_monthly_health_indicators': return _health_indicators(database_path,tenant_id,args)
+    if tool_name=='compare_periods': return _compare_periods(database_path,tenant_id,args)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')

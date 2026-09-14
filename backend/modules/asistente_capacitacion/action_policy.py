@@ -26,6 +26,7 @@ RULES = {
     'universal_search': ActionRule('universal_search','read',ALL_AUTHENTICATED),
     'get_platform_module_summary': ActionRule('get_platform_module_summary','read',ALL_AUTHENTICATED),
     'get_monthly_health_indicators': ActionRule('get_monthly_health_indicators','read',ALL_AUTHENTICATED),
+    'compare_periods': ActionRule('compare_periods','read',ALL_AUTHENTICATED),
     'get_document_processing_status': ActionRule('get_document_processing_status','read',ALL_AUTHENTICATED),
     'get_format_generation_status': ActionRule('get_format_generation_status','read',ALL_AUTHENTICATED),
     'get_structured_error': ActionRule('get_structured_error','read',ALL_AUTHENTICATED),
