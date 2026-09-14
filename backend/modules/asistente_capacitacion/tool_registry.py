@@ -13,7 +13,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -639,6 +639,23 @@ def _run_favorite(database_path: str, tenant_id: int, args: dict, user: dict) ->
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'favorite':{'id':row['id'],'name':row['nombre']},'resolved_action':proposal.get('id'),'executed':False,'proposal':proposal,'confirmation_required':bool(proposal.get('confirmation_required')),'read_only':True}
 
 
+def _role_dashboard(database_path: str,tenant_id: int,args: dict,user: dict) -> dict:
+    role=str(user.get('rol') or user.get('role') or '').upper();sections={};availability={}
+    try:period=str(args.get('period') or '').strip() or None
+    except Exception:period=None
+    def collect(name,call):
+        try:sections[name]=call();availability[name]=True
+        except Exception:sections[name]={};availability[name]=False
+    team=role in {'SUPERADMIN','GERENTE','COORDINADOR'} and str(args.get('scope') or '').lower()=='team'
+    collect('tasks',lambda:execute('get_pending_activities_summary',args={'scope':'team' if team else 'self','period':period},database_path=database_path,tenant_id=tenant_id,user=user))
+    collect('deliverables',lambda:_deliverable_supervision(database_path,tenant_id,{'period':period},user))
+    collect('notifications',lambda:_notification_center(database_path,tenant_id,{'limit':50},user))
+    tasks=sections.get('tasks',{});deliverables=sections.get('deliverables',{}).get('summary',{});notifications=sections.get('notifications',{}).get('summary',{})
+    missing='NO DISPONIBLE';metrics=[{'label':'Tareas pendientes','value':tasks.get('total',0) if availability.get('tasks') else missing,'section':'tasks'},{'label':'Tareas vencidas','value':tasks.get('overdue',0) if availability.get('tasks') else missing,'section':'tasks'},{'label':'Entregables pendientes','value':deliverables.get('pending',0) if availability.get('deliverables') else missing,'section':'deliverables'},{'label':'Entregables vencidos','value':deliverables.get('overdue',0) if availability.get('deliverables') else missing,'section':'deliverables'},{'label':'Alertas críticas','value':notifications.get('critical',0) if availability.get('notifications') else missing,'section':'notifications'}]
+    priority={'DOCENTE':['Tareas propias','Entregables asignados','Guías de carga'],'COORDINADOR':['Equipo y UDS asignadas','Entregables vencidos','Alertas de seguimiento'],'GERENTE':['Cobertura institucional','Cumplimiento','Alertas gerenciales'],'SUPERADMIN':['Salud y operación','Fundaciones','Alertas administrativas']}.get(role,['Tareas autorizadas','Alertas'])
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'role':role,'period':period,'team_scope':team,'title':f'Tablero de {role.title()}','metrics':metrics,'priorities':priority,'sections':sections,'availability':availability,'partial':not all(availability.values()),'source':'Calendario, Entregables y Notificaciones','read_only':True}
+
+
 def _liam_center_base(database_path: str, tenant_id: int, user: dict) -> dict:
     sections={};availability={}
     def section(name,call):
@@ -730,6 +747,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
         if allowed and module not in allowed:raise PermissionError('Tu rol no tiene permiso para consultar ese módulo.')
         return _module_summary(database_path,tenant_id,args)
     if tool_name=='get_monthly_health_indicators': return _health_indicators(database_path,tenant_id,args)
+    if tool_name=='get_role_dashboard': return _role_dashboard(database_path,tenant_id,args,user)
     if tool_name=='compare_periods': return _compare_periods(database_path,tenant_id,args)
     if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)

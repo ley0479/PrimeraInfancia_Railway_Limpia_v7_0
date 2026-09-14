@@ -165,6 +165,13 @@ def test_liam_center_intent_is_closed_read_only_tool():
     assert value['confirmation_required'] is False
 
 
+def test_role_dashboard_uses_session_period_and_requested_scope():
+    value=propose_action('Liam muéstrame mi tablero del equipo',screen_context={'selected_period':'2026-09'})
+    assert value['server_tool']=='get_role_dashboard'
+    assert value['arguments']=={'period':'2026-09','scope':'team'}
+    assert value['confirmation_required'] is False
+
+
 def test_safe_repair_requires_confirmation_but_preview_does_not():
     preview=propose_action('Liam muéstrame el plan de reparación')
     assert preview['client_handler']=='safe_repair_preview' and preview['confirmation_required'] is False
@@ -195,5 +202,6 @@ if __name__=='__main__':
     test_communication_intent_creates_draft_not_send_action()
     test_favorite_intent_resolves_name_without_executing_locally()
     test_liam_center_intent_is_closed_read_only_tool()
+    test_role_dashboard_uses_session_period_and_requested_scope()
     test_safe_repair_requires_confirmation_but_preview_does_not()
     print('LIAM_ACTION_INTENTS_V7_PASS')

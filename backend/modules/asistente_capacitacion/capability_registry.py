@@ -16,6 +16,7 @@ class Capability:
 CAPABILITIES = {
     item.name: item for item in (
         Capability('get_foundation_data_summary','consulta','Base Maestra'),
+        Capability('get_role_dashboard','consulta','Calendario, Entregables y Notificaciones'),
         Capability('get_monthly_relation_summary','analiza','Base Maestra'),
         Capability('list_foundation_profiles','consulta','Usuarios'),
         Capability('search_foundation_beneficiaries','consulta','Base Maestra'),
