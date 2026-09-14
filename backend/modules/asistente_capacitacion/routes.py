@@ -232,6 +232,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                     elif step['server_tool']=='get_platform_module_summary':
                         detail=', '.join(f"{item['name']}: {item['total']}" for item in value.get('datasets') or [])
                         parts.append(f"{value['module']}: {detail}")
+                    elif step['server_tool']=='get_monthly_health_indicators':
+                        x=value['indicators'];parts.append(f"Salud: {x['carne_salud']} con carné, {x['crecimiento_desarrollo']} con crecimiento y desarrollo, {x['registro_civil']} con registro civil, {x['perimetro_braquial']} con perímetro braquial, {x['gestantes_control_prenatal']} gestantes con control prenatal, {x['sobrepeso']} con sobrepeso, {x['desnutricion']} con desnutrición y {x['riesgo_desnutricion']} en riesgo")
                     audit_lia(ctx,'TOOL_COMPLETED',module=module,tool=step['server_tool'],request_id=result['request_id'],metadata={'read_only':True,'agentic_step':len(tool_results)})
                 except (PermissionError,LookupError,ValueError) as exc:parts.append(f"{step['server_tool']}: {exc}")
             message='. '.join(parts)+'.'
@@ -296,6 +298,10 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                         total=int(tool_result.get('total_records') or 0)
                         detail=', '.join(f"{item['name']}: {item['total']}" for item in tool_result.get('datasets') or []) or 'sin registros'
                         message=f"Resumen de {tool_result.get('module')}: {detail}."
+                        actions=[]
+                    elif proposal['server_tool']=='get_monthly_health_indicators':
+                        x=tool_result['indicators'];total=int(x.get('total') or 0)
+                        message=f"De {total} beneficiarios: {x['carne_salud']} tienen carné de salud, {x['crecimiento_desarrollo']} crecimiento y desarrollo, {x['registro_civil']} registro civil, {x['perimetro_braquial']} perímetro braquial y {x['gestantes_control_prenatal']} de {x['gestantes']} gestantes tienen control prenatal. Anexo nutricional: {x['sobrepeso']} con sobrepeso, {x['desnutricion']} con desnutrición y {x['riesgo_desnutricion']} en riesgo."
                         actions=[]
                     else:
                         total=int(tool_result.get('total') or 0); overdue=int(tool_result.get('overdue') or 0); today=int(tool_result.get('due_today') or 0); upcoming=int(tool_result.get('upcoming') or 0); undated=int(tool_result.get('undated') or 0)
@@ -402,6 +408,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             {'type':'function','name':'list_foundation_profiles','description':'Lista perfiles de usuario de la fundación de la sesión activa. Puede filtrar por rol y paginar; nunca consulta otra fundación.','parameters':{'type':'object','properties':{'role':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':100},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
             {'type':'function','name':'search_foundation_beneficiaries','description':'Busca y filtra beneficiarios de la fundación de la sesión activa por nombre, documento, UDS, grupo etario o estado. Es de solo lectura y nunca cruza fundaciones.','parameters':{'type':'object','properties':{'query':{'type':'string'},'unit':{'type':'string'},'age_group':{'type':'string'},'status':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':50},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
             {'type':'function','name':'get_platform_module_summary','description':'Consulta un resumen operativo autorizado de Salud y Nutrición, Talento Humano, Planeación, Gestión Pedagógica, Centro Documental, Reportes, Paquete Mensual o Familias y Redes.','parameters':{'type':'object','properties':{'module':{'type':'string','enum':['salud-nutricion','talento','planeacion-pedagogica','gestion-pedagogica','centro-documental','reportes-gerenciales','paquete-mensual','familias-redes']}},'required':['module'],'additionalProperties':False}},
+            {'type':'function','name':'get_monthly_health_indicators','description':'Consulta indicadores mensuales de carné de salud, crecimiento y desarrollo, control prenatal, registro civil, perímetro braquial y devuelve anexo nominal autorizado de sobrepeso, desnutrición y riesgo.','parameters':{'type':'object','properties':{'unit':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':200}},'additionalProperties':False}},
             {'type':'function','name':'get_structured_error','description':'Explica un código de error de la plataforma.','parameters':{'type':'object','properties':{'code':{'type':'string'}},'required':['code'],'additionalProperties':False}},
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
             {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},

@@ -56,6 +56,8 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    if any(text in q for text in ('carne de salud','carnet de salud','crecimiento y desarrollo','control prenatal','registro civil','perimetro braquial','sobrepeso','desnutricion','estado nutricional')):
+        return {'id':'get_monthly_health_indicators','label':'Consultar indicadores de salud','summary':'Consultaré los indicadores y el anexo nutricional de la fundación activa.','arguments':{'limit':100},'missing':[],'confirmation_required':False,'server_tool':'get_monthly_health_indicators'}
     search_words=('busca','buscar','consulta','consultar','muestra','dime quien','cual nino','cual nina')
     if any(word in q for word in search_words) and any(word in q for word in ('nino','nina','beneficiario','participante')):
         document_match=re.search(r'\b(?:documento|cedula|identificacion|nui)\s*(?:numero|nro|no)?\s*[:#-]?\s*(\d{5,15})\b',q)
@@ -174,6 +176,8 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
 def propose_read_actions(question: str, *, screen_context: dict | None = None) -> list[dict]:
     """Planifica varias consultas de lectura pedidas en un mismo turno."""
     q=_plain(question);actions=[]
+    if any(text in q for text in ('carne de salud','carnet de salud','crecimiento y desarrollo','control prenatal','registro civil','perimetro braquial','sobrepeso','desnutricion','estado nutricional')):
+        actions.append({'id':'get_monthly_health_indicators','arguments':{'limit':100},'server_tool':'get_monthly_health_indicators'})
     summary_terms=('cuantos ninos','cuantas ninas','cuantos beneficiarios','cuantos perfiles','grupo etario','grupos etarios','cuantos coordinadores','ninos por unidad','beneficiarios por unidad','unidades activas','uds activas','ods activas','cuales son las uds','cuales son las ods','informacion de la base de datos','resumen de la base de datos','datos de la fundacion','base maestra incompleta','campos incompletos')
     if any(text in q for text in summary_terms):
         actions.append({'id':'get_foundation_data_summary','arguments':{},'server_tool':'get_foundation_data_summary'})

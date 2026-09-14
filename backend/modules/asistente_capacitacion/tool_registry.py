@@ -11,7 +11,7 @@ from .action_policy import decision as action_decision
 from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','list_foundation_profiles','search_foundation_beneficiaries','get_platform_module_summary','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','list_foundation_profiles','search_foundation_beneficiaries','get_platform_module_summary','get_monthly_health_indicators','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'salud-nutricion': [('valoraciones','sn_valoraciones','estado'),('alertas','sn_alertas','estado'),('actividades','sn_actividades_integrales','estado'),('canalizaciones','sn_canalizaciones','estado')],
@@ -112,6 +112,53 @@ def _module_summary(database_path: str, tenant_id: int, args: dict) -> dict:
     finally:conn.close()
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'module':module,'datasets':datasets,'total_records':sum(x['total'] for x in datasets),'read_only':True}
 
+def _present(value) -> bool:
+    text=str(value or '').strip().lower()
+    return bool(text and text not in {'no','0','false','ninguno','ninguna','sin dato','pendiente','n/a','na'})
+
+def _health_indicators(database_path: str, tenant_id: int, args: dict) -> dict:
+    limit=max(1,min(200,int(args.get('limit') or 100)));unit=str(args.get('unit') or '').strip()[:120]
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        where='n.fundacion_id=? AND COALESCE(n.activo,1)=1';params=[tenant_id]
+        if unit:where+=" AND LOWER(COALESCE(n.unidad_servicio,'')) LIKE LOWER(?)";params.append(f'%{unit}%')
+        rows=conn.execute(f'''SELECT n.id,n.documento,n.tipo_documento,n.nombre_completo,n.grupo_etario,n.unidad_servicio,
+          n.carne_salud,n.control_crecimiento,n.carne_crecimiento,n.perimetro_braquial,n.diagnostico_nutricional,n.estado_nutricional,n.datos_json
+          FROM master_ninos n WHERE {where} ORDER BY n.nombre_completo''',tuple(params)).fetchall()
+        try:
+            valuations=conn.execute('''SELECT documento,diagnostico_global,clasificacion_profesional,nivel_alerta,perimetro_braquial_cm,fecha_valoracion
+              FROM sn_valoraciones WHERE fundacion_id=? ORDER BY fecha_valoracion DESC,id DESC''',(tenant_id,)).fetchall()
+        except Exception:valuations=[]
+    finally:conn.close()
+    latest={}
+    for row in valuations:
+        doc=str(row['documento'] or '').strip()
+        if doc and doc not in latest:latest[doc]=dict(row)
+    counts={'total':len(rows),'carne_salud':0,'crecimiento_desarrollo':0,'registro_civil':0,'perimetro_braquial':0,'gestantes':0,'gestantes_control_prenatal':0,'sobrepeso':0,'desnutricion':0,'riesgo_desnutricion':0}
+    annex=[]
+    for row in rows:
+        item=dict(row);valuation=latest.get(str(item.get('documento') or '').strip(),{})
+        try:data=__import__('json').loads(item.get('datos_json') or '{}')
+        except Exception:data={}
+        flat=' '.join(f'{k}:{v}' for k,v in data.items()).lower() if isinstance(data,dict) else ''
+        if _present(item.get('carne_salud')):counts['carne_salud']+=1
+        if _present(item.get('control_crecimiento')) or _present(item.get('carne_crecimiento')):counts['crecimiento_desarrollo']+=1
+        if 'registro' in str(item.get('tipo_documento') or '').lower() or str(item.get('tipo_documento') or '').strip().upper()=='RC':counts['registro_civil']+=1
+        arm=valuation.get('perimetro_braquial_cm') or item.get('perimetro_braquial')
+        if _present(arm):counts['perimetro_braquial']+=1
+        pregnant='gestante' in str(item.get('grupo_etario') or '').lower()
+        if pregnant:
+            counts['gestantes']+=1
+            if 'control_prenatal' in flat and not any(x in flat for x in ('control_prenatal:no','control_prenatal: no','control_prenatal:false')):counts['gestantes_control_prenatal']+=1
+        diagnosis=str(valuation.get('clasificacion_profesional') or valuation.get('diagnostico_global') or item.get('diagnostico_nutricional') or item.get('estado_nutricional') or 'SIN CLASIFICAR').strip()
+        norm=diagnosis.lower()
+        category=None
+        if 'sobrepeso' in norm or 'obesidad' in norm:category='SOBREPESO';counts['sobrepeso']+=1
+        elif 'riesgo' in norm and 'desnut' in norm:category='RIESGO_DESNUTRICION';counts['riesgo_desnutricion']+=1
+        elif 'desnut' in norm:category='DESNUTRICION';counts['desnutricion']+=1
+        if category and len(annex)<limit:annex.append({'id':item.get('id'),'document':item.get('documento'),'name':item.get('nombre_completo'),'unit':item.get('unidad_servicio'),'age_group':item.get('grupo_etario'),'category':category,'nutritional_status':diagnosis,'alert_level':valuation.get('nivel_alerta'),'arm_circumference_cm':arm})
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'unit':unit or None,'indicators':counts,'nutritional_annex':annex,'annex_limit':limit,'read_only':True}
+
 def _int_arg(args, name, minimum=1):
     try: value=int(args.get(name))
     except (TypeError,ValueError): raise ValueError(f'{name} debe ser un entero válido.')
@@ -141,6 +188,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='list_foundation_profiles': return _foundation_profiles(database_path,tenant_id,args)
     if tool_name=='search_foundation_beneficiaries': return _beneficiaries(database_path,tenant_id,args)
     if tool_name=='get_platform_module_summary': return _module_summary(database_path,tenant_id,args)
+    if tool_name=='get_monthly_health_indicators': return _health_indicators(database_path,tenant_id,args)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')

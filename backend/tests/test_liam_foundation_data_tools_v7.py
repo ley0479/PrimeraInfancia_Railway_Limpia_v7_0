@@ -77,3 +77,15 @@ def test_module_summary_is_scoped_and_can_join_multitask_plan(tmp_path):
     assert sum(x['total'] for x in result['datasets'][0]['by_status'])==2
     plan=propose_read_actions('Dime cuántos niños hay y el resumen de salud y nutrición')
     assert {x['server_tool'] for x in plan}=={'get_foundation_data_summary','get_platform_module_summary'}
+
+
+def test_health_annex_reports_overweight_and_malnutrition_without_crossing_tenants(tmp_path):
+    db=tmp_path/'health.db';conn=sqlite3.connect(db)
+    conn.executescript('''CREATE TABLE master_ninos(id INTEGER,documento TEXT,tipo_documento TEXT,nombre_completo TEXT,grupo_etario TEXT,unidad_servicio TEXT,carne_salud TEXT,control_crecimiento TEXT,carne_crecimiento TEXT,perimetro_braquial REAL,diagnostico_nutricional TEXT,estado_nutricional TEXT,datos_json TEXT,activo INTEGER,fundacion_id INTEGER);
+      CREATE TABLE sn_valoraciones(id INTEGER,documento TEXT,diagnostico_global TEXT,clasificacion_profesional TEXT,nivel_alerta TEXT,perimetro_braquial_cm REAL,fecha_valoracion TEXT,fundacion_id INTEGER);''')
+    conn.executemany('INSERT INTO master_ninos VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[(1,'1','RC','Ana','3 A 5','UDS 1','SI','SI','SI',14,'Sobrepeso','Sobrepeso','{}',1,1),(2,'2','RC','Beto','3 A 5','UDS 1','NO','NO','NO',12,'Desnutrición moderada','Desnutrición','{}',1,1),(3,'3','RC','Ajeno','3 A 5','UDS X','SI','SI','SI',15,'Obesidad','Obesidad','{}',1,2)])
+    conn.commit();conn.close()
+    result=execute('get_monthly_health_indicators',args={},database_path=str(db),tenant_id=1,user={'rol':'NUTRICIONISTA'})
+    assert result['indicators']['total']==2
+    assert result['indicators']['sobrepeso']==1 and result['indicators']['desnutricion']==1
+    assert {x['name'] for x in result['nutritional_annex']}=={'Ana','Beto'}
