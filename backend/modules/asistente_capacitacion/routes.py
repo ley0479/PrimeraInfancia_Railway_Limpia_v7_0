@@ -59,6 +59,9 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         def table_for(value):
             if not isinstance(value,dict):return None
             if value.get('executed') is True and isinstance(value.get('result'),dict):return table_for(value['result'])
+            if value.get('scope',{}).get('type')=='authorized_admin_center' and isinstance(value.get('metrics'),list):
+                availability=value.get('availability') or {}
+                return {'title':value.get('title') or 'LIAM · Centro Inteligente','note':'Consulta administrativa de solo lectura. Algunas fuentes pueden aparecer como no disponibles.','metrics':value['metrics'],'columns':['Sección','Disponibilidad'],'rows':[[str(key).replace('_',' ').title(),'Disponible' if enabled else 'No disponible'] for key,enabled in availability.items()]}
             if isinstance(value.get('relation_rows'),list):
                 rows=list(value.get('relation_rows') or [])
                 if value.get('total_row'):rows.append(value['total_row'])
@@ -540,6 +543,10 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                         else:
                             saved=tool_result.get('proposal') or {};message=f"El favorito {tool_result.get('favorite',{}).get('name')} solicita {saved.get('label') or tool_result.get('resolved_action')}. No lo ejecuté porque requiere el flujo de confirmación correspondiente."
                             result['action_proposal']=saved;result['confirmation_required']=bool(tool_result.get('confirmation_required'));actions=[]
+                    elif proposal['server_tool']=='get_liam_center':
+                        available=sum(1 for enabled in (tool_result.get('availability') or {}).values() if enabled);total_sources=len(tool_result.get('availability') or {})
+                        message=f"Centro Liam: consolidé {available} de {total_sources} fuentes administrativas autorizadas. La vista es sanitizada y de solo lectura."
+                        actions=[]
                     else:
                         total=int(tool_result.get('total') or 0); overdue=int(tool_result.get('overdue') or 0); today=int(tool_result.get('due_today') or 0); upcoming=int(tool_result.get('upcoming') or 0); undated=int(tool_result.get('undated') or 0)
                         query=tool_result.get('query') or {}; scope_label='del equipo' if query.get('scope')=='team' else 'asignadas a tu cuenta'; period_label=f" del periodo {query.get('period')}" if query.get('period') else ''
@@ -662,6 +669,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             {'type':'function','name':'get_notification_center','description':'Unifica avisos pendientes de planeación, calendario, incidencias, documentos y créditos dentro del alcance autenticado.','parameters':{'type':'object','properties':{'limit':{'type':'integer','minimum':1,'maximum':100}},'additionalProperties':False}},
             {'type':'function','name':'prepare_communication_draft','description':'Prepara, sin enviar, un borrador para responsables con entregables pendientes dentro del alcance autorizado.','parameters':{'type':'object','properties':{'audience':{'type':'string','enum':['pending_deliverables']},'period':{'type':'string'}},'required':['audience'],'additionalProperties':False}},
             {'type':'function','name':'run_command_favorite','description':'Resuelve un comando favorito del usuario. Ejecuta solo lecturas seguras; las acciones mutables conservan su confirmación normal.','parameters':{'type':'object','properties':{'name':{'type':'string'},'screen_context':{'type':'object'}},'required':['name'],'additionalProperties':False}},
+            {'type':'function','name':'get_liam_center','description':'Exclusivo de SUPERADMIN. Consolida salud, actividad, incidencias, alertas, fundaciones, créditos, entregables, calidad y cambios en una vista sanitizada de solo lectura.','parameters':{'type':'object','properties':{},'additionalProperties':False}},
             {'type':'function','name':'get_structured_error','description':'Explica un código de error de la plataforma.','parameters':{'type':'object','properties':{'code':{'type':'string'}},'required':['code'],'additionalProperties':False}},
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
             {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},

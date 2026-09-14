@@ -37,6 +37,7 @@ RULES = {
     'get_notification_center': ActionRule('get_notification_center','read',ALL_AUTHENTICATED),
     'prepare_communication_draft': ActionRule('prepare_communication_draft','generation',frozenset({'SUPERADMIN','GERENTE','COORDINADOR'})),
     'run_command_favorite': ActionRule('run_command_favorite','read',ALL_AUTHENTICATED),
+    'get_liam_center': ActionRule('get_liam_center','read',frozenset({'SUPERADMIN'})),
     'get_document_processing_status': ActionRule('get_document_processing_status','read',ALL_AUTHENTICATED),
     'get_format_generation_status': ActionRule('get_format_generation_status','read',ALL_AUTHENTICATED),
     'get_structured_error': ActionRule('get_structured_error','read',ALL_AUTHENTICATED),

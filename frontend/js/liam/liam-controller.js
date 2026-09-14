@@ -1285,6 +1285,10 @@
     else if (action === "history-audit") auditHistory().catch((error) => add("liam", error.message));
     else if (action === "favorite-save") saveFavorite().catch((error) => add("liam", error.message));
     else if (action === "favorite-list") viewFavorites().catch((error) => add("liam", error.message));
+    else if (action === "liam-center") {
+      open();
+      ask("Liam muéstrame el Centro Liam");
+    }
     else if (action === "stop") {
       window.LIAM_REALTIME?.stop();
       window.LIA_SPEECH?.stop();

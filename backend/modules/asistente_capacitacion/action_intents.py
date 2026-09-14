@@ -74,6 +74,8 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     favorite_match=re.match(r'^(?:liam|lian|lia)?\s*ejecuta\s+(?:el\s+comando\s+favorito\s+|el\s+favorito\s+)?(.+?)\s*$',q)
     if favorite_match:
         return {'id':'run_command_favorite','label':'Ejecutar comando favorito','summary':'Resolveré el favorito dentro de tu usuario y aplicaré sus permisos actuales.','arguments':{'name':_clean_unit(favorite_match.group(1)),'screen_context':context},'missing':[],'confirmation_required':False,'server_tool':'run_command_favorite'}
+    if any(text in q for text in ('centro liam','centro de liam','centro inteligente')):
+        return {'id':'get_liam_center','label':'Consultar Centro Liam','summary':'Consolidaré el centro administrativo autorizado con datos sanitizados y disponibilidad por fuente.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_liam_center'}
     if any(text in q for text in ('salud del sistema', 'estado del sistema', 'diagnostico del sistema')):
         return {'id':'get_system_health','label':'Consultar salud del sistema','summary':'Revisaré componentes internos sin exponer secretos.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_system_health'}
     if 'fundacion' in q and any(text in q for text in ('proximas a vencer','proxima a vencer','sin usuarios','sin actividad','fundaciones activas','estado de las fundaciones')):

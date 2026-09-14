@@ -13,7 +13,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -603,6 +603,31 @@ def _run_favorite(database_path: str, tenant_id: int, args: dict, user: dict) ->
     proposal.update({'risk':policy['risk'],'confirmation_type':policy['confirmation']})
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'favorite':{'id':row['id'],'name':row['nombre']},'resolved_action':proposal.get('id'),'executed':False,'proposal':proposal,'confirmation_required':bool(proposal.get('confirmation_required')),'read_only':True}
 
+
+def _liam_center(database_path: str, tenant_id: int, user: dict) -> dict:
+    sections={};availability={}
+    def section(name,call):
+        try:sections[name]=call();availability[name]=True
+        except Exception:sections[name]={};availability[name]=False
+    section('system_health',lambda:_system_health(database_path,tenant_id))
+    section('foundations',lambda:_foundation_portfolio(database_path,{}))
+    section('incidents',lambda:_incident_center(database_path,tenant_id,{'limit':100},user))
+    section('notifications',lambda:_notification_center(database_path,tenant_id,{'limit':100},user))
+    section('deliverables',lambda:_deliverable_supervision(database_path,tenant_id,{},user))
+    section('data_quality',lambda:_master_data_quality(database_path,tenant_id,user))
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row;today=datetime.now(ZoneInfo('America/Bogota')).date().isoformat()
+    try:
+        activity=dict(conn.execute("""SELECT COUNT(*) AS total,SUM(CASE WHEN success=0 THEN 1 ELSE 0 END) AS failed,COUNT(DISTINCT usuario_id) AS users FROM lia_audit_events WHERE fundacion_id=? AND SUBSTR(created_at,1,10)=?""",(tenant_id,today)).fetchone())
+        try:changes=dict(conn.execute("SELECT COUNT(*) AS total,SUM(CASE WHEN status='PENDING' THEN 1 ELSE 0 END) AS pending,SUM(CASE WHEN status='COMPLETED' THEN 1 ELSE 0 END) AS completed FROM lia_action_proposals").fetchone())
+        except Exception:changes={'total':0,'pending':0,'completed':0}
+        availability['activity']=True;availability['changes']=True
+    except Exception:activity={'total':0,'failed':0,'users':0};changes={'total':0,'pending':0,'completed':0};availability['activity']=False;availability['changes']=False
+    finally:conn.close()
+    sections['activity']={key:int(value or 0) for key,value in activity.items()};sections['changes']={key:int(value or 0) for key,value in changes.items()}
+    health=sections.get('system_health',{});foundation=sections.get('foundations',{}).get('summary',{});incident=sections.get('incidents',{}).get('summary',{});notifications=sections.get('notifications',{}).get('summary',{});deliverables=sections.get('deliverables',{}).get('summary',{});quality=sections.get('data_quality',{}).get('summary',{})
+    metrics=[{'label':'Salud del sistema','value':health.get('overall_status','NO DISPONIBLE'),'section':'system_health'},{'label':'Consultas hoy','value':sections['activity'].get('total',0),'section':'activity'},{'label':'Errores detectados','value':incident.get('open',0),'section':'incidents'},{'label':'Alertas críticas','value':notifications.get('critical',0),'section':'notifications'},{'label':'Fundaciones activas','value':foundation.get('active',0),'section':'foundations'},{'label':'Próximas a vencer','value':foundation.get('expiring',0),'section':'foundations'},{'label':'Crédito bajo o agotado','value':int(foundation.get('low_credit',0) or 0)+int(foundation.get('exhausted_credit',0) or 0),'section':'foundations'},{'label':'Entregables pendientes','value':deliverables.get('pending',0),'section':'deliverables'},{'label':'Entregables vencidos','value':deliverables.get('overdue',0),'section':'deliverables'},{'label':'Hallazgos de calidad','value':quality.get('alerts',0),'section':'data_quality'},{'label':'Cambios esperando aprobación','value':sections['changes'].get('pending',0),'section':'changes'}]
+    return {'scope':{'type':'authorized_admin_center','active_foundation_id':tenant_id,'cross_foundation_sections':['foundations','changes'],'role':'SUPERADMIN'},'title':'LIAM · Centro Inteligente','metrics':metrics,'sections':sections,'availability':availability,'partial':not all(availability.values()),'sanitized':True,'read_only':True}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -668,6 +693,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_notification_center': return _notification_center(database_path,tenant_id,args,user)
     if tool_name=='prepare_communication_draft': return _communication_draft(database_path,tenant_id,args,user)
     if tool_name=='run_command_favorite': return _run_favorite(database_path,tenant_id,args,user)
+    if tool_name=='get_liam_center': return _liam_center(database_path,tenant_id,user)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')

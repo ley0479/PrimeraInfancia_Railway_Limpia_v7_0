@@ -147,6 +147,12 @@ def test_favorite_intent_resolves_name_without_executing_locally():
     assert value['arguments']['name']=='pendientes docentes'
 
 
+def test_liam_center_intent_is_closed_read_only_tool():
+    value=propose_action('Liam muéstrame el Centro Liam')
+    assert value['server_tool']=='get_liam_center'
+    assert value['confirmation_required'] is False
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -167,4 +173,5 @@ if __name__=='__main__':
     test_notification_center_intent_is_read_only()
     test_communication_intent_creates_draft_not_send_action()
     test_favorite_intent_resolves_name_without_executing_locally()
+    test_liam_center_intent_is_closed_read_only_tool()
     print('LIAM_ACTION_INTENTS_V7_PASS')

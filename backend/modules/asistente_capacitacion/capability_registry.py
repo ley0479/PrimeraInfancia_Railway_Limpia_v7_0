@@ -33,6 +33,7 @@ CAPABILITIES = {
         Capability('get_notification_center','consulta','Centro de Notificaciones'),
         Capability('prepare_communication_draft','ejecuta','Calendario y Entregables'),
         Capability('run_command_favorite','ejecuta','Comandos Favoritos'),
+        Capability('get_liam_center','admin','Centro Liam',False),
         Capability('get_pending_activities_summary','analiza','Calendario y Entregables'),
         Capability('get_document_processing_status','consulta','Motor Documental'),
         Capability('get_format_generation_status','consulta','Motor de Formatos'),
