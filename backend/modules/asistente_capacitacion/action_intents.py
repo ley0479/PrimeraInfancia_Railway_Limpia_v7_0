@@ -46,6 +46,11 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    if any(text in q for text in ('cuantos ninos','cuantas ninas','cuantos beneficiarios','cuantos perfiles','grupo etario','grupos etarios','cuantos coordinadores','ninos por unidad','beneficiarios por unidad','unidades activas','uds activas','ods activas','cuales son las uds','cuales son las ods','informacion de la base de datos','resumen de la base de datos','datos de la fundacion','base maestra incompleta','campos incompletos')):
+        return {'id':'get_foundation_data_summary','label':'Consultar información de la fundación','summary':'Consultaré la información autorizada de la fundación de tu sesión.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_foundation_data_summary'}
+    if any(text in q for text in ('perfiles de la fundacion','usuarios de la fundacion','lista de perfiles','lista de usuarios')):
+        role=next((item for item in ('SUPERADMIN','GERENTE','COORDINADOR','DOCENTE','NUTRICIONISTA','PSICOSOCIAL','AUXILIAR_ADMINISTRATIVO') if item.lower().replace('_',' ') in q),None)
+        return {'id':'list_foundation_profiles','label':'Consultar perfiles de la fundación','summary':'Consultaré los perfiles de la fundación de tu sesión.','arguments':{'role':role,'limit':50,'offset':0},'missing':[],'confirmation_required':False,'server_tool':'list_foundation_profiles'}
     if any(word in q for word in ('abre', 'abrir', 'llevame', 'ir a', 've a')):
         for aliases, module, label in MODULE_ALIASES:
             if any(alias in q for alias in aliases):

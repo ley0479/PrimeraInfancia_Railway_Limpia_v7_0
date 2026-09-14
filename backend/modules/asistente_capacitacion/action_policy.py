@@ -19,6 +19,8 @@ RULES = {
     'open_module': ActionRule('open_module','navigation',ALL_AUTHENTICATED,description='Abrir un módulo autorizado.'),
     'search_beneficiary': ActionRule('search_beneficiary','read',ALL_AUTHENTICATED),
     'get_pending_activities_summary': ActionRule('get_pending_activities_summary','read',ALL_AUTHENTICATED),
+    'get_foundation_data_summary': ActionRule('get_foundation_data_summary','read',ALL_AUTHENTICATED),
+    'list_foundation_profiles': ActionRule('list_foundation_profiles','read',ALL_AUTHENTICATED),
     'get_document_processing_status': ActionRule('get_document_processing_status','read',ALL_AUTHENTICATED),
     'get_format_generation_status': ActionRule('get_format_generation_status','read',ALL_AUTHENTICATED),
     'get_structured_error': ActionRule('get_structured_error','read',ALL_AUTHENTICATED),

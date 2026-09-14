@@ -252,11 +252,23 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                 try:
                     user=dict(getattr(g,'current_user',None) or {}) or {'id':ctx.get('usuario_id'),'rol':ctx.get('rol')}
                     tool_result=execute(proposal['server_tool'],args=proposal.get('arguments') or {},database_path=database_path,tenant_id=int(ctx.get('fundacion_id') or 1),user=user)
-                    total=int(tool_result.get('total') or 0); overdue=int(tool_result.get('overdue') or 0); today=int(tool_result.get('due_today') or 0); upcoming=int(tool_result.get('upcoming') or 0); undated=int(tool_result.get('undated') or 0)
-                    query=tool_result.get('query') or {}; scope_label='del equipo' if query.get('scope')=='team' else 'asignadas a tu cuenta'; period_label=f" del periodo {query.get('period')}" if query.get('period') else ''
-                    message=f'Encontré {total} actividades {scope_label}{period_label}: {overdue} vencidas, {today} para hoy, {upcoming} próximas y {undated} sin fecha.'
-                    action={'type':'navigate','module':'calendario-inteligente','period':query.get('period'),'scope':query.get('scope'),'target':'calendario.pending.list'}
-                    result.update({'message':message,'speech_text':message,'confidence':'confirmed','confirmation_required':False,'tool_result':tool_result,'actions':[action]})
+                    if proposal['server_tool']=='get_foundation_data_summary':
+                        profiles=tool_result.get('profiles') or {};beneficiaries=tool_result.get('beneficiaries') or {};units=tool_result.get('units') or {}
+                        groups=', '.join(f"{item['age_group']}: {item['total']}" for item in beneficiaries.get('by_age_group') or []) or 'sin grupos registrados'
+                        message=f"En la fundación de tu sesión hay {profiles.get('total',0)} perfiles, {profiles.get('coordinators',0)} coordinadores, {beneficiaries.get('total',0)} beneficiarios y {units.get('registered_active',0)} UDS activas. Por grupo etario: {groups}."
+                        actions=[];total=int(beneficiaries.get('total') or 0)
+                    elif proposal['server_tool']=='list_foundation_profiles':
+                        roles={}
+                        for item in tool_result.get('profiles') or []:roles[item.get('rol') or 'SIN_ROL']=roles.get(item.get('rol') or 'SIN_ROL',0)+1
+                        detail=', '.join(f'{role}: {count}' for role,count in sorted(roles.items())) or 'sin perfiles'
+                        message=f"Encontré {tool_result.get('total',0)} perfiles en la fundación de tu sesión. En esta página: {detail}."
+                        actions=[];total=int(tool_result.get('total') or 0)
+                    else:
+                        total=int(tool_result.get('total') or 0); overdue=int(tool_result.get('overdue') or 0); today=int(tool_result.get('due_today') or 0); upcoming=int(tool_result.get('upcoming') or 0); undated=int(tool_result.get('undated') or 0)
+                        query=tool_result.get('query') or {}; scope_label='del equipo' if query.get('scope')=='team' else 'asignadas a tu cuenta'; period_label=f" del periodo {query.get('period')}" if query.get('period') else ''
+                        message=f'Encontré {total} actividades {scope_label}{period_label}: {overdue} vencidas, {today} para hoy, {upcoming} próximas y {undated} sin fecha.'
+                        actions=[{'type':'navigate','module':'calendario-inteligente','period':query.get('period'),'scope':query.get('scope'),'target':'calendario.pending.list'}]
+                    result.update({'message':message,'speech_text':message,'confidence':'confirmed','confirmation_required':False,'tool_result':tool_result,'actions':actions})
                     audit_lia(ctx,'TOOL_COMPLETED',module=module,tool=proposal['server_tool'],request_id=result['request_id'],metadata={'read_only':True,'total':total})
                 except (PermissionError,LookupError,ValueError) as exc:
                     result.update({'message':str(exc),'speech_text':str(exc),'confidence':'insufficient','confirmation_required':False})
@@ -352,6 +364,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         realtime_tools=[
             {'type':'function','name':'propose_platform_action','description':'Prepara, sin ejecutar, una acción solicitada por voz: RAM, RPP, consolidar/publicar Base Maestra, crear/suspender/reactivar usuarios o fundaciones. Siempre muestra confirmación en la interfaz.','parameters':{'type':'object','properties':{'command':{'type':'string','description':'Orden completa pronunciada por el usuario.'}},'required':['command'],'additionalProperties':False}},
             {'type':'function','name':'get_pending_activities_summary','description':'Consulta actividades pendientes autorizadas por periodo y alcance personal o de equipo.','parameters':{'type':'object','properties':{'period':{'type':'string','description':'Periodo opcional en formato AAAA-MM.'},'scope':{'type':'string','enum':['self','team'],'description':'self para pendientes propios; team para equipo autorizado.'}},'additionalProperties':False}},
+            {'type':'function','name':'get_foundation_data_summary','description':'Consulta estadísticas completas de la fundación de la sesión activa: perfiles, coordinadores, beneficiarios, grupos etarios, unidades o UDS y campos incompletos. Nunca consulta otra fundación.','parameters':{'type':'object','properties':{},'additionalProperties':False}},
+            {'type':'function','name':'list_foundation_profiles','description':'Lista perfiles de usuario de la fundación de la sesión activa. Puede filtrar por rol y paginar; nunca consulta otra fundación.','parameters':{'type':'object','properties':{'role':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':100},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
             {'type':'function','name':'get_structured_error','description':'Explica un código de error de la plataforma.','parameters':{'type':'object','properties':{'code':{'type':'string'}},'required':['code'],'additionalProperties':False}},
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
             {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},
@@ -360,7 +374,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         session={'type':'realtime','model':model,'instructions':(
             'Eres LIAN, asistente virtual femenina de la plataforma Primera Infancia. Habla en español colombiano, '
             'con calidez, claridad y respuestas breves. Ayuda únicamente con la plataforma y su manual operativo. '
-            'No inventes datos, no solicites información personal de niños y no afirmes haber ejecutado acciones. '
+            'No inventes datos, no solicites información personal de niños y no afirmes haber ejecutado acciones. Usa las herramientas de lectura para responder sobre perfiles, Base Maestra, beneficiarios, grupos etarios y UDS. '
             'No ejecutes ni afirmes haber ejecutado herramientas que no estén disponibles. Las modificaciones requieren confirmación mediante la interfaz autorizada. '
             f'Política de acciones del rol actual: {voice_policy}. '
             f'Contexto institucional autorizado: {safe_context}'

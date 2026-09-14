@@ -11,7 +11,54 @@ from .action_policy import decision as action_decision
 from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','list_foundation_profiles','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+
+def _foundation_summary(database_path: str, tenant_id: int) -> dict:
+    """Resumen de solo lectura. El tenant siempre proviene de la sesión autenticada."""
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        foundation=conn.execute('SELECT id,nombre FROM fundaciones WHERE id=?',(tenant_id,)).fetchone()
+        profile_rows=conn.execute('''SELECT COALESCE(NULLIF(TRIM(rol),''),'SIN_ROL') AS rol,COUNT(*) AS total,
+          SUM(CASE WHEN COALESCE(activo,1)=1 THEN 1 ELSE 0 END) AS activos
+          FROM usuarios_app WHERE fundacion_id=? GROUP BY COALESCE(NULLIF(TRIM(rol),''),'SIN_ROL') ORDER BY rol''',(tenant_id,)).fetchall()
+        children=conn.execute('''SELECT id,documento,nombre_completo,fecha_nacimiento,edad_meses,grupo_etario,
+          unidad_servicio,codigo_unidad,estado
+          FROM master_ninos WHERE fundacion_id=? AND COALESCE(activo,1)=1''',(tenant_id,)).fetchall()
+        unit_rows=conn.execute('''SELECT COALESCE(NULLIF(TRIM(unidad_servicio),''),'SIN UNIDAD') AS unidad,
+          MAX(NULLIF(TRIM(codigo_unidad),'')) AS codigo,COUNT(*) AS total
+          FROM master_ninos WHERE fundacion_id=? AND COALESCE(activo,1)=1
+          GROUP BY COALESCE(NULLIF(TRIM(unidad_servicio),''),'SIN UNIDAD') ORDER BY unidad''',(tenant_id,)).fetchall()
+        registered_units=conn.execute('SELECT COUNT(*) AS total FROM master_unidades WHERE fundacion_id=? AND COALESCE(activo,1)=1',(tenant_id,)).fetchone()
+    finally: conn.close()
+    groups={}
+    missing={'documento':0,'nombre_completo':0,'fecha_nacimiento':0,'grupo_etario':0,'unidad':0,'estado':0}
+    for row in children:
+        group=str(row['grupo_etario'] or 'SIN GRUPO ETARIO').strip() or 'SIN GRUPO ETARIO'
+        groups[group]=groups.get(group,0)+1
+        values={'documento':row['documento'],'nombre_completo':row['nombre_completo'],'fecha_nacimiento':row['fecha_nacimiento'],'grupo_etario':row['grupo_etario'],'unidad':row['unidad_servicio'],'estado':row['estado']}
+        for key,value in values.items():
+            if not str(value or '').strip():missing[key]+=1
+    profiles=[{'role':row['rol'],'total':int(row['total'] or 0),'active':int(row['activos'] or 0)} for row in profile_rows]
+    return {'scope':{'foundation_id':tenant_id,'foundation_name':foundation['nombre'] if foundation else None,'source':'authenticated_session','cross_foundation':False},
+      'profiles':{'total':sum(x['total'] for x in profiles),'by_role':profiles,'coordinators':sum(x['total'] for x in profiles if str(x['role']).upper()=='COORDINADOR')},
+      'beneficiaries':{'total':len(children),'by_age_group':[{'age_group':key,'total':value} for key,value in sorted(groups.items())]},
+      'units':{'registered_active':int(registered_units['total'] or 0) if registered_units else 0,'with_beneficiaries':len(unit_rows),'items':[{'unit':row['unidad'],'code':row['codigo'],'beneficiaries':int(row['total'] or 0)} for row in unit_rows]},
+      'data_quality':{'incomplete_fields':missing,'records_with_any_incomplete_field':sum(1 for row in children if any(not str(row[key] or '').strip() for key in ('documento','nombre_completo','fecha_nacimiento','grupo_etario','unidad_servicio','estado')))},
+      'read_only':True}
+
+def _foundation_profiles(database_path: str, tenant_id: int, args: dict) -> dict:
+    limit=max(1,min(100,int(args.get('limit') or 50)));offset=max(0,int(args.get('offset') or 0))
+    role=str(args.get('role') or '').strip().upper()
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        where='fundacion_id=?';params=[tenant_id]
+        if role:where+=' AND UPPER(rol)=?';params.append(role)
+        total=conn.execute(f'SELECT COUNT(*) AS total FROM usuarios_app WHERE {where}',tuple(params)).fetchone()
+        rows=conn.execute(f'''SELECT id,username,email,rol,nombre_completo,activo,estado,fecha_ultima_conexion
+          FROM usuarios_app WHERE {where} ORDER BY rol,nombre_completo,username LIMIT ? OFFSET ?''',tuple([*params,limit,offset])).fetchall()
+    finally:conn.close()
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'total':int(total['total'] or 0),'limit':limit,'offset':offset,
+      'profiles':[dict(row) for row in rows],'read_only':True}
 
 def _int_arg(args, name, minimum=1):
     try: value=int(args.get(name))
@@ -38,6 +85,8 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
         message=proposal['summary']+(' Antes de continuar necesito: '+', '.join(proposal['missing'])+'.' if proposal.get('missing') else ' Revisa los datos y confirma desde la interfaz.')
         return {'proposal_only':True,'message':message,'action_proposal':proposal}
     if tool_name=='get_structured_error': return explain(str(args.get('code') or ''))
+    if tool_name=='get_foundation_data_summary': return _foundation_summary(database_path,tenant_id)
+    if tool_name=='list_foundation_profiles': return _foundation_profiles(database_path,tenant_id,args)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')
