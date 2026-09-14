@@ -20,6 +20,7 @@ from .action_intents import propose_action, propose_read_actions
 from .error_center import record as record_incident, get as get_incident, list_recent as list_incidents
 from .credit_agent import parse_credit_request, query as query_credits, create_proposal as create_credit_proposal, confirm as confirm_credit_proposal
 from .action_policy import decision as action_decision, public_policy
+from .system_prompt import realtime_instructions
 import json, uuid, os, tempfile, re, hashlib, requests
 
 
@@ -411,7 +412,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         realtime_tools=[
             {'type':'function','name':'propose_platform_action','description':'Prepara, sin ejecutar, una acción solicitada por voz: RAM, RPP, consolidar/publicar Base Maestra, crear/suspender/reactivar usuarios o fundaciones. Siempre muestra confirmación en la interfaz.','parameters':{'type':'object','properties':{'command':{'type':'string','description':'Orden completa pronunciada por el usuario.'}},'required':['command'],'additionalProperties':False}},
             {'type':'function','name':'get_pending_activities_summary','description':'Consulta actividades pendientes autorizadas por periodo y alcance personal o de equipo.','parameters':{'type':'object','properties':{'period':{'type':'string','description':'Periodo opcional en formato AAAA-MM.'},'scope':{'type':'string','enum':['self','team'],'description':'self para pendientes propios; team para equipo autorizado.'}},'additionalProperties':False}},
-            {'type':'function','name':'get_foundation_data_summary','description':'Consulta estadísticas completas de la fundación de la sesión activa: perfiles, coordinadores, beneficiarios, grupos etarios, unidades o UDS y campos incompletos. Nunca consulta otra fundación.','parameters':{'type':'object','properties':{},'additionalProperties':False}},
+            {'type':'function','name':'get_foundation_data_summary','description':'Consulta el panorama institucional consolidado de la fundación activa: perfiles, coordinadores, equipos de talento humano, beneficiarios, grupos etarios, UDS, cargas vigentes por fuente, movimientos y campos incompletos. Nunca consulta otra fundación.','parameters':{'type':'object','properties':{},'additionalProperties':False}},
             {'type':'function','name':'list_foundation_profiles','description':'Lista perfiles de usuario de la fundación de la sesión activa. Puede filtrar por rol y paginar; nunca consulta otra fundación.','parameters':{'type':'object','properties':{'role':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':100},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
             {'type':'function','name':'search_foundation_beneficiaries','description':'Busca y filtra beneficiarios de la fundación de la sesión activa por nombre, documento, UDS, grupo etario o estado. Es de solo lectura y nunca cruza fundaciones.','parameters':{'type':'object','properties':{'query':{'type':'string'},'unit':{'type':'string'},'age_group':{'type':'string'},'status':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':50},'offset':{'type':'integer','minimum':0}},'additionalProperties':False}},
             {'type':'function','name':'get_platform_module_summary','description':'Consulta un resumen operativo autorizado de Salud y Nutrición, Talento Humano, Planeación, Gestión Pedagógica, Centro Documental, Reportes, Paquete Mensual o Familias y Redes.','parameters':{'type':'object','properties':{'module':{'type':'string','enum':['salud-nutricion','talento','planeacion-pedagogica','gestion-pedagogica','centro-documental','reportes-gerenciales','paquete-mensual','familias-redes']}},'required':['module'],'additionalProperties':False}},
@@ -421,13 +422,8 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},
         ]
         voice_policy='; '.join(f"{item['action']}={item['risk']}/{item['confirmation']}" for item in public_policy(str(ctx.get('rol') or '')) if item.get('allowed') and item.get('connected'))
-        session={'type':'realtime','model':model,'instructions':(
-            'Eres LIAN, asistente virtual femenina de la plataforma Primera Infancia. Habla en español colombiano, '
-            'con calidez, claridad y respuestas breves. Ayuda únicamente con la plataforma y su manual operativo. '
-            'No inventes datos, no solicites información personal de niños y no afirmes haber ejecutado acciones. Usa las herramientas de lectura para responder sobre perfiles, Base Maestra, beneficiarios, grupos etarios y UDS. '
-            'No ejecutes ni afirmes haber ejecutado herramientas que no estén disponibles. Las modificaciones requieren confirmación mediante la interfaz autorizada. '
-            f'Política de acciones del rol actual: {voice_policy}. '
-            f'Contexto institucional autorizado: {safe_context}'
+        session={'type':'realtime','model':model,'instructions':realtime_instructions(
+            action_policy=voice_policy, authorized_context=safe_context
         ),'output_modalities':['audio'],'tools':realtime_tools,'tool_choice':'auto','audio':{
             'input':{'transcription':{'model':'gpt-4o-mini-transcribe','language':'es'},'turn_detection':{'type':'server_vad','create_response':True,'interrupt_response':True}},
             'output':{'voice':'marin'},

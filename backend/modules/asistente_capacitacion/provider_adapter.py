@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import json, os
 import requests
+from .system_prompt import LIA_SYSTEM_PROMPT
 
 class AssistantProvider(ABC):
     @abstractmethod
@@ -22,12 +23,7 @@ class OpenAIResponsesProvider(AssistantProvider):
         if not status['ready']: raise ProviderUnavailable(status['reason'])
         self.key=os.environ['OPENAI_API_KEY'].strip();self.model=os.environ['LIAM_OPENAI_MODEL'].strip()
     def respond(self,*,messages:list[dict],context:dict,tools:list[dict])->dict:
-        instructions=("Eres LIAM, asistente virtual femenina de la plataforma Primera Infancia. "
-          "Responde en español colombiano, con calidez y pasos concretos. Usa exclusivamente el contexto autorizado. "
-          "No inventes funciones, normas o datos. No solicites datos personales. No ejecutes acciones. "
-          "El borrador verificado tiene prioridad. Si su confianza es insufficient, puedes reorganizar el manual para orientar, "
-          "pero debes declarar lo que no esté confirmado y pedir el nombre del botón o código del error.")
-        payload={'model':self.model,'instructions':instructions,'input':[
+        payload={'model':self.model,'instructions':LIA_SYSTEM_PROMPT,'input':[
           {'role':'developer','content':'CONTEXTO AUTORIZADO:\n'+json.dumps(context,ensure_ascii=False,default=str)},
           *messages[-6:],
         ],'max_output_tokens':500,'store':False}
