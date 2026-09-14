@@ -1,5 +1,6 @@
 """Contrato de UI dinámica y renderizado seguro para Lía."""
 from pathlib import Path
+from modules.asistente_capacitacion.action_intents import propose_action, propose_read_actions
 
 ROOT=Path(__file__).resolve().parents[2]
 
@@ -19,7 +20,13 @@ def test_frontend_renders_without_injecting_data_as_html():
     assert "lia-data-drawer" in css and "lia-spotlight" in css
     assert "lia-dynamic-ui.css?v=2.7.5-dynamic-ui-1" in html
 
+def test_master_report_phrases_force_data_cards():
+    for question in ('Dame el informe de la Base Maestra','Muéstrame el registro de la Base Maestra','Explica la Base Maestra'):
+        assert propose_action(question)['server_tool']=='get_foundation_data_summary'
+        assert propose_read_actions(question)[0]['server_tool']=='get_foundation_data_summary'
+
 if __name__=='__main__':
     test_backend_emits_structured_visual_contract()
     test_frontend_renders_without_injecting_data_as_html()
+    test_master_report_phrases_force_data_cards()
     print('LIA_DYNAMIC_UI_V7_PASS')

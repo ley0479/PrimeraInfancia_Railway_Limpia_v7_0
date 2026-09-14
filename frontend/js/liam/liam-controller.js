@@ -330,6 +330,7 @@
       const grid = document.createElement("div"); grid.className = "lia-metrics";
       for (const item of (data.metrics || []).slice(0, 16)) { const card = document.createElement("div"), value = document.createElement("strong"), label = document.createElement("span"); card.className = "lia-metric"; value.textContent = String(item.value ?? "—"); label.textContent = String(item.label || "Indicador"); card.append(value, label); grid.appendChild(card); }
       root.appendChild(grid);
+      if (Array.isArray(data.rows) && data.rows.length) { const detail = richContent({ componentType: "table", data: { columns: data.columns || [], rows: data.rows } }); if (detail) root.appendChild(detail); }
     } else if (type === "table") {
       const table = document.createElement("table"), head = document.createElement("thead"), body = document.createElement("tbody"), tr = document.createElement("tr");
       for (const label of (data.columns || []).slice(0, 8)) { const th = document.createElement("th"); th.textContent = String(label ?? ""); tr.appendChild(th); } head.appendChild(tr);
