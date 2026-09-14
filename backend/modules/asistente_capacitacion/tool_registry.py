@@ -10,8 +10,9 @@ from .action_policy import require as require_action
 from .action_policy import decision as action_decision
 from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
+from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','list_foundation_profiles','search_foundation_beneficiaries','get_platform_module_summary','get_monthly_health_indicators','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','get_platform_module_summary','get_monthly_health_indicators','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -248,6 +249,31 @@ def _int_arg(args, name, minimum=1):
     if value<minimum: raise ValueError(f'{name} no es válido.')
     return value
 
+def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
+    period=str(args.get('period') or '').strip()
+    if not period:
+        try: period=f"{int(args.get('year')):04d}-{int(args.get('month')):02d}"
+        except (TypeError,ValueError): period=datetime.now(ZoneInfo('America/Bogota')).strftime('%Y-%m')
+    if len(period)!=7 or period[4]!='-' or not period[:4].isdigit() or not period[5:].isdigit() or not 1<=int(period[5:])<=12:
+        raise ValueError('period debe tener el formato AAAA-MM.')
+    year,month=int(period[:4]),int(period[5:])
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        rows=conn.execute('''SELECT unidad_servicio AS unidad,grupo_etario,edad_meses,fecha_nacimiento,
+          estado,docente,datos_json FROM master_ninos
+          WHERE fundacion_id=? AND COALESCE(activo,1)=1''',(tenant_id,)).fetchall()
+    finally:conn.close()
+    grouped=consolidar_por_unidad((dict(row) for row in rows),year,month)
+    columns=['UNIDAD DE ATENCIÓN','DOCENTE','GESTANTES','MENORES 6 MESES','6 A 11 MESES','1 A 2 AÑOS 11 MESES','3 A 5 AÑOS 11 MESES','SIN CLASIFICAR / REVISAR','TOTAL USUARIOS','HUEVOS PARA GRUPOS DE 30','HUEVOS PARA 6 A 11 (15)','TOTAL HUEVOS (UNIDADES)','CUBETAS DE 30','PANALES COMPLETOS (7 CUBETAS)','CUBETAS SUELTAS','GESTANTES/LACTANTES CON DOBLE VERDURA','TOTAL VERDURAS','OLLA COMUNITARIA','BIENESTARINA']
+    output=[]
+    for unit in sorted(grouped):
+        item=grouped[unit];amounts=cantidades(item)
+        output.append([unit,docente_mas_frecuente(item) or 'SIN DOCENTE ASIGNADO',item['gestantes'],item['menores_6'],item['seis_11'],item['uno_2'],item['tres_5'],item['sin_clasificar'],amounts['total'],amounts['huevos_30'],amounts['huevos_15'],amounts['total_huevos'],amounts['cubetas_30'],amounts['panales_7'],amounts['cubetas_sueltas'],item['verduras_dobles'],amounts['verduras'],amounts['olla_comunitaria'],amounts['bienestarina']])
+    numeric_totals=[sum(int(row[index] or 0) for row in output) for index in range(2,len(columns))]
+    total_row=['TOTAL GENERAL','',*numeric_totals]
+    metrics=[{'label':'Unidades de atención','value':len(output)},{'label':'Total usuarios','value':numeric_totals[6] if numeric_totals else 0},{'label':'Total huevos','value':numeric_totals[9] if numeric_totals else 0},{'label':'Cubetas de 30','value':numeric_totals[10] if numeric_totals else 0},{'label':'Panales completos','value':numeric_totals[11] if numeric_totals else 0},{'label':'Total verduras','value':numeric_totals[14] if numeric_totals else 0},{'label':'Ollas comunitarias','value':numeric_totals[15] if numeric_totals else 0},{'label':'Bienestarina','value':numeric_totals[16] if numeric_totals else 0}]
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'period':period,'title':f'RELACIÓN DEL MES {period}','rule':'30 huevos por usuario; de 6 a 11 meses recibe 15. Una cubeta contiene 30 huevos y un panal contiene 7 cubetas.','metrics':metrics,'columns':columns,'relation_rows':output,'total_row':total_row,'read_only':True}
+
 def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, user: dict) -> dict:
     if tool_name not in ALLOWED_TOOLS: raise PermissionError('Herramienta no autorizada para LÍA.')
     require_action(tool_name, str(user.get('rol') or ''))
@@ -268,6 +294,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
         return {'proposal_only':True,'message':message,'action_proposal':proposal}
     if tool_name=='get_structured_error': return explain(str(args.get('code') or ''))
     if tool_name=='get_foundation_data_summary': return _foundation_summary_complete(database_path,tenant_id)
+    if tool_name=='get_monthly_relation_summary': return _monthly_relation(database_path,tenant_id,args)
     if tool_name=='list_foundation_profiles': return _foundation_profiles(database_path,tenant_id,args)
     if tool_name=='search_foundation_beneficiaries': return _beneficiaries(database_path,tenant_id,args)
     if tool_name=='get_platform_module_summary':

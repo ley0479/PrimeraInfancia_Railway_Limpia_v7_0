@@ -20,6 +20,7 @@ RULES = {
     'search_beneficiary': ActionRule('search_beneficiary','read',ALL_AUTHENTICATED),
     'get_pending_activities_summary': ActionRule('get_pending_activities_summary','read',ALL_AUTHENTICATED),
     'get_foundation_data_summary': ActionRule('get_foundation_data_summary','read',ALL_AUTHENTICATED),
+    'get_monthly_relation_summary': ActionRule('get_monthly_relation_summary','read',ALL_AUTHENTICATED),
     'list_foundation_profiles': ActionRule('list_foundation_profiles','read',ALL_AUTHENTICATED),
     'search_foundation_beneficiaries': ActionRule('search_foundation_beneficiaries','read',ALL_AUTHENTICATED),
     'get_platform_module_summary': ActionRule('get_platform_module_summary','read',ALL_AUTHENTICATED),

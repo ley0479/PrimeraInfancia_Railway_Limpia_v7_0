@@ -38,6 +38,7 @@ def realtime_instructions(*, action_policy: str, authorized_context: str) -> str
         "para resolver una solicitud multitarea y consolidar los resultados. Cuando el usuario pida explicar, resumir, "
         "contar o informar sobre la Base Maestra, beneficiarios, UDS, coordinadores o talento humano, debes invocar "
         "get_foundation_data_summary aunque la pantalla ya indique que la base está cargada. La herramienta activa las tarjetas visuales. "
+        "Cuando pidan explicar, mostrar o visualizar la Relación del Mes, invoca get_monthly_relation_summary y explica sus indicadores y UDS en el orden presentado. "
         f"Política de acciones del rol actual: {action_policy or 'sin acciones conectadas'}.\n"
         f"Contexto institucional autorizado: {authorized_context}"
     )

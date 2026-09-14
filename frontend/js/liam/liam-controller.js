@@ -369,15 +369,19 @@
     const type = payload?.componentType, data = payload?.data || {};
     if (!["metric-card", "table", "list", "spotlight"].includes(type)) return null;
     const root = document.createElement("div"); root.className = "lia-rich"; root.dataset.componentType = type;
+    if (data.title) { const title = document.createElement("h3"); title.textContent = String(data.title); root.appendChild(title); }
+    if (data.note) { const note = document.createElement("p"); note.className = "lia-data-note"; note.textContent = String(data.note); root.appendChild(note); }
     if (type === "metric-card") {
       const grid = document.createElement("div"); grid.className = "lia-metrics";
       for (const item of (data.metrics || []).slice(0, 16)) { const card = document.createElement("div"), value = document.createElement("strong"), label = document.createElement("span"); card.className = "lia-metric lia-data-point"; card.dataset.liaLabel = String(item.label || "Indicador"); value.textContent = String(item.value ?? "—"); label.textContent = String(item.label || "Indicador"); card.append(value, label); grid.appendChild(card); }
       root.appendChild(grid);
-      if (Array.isArray(data.rows) && data.rows.length) { const detail = richContent({ componentType: "table", data: { columns: data.columns || [], rows: data.rows } }); if (detail) root.appendChild(detail); }
+      if (Array.isArray(data.rows) && data.rows.length) { const detail = richContent({ componentType: "table", data: { columns: data.columns || [], rows: data.rows, maxColumns: data.maxColumns, relationFormat: data.relationFormat } }); if (detail) root.appendChild(detail); }
     } else if (type === "table") {
       const table = document.createElement("table"), head = document.createElement("thead"), body = document.createElement("tbody"), tr = document.createElement("tr");
-      for (const label of (data.columns || []).slice(0, 8)) { const th = document.createElement("th"); th.textContent = String(label ?? ""); tr.appendChild(th); } head.appendChild(tr);
-      for (const row of (data.rows || []).slice(0, 50)) { const line = document.createElement("tr"); line.className = "lia-data-point"; line.dataset.liaLabel = String((Array.isArray(row) && row[0]) || "Registro"); for (const value of (Array.isArray(row) ? row : []).slice(0, 8)) { const td = document.createElement("td"); td.textContent = String(value ?? "—"); line.appendChild(td); } body.appendChild(line); }
+      const maxColumns = Math.max(1, Math.min(24, Number(data.maxColumns || 8)));
+      if (data.relationFormat) root.classList.add("lia-relation-format");
+      for (const label of (data.columns || []).slice(0, maxColumns)) { const th = document.createElement("th"); th.textContent = String(label ?? ""); tr.appendChild(th); } head.appendChild(tr);
+      for (const row of (data.rows || []).slice(0, 50)) { const line = document.createElement("tr"); line.className = "lia-data-point"; line.dataset.liaLabel = String((Array.isArray(row) && row[0]) || "Registro"); for (const value of (Array.isArray(row) ? row : []).slice(0, maxColumns)) { const td = document.createElement("td"); td.textContent = String(value ?? "—"); line.appendChild(td); } body.appendChild(line); }
       if (!body.children.length) { const line = document.createElement("tr"), td = document.createElement("td"); td.colSpan = Math.max(1, (data.columns || []).length); td.textContent = "La consulta no devolvió registros para mostrar."; line.appendChild(td); body.appendChild(line); }
       table.append(head, body); root.appendChild(table);
     } else if (type === "list") {

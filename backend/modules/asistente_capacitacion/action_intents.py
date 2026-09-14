@@ -71,6 +71,11 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    if ('relacion del mes' in q or 'relacion mensual' in q) and any(word in q for word in ('explica','explicar','muestra','mostrar','visualiza','visualizar','resumen','consulta','consultar')):
+        month=next((number for name,number in MONTHS.items() if re.search(rf'\b{name}\b',q)),None) or context.get('selected_month')
+        year_match=re.search(r'\b(20\d{2}|2100)\b',q);year=int(year_match.group(1)) if year_match else context.get('selected_year')
+        arguments={'period':f'{int(year):04d}-{int(month):02d}' if month and year else None}
+        return {'id':'get_monthly_relation_summary','label':'Consultar Relación del Mes','summary':'Consultaré y visualizaré la Relación del Mes de la fundación activa.','arguments':arguments,'missing':[],'confirmation_required':False,'server_tool':'get_monthly_relation_summary'}
     if ('relacion del mes' in q or 'relacion mensual' in q) and any(word in q for word in ('genera','generar','descarga','descargar','saca','sacame')):
         month=next((number for name,number in MONTHS.items() if re.search(rf'\b{name}\b',q)),None) or context.get('selected_month')
         year_match=re.search(r'\b(20\d{2}|2100)\b',q);year=int(year_match.group(1)) if year_match else context.get('selected_year')
@@ -196,6 +201,9 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
 def propose_read_actions(question: str, *, screen_context: dict | None = None) -> list[dict]:
     """Planifica varias consultas de lectura pedidas en un mismo turno."""
     q=_plain(question);actions=[]
+    if ('relacion del mes' in q or 'relacion mensual' in q) and not any(word in q for word in ('genera','generar','descarga','descargar')):
+        action=propose_action(question,screen_context=screen_context)
+        if action and action.get('server_tool')=='get_monthly_relation_summary':actions.append(action)
     if any(text in q for text in ('carne de salud','carnet de salud','crecimiento y desarrollo','control prenatal','registro civil','perimetro braquial','sobrepeso','desnutricion','estado nutricional')):
         actions.append({'id':'get_monthly_health_indicators','arguments':{'limit':100},'server_tool':'get_monthly_health_indicators'})
     summary_terms=('cuantos ninos','cuantas ninas','cuantos beneficiarios','total de beneficiarios','cuantos perfiles','grupo etario','grupos etarios','cuantos coordinadores','ninos por unidad','beneficiarios por unidad','unidades activas','uds activas','ods activas','cuales son las uds','cuales son las ods','informacion de la base de datos','resumen de la base de datos','informe de la base maestra','informe base maestra','registro de la base maestra','registros de la base maestra','detalle de la base maestra','explica la base maestra','datos de la fundacion','base maestra incompleta','campos incompletos')
