@@ -58,6 +58,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         tool='';component='spotlight';data={};display='inline'
         def table_for(value):
             if not isinstance(value,dict):return None
+            if value.get('executed') is True and isinstance(value.get('result'),dict):return table_for(value['result'])
             if isinstance(value.get('relation_rows'),list):
                 rows=list(value.get('relation_rows') or [])
                 if value.get('total_row'):rows.append(value['total_row'])
@@ -532,6 +533,13 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
                     elif proposal['server_tool']=='prepare_communication_draft':
                         message=f"Preparé un borrador para {tool_result.get('recipient_count',0)} responsables con {tool_result.get('pending_count',0)} entregables que requieren atención. No fue enviado y cualquier integración futura exigirá aprobación."
                         actions=[]
+                    elif proposal['server_tool']=='run_command_favorite':
+                        if tool_result.get('executed'):
+                            message=f"Ejecuté el comando favorito {tool_result.get('favorite',{}).get('name')} mediante la herramienta segura {tool_result.get('resolved_action')}."
+                            actions=[]
+                        else:
+                            saved=tool_result.get('proposal') or {};message=f"El favorito {tool_result.get('favorite',{}).get('name')} solicita {saved.get('label') or tool_result.get('resolved_action')}. No lo ejecuté porque requiere el flujo de confirmación correspondiente."
+                            result['action_proposal']=saved;result['confirmation_required']=bool(tool_result.get('confirmation_required'));actions=[]
                     else:
                         total=int(tool_result.get('total') or 0); overdue=int(tool_result.get('overdue') or 0); today=int(tool_result.get('due_today') or 0); upcoming=int(tool_result.get('upcoming') or 0); undated=int(tool_result.get('undated') or 0)
                         query=tool_result.get('query') or {}; scope_label='del equipo' if query.get('scope')=='team' else 'asignadas a tu cuenta'; period_label=f" del periodo {query.get('period')}" if query.get('period') else ''
@@ -653,6 +661,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             {'type':'function','name':'get_incident_center','description':'Consulta incidencias sanitizadas. Usuario común ve las propias; gerente y SUPERADMIN ven su fundación.','parameters':{'type':'object','properties':{'incident_id':{'type':'string'},'status':{'type':'string','enum':['','OPEN','IN_ANALYSIS','IN_PROGRESS','RESOLVED','CLOSED']},'limit':{'type':'integer','minimum':1,'maximum':100}},'additionalProperties':False}},
             {'type':'function','name':'get_notification_center','description':'Unifica avisos pendientes de planeación, calendario, incidencias, documentos y créditos dentro del alcance autenticado.','parameters':{'type':'object','properties':{'limit':{'type':'integer','minimum':1,'maximum':100}},'additionalProperties':False}},
             {'type':'function','name':'prepare_communication_draft','description':'Prepara, sin enviar, un borrador para responsables con entregables pendientes dentro del alcance autorizado.','parameters':{'type':'object','properties':{'audience':{'type':'string','enum':['pending_deliverables']},'period':{'type':'string'}},'required':['audience'],'additionalProperties':False}},
+            {'type':'function','name':'run_command_favorite','description':'Resuelve un comando favorito del usuario. Ejecuta solo lecturas seguras; las acciones mutables conservan su confirmación normal.','parameters':{'type':'object','properties':{'name':{'type':'string'},'screen_context':{'type':'object'}},'required':['name'],'additionalProperties':False}},
             {'type':'function','name':'get_structured_error','description':'Explica un código de error de la plataforma.','parameters':{'type':'object','properties':{'code':{'type':'string'}},'required':['code'],'additionalProperties':False}},
             {'type':'function','name':'get_document_processing_status','description':'Consulta el estado autorizado de un documento procesado.','parameters':{'type':'object','properties':{'document_id':{'type':'integer'}},'required':['document_id'],'additionalProperties':False}},
             {'type':'function','name':'get_format_generation_status','description':'Consulta el estado de una generación de formato.','parameters':{'type':'object','properties':{'test_id':{'type':'integer'}},'required':['test_id'],'additionalProperties':False}},
@@ -767,6 +776,28 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         reason=str(data.get('reason') or '')[:240];module=str(data.get('module') or '')[:80];request_id=str(data.get('request_id') or '')[:64];conn=connect();now=datetime.now().isoformat(timespec='seconds')
         conn.execute('INSERT INTO lia_feedback(fundacion_id,usuario_id,request_id,rating,reason,module,created_at) VALUES(?,?,?,?,?,?,?)',(int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),request_id,rating,reason,module,now));conn.commit();conn.close();audit_lia(ctx,'FEEDBACK_RECORDED',module=module,request_id=request_id,metadata={'rating':rating})
         return jsonify({'message':'Gracias. Registramos tu valoración sin guardar datos personales de la conversación.'}),201
+
+    @bp.route('/command-favorites',methods=['GET','POST'])
+    def command_favorites():
+        ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0);conn=connect()
+        if request.method=='GET':
+            rows=conn.execute('SELECT id,nombre,comando,created_at,updated_at FROM lia_command_favorites WHERE fundacion_id=? AND usuario_id=? ORDER BY nombre',(fid,uid)).fetchall();conn.close()
+            return jsonify({'favorites':[dict(row) for row in rows]}),200
+        data=request.get_json(silent=True) or {};name=re.sub(r'\s+',' ',str(data.get('name') or '')).strip();command=re.sub(r'\s+',' ',str(data.get('command') or '')).strip()
+        if not 2<=len(name)<=60 or not 2<=len(command)<=1000:conn.close();return jsonify({'error':'Nombre o comando favorito no válido.'}),422
+        now=datetime.now().isoformat(timespec='seconds');existing=conn.execute('SELECT id FROM lia_command_favorites WHERE fundacion_id=? AND usuario_id=? AND LOWER(nombre)=LOWER(?)',(fid,uid,name)).fetchone()
+        if existing:
+            conn.execute('UPDATE lia_command_favorites SET nombre=?,comando=?,updated_at=? WHERE id=? AND fundacion_id=? AND usuario_id=?',(name,command,now,existing['id'],fid,uid));favorite_id=int(existing['id']);created=False
+        else:
+            cur=conn.execute('INSERT INTO lia_command_favorites(fundacion_id,usuario_id,nombre,comando,created_at,updated_at) VALUES(?,?,?,?,?,?)',(fid,uid,name,command,now,now));favorite_id=int(cur.lastrowid);created=True
+        conn.commit();conn.close();audit_lia(ctx,'COMMAND_FAVORITE_SAVED',tool='command_favorite',metadata={'favorite_id':favorite_id,'created':created})
+        return jsonify({'favorite':{'id':favorite_id,'name':name,'command':command},'created':created}),201 if created else 200
+
+    @bp.delete('/command-favorites/<int:favorite_id>')
+    def delete_command_favorite(favorite_id):
+        ctx=get_request_user_context();fid=int(ctx.get('fundacion_id') or 1);uid=int(ctx.get('usuario_id') or 0);conn=connect();cur=conn.execute('DELETE FROM lia_command_favorites WHERE id=? AND fundacion_id=? AND usuario_id=?',(favorite_id,fid,uid));conn.commit();deleted=int(getattr(cur,'rowcount',0) or 0);conn.close()
+        if not deleted:return jsonify({'error':'Comando favorito no encontrado.'}),404
+        audit_lia(ctx,'COMMAND_FAVORITE_DELETED',tool='command_favorite',metadata={'favorite_id':favorite_id});return jsonify({'deleted':True,'id':favorite_id}),200
 
     app.register_blueprint(bp)
 

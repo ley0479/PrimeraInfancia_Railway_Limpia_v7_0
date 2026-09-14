@@ -31,6 +31,18 @@ ON lia_audit_events(fundacion_id, usuario_id, created_at);
 CREATE TABLE IF NOT EXISTS lia_user_preferences (id INTEGER PRIMARY KEY AUTOINCREMENT,fundacion_id INTEGER NOT NULL,usuario_id INTEGER NOT NULL,voice_enabled INTEGER DEFAULT 0,auto_speak_enabled INTEGER DEFAULT 0,muted INTEGER DEFAULT 0,speech_rate REAL DEFAULT 0.95,reduced_motion INTEGER DEFAULT 0,language TEXT DEFAULT 'es-CO',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(fundacion_id,usuario_id));
 CREATE TABLE IF NOT EXISTS lia_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT,fundacion_id INTEGER NOT NULL,usuario_id INTEGER NOT NULL,request_id TEXT,rating INTEGER NOT NULL,reason TEXT,module TEXT,created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_lia_feedback_tenant_date ON lia_feedback(fundacion_id, created_at);
+CREATE TABLE IF NOT EXISTS lia_command_favorites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER NOT NULL,
+    usuario_id INTEGER NOT NULL,
+    nombre TEXT NOT NULL,
+    comando TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(fundacion_id, usuario_id, nombre)
+);
+CREATE INDEX IF NOT EXISTS idx_lia_favorites_tenant_user
+ON lia_command_favorites(fundacion_id, usuario_id, updated_at);
 CREATE TABLE IF NOT EXISTS lia_conversation_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fundacion_id INTEGER NOT NULL,

@@ -24,6 +24,7 @@
     historyFilters: {},
     realtimeSessionId: "",
     dataPresentation: null,
+    lastUserCommand: "",
     history: [],
   };
   const apiBase = () => `${window.backendUrl || ""}/api/asistente-capacitacion`;
@@ -428,7 +429,20 @@
       document.head.appendChild(style);
     }
     const canAudit = ["SUPERADMIN", "GERENTE", "COORDINADOR"].includes(String(authenticatedUser().rol || "").toUpperCase());
-    box.insertAdjacentHTML("beforebegin", `<div id="liam-history-tools" class="liam-history-tools"><input id="liam-history-search" type="search" maxlength="120" placeholder="Buscar"><input id="liam-history-module" maxlength="80" placeholder="Módulo"><input id="liam-history-from" type="date" title="Desde"><input id="liam-history-to" type="date" title="Hasta"><select id="liam-history-role"><option value="">Todos</option><option value="user">Órdenes</option><option value="assistant">Respuestas</option></select><button type="button" data-action="history-search">Filtrar</button><button type="button" data-action="history-more" id="liam-history-more">Ver anteriores</button><button type="button" data-action="history-sessions">Sesiones</button><button type="button" data-action="history-stats">Estadísticas</button><button type="button" data-action="history-export">CSV</button><button type="button" data-action="history-export-xlsx">Excel</button><button type="button" data-action="history-export-pdf">PDF</button>${canAudit ? '<button type="button" data-action="history-audit">Auditoría</button>' : ''}</div>`);
+    box.insertAdjacentHTML("beforebegin", `<div id="liam-history-tools" class="liam-history-tools"><input id="liam-history-search" type="search" maxlength="120" placeholder="Buscar"><input id="liam-history-module" maxlength="80" placeholder="Módulo"><input id="liam-history-from" type="date" title="Desde"><input id="liam-history-to" type="date" title="Hasta"><select id="liam-history-role"><option value="">Todos</option><option value="user">Órdenes</option><option value="assistant">Respuestas</option></select><button type="button" data-action="history-search">Filtrar</button><button type="button" data-action="history-more" id="liam-history-more">Ver anteriores</button><button type="button" data-action="history-sessions">Sesiones</button><button type="button" data-action="history-stats">Estadísticas</button><button type="button" data-action="favorite-save">☆ Guardar orden</button><button type="button" data-action="favorite-list">Favoritos</button><button type="button" data-action="history-export">CSV</button><button type="button" data-action="history-export-xlsx">Excel</button><button type="button" data-action="history-export-pdf">PDF</button>${canAudit ? '<button type="button" data-action="history-audit">Auditoría</button>' : ''}</div>`);
+  }
+  async function saveFavorite(){
+    if(!state.lastUserCommand){add("liam","Primero escribe o dicta una orden para poder guardarla.");return}
+    const name=String(window.prompt("Nombre del comando favorito:","")||"").trim();if(!name)return;
+    const data=await request("/command-favorites",{method:"POST",body:JSON.stringify({name,command:state.lastUserCommand})});
+    add("liam",`${data.created?"Guardé":"Actualicé"} el favorito ${data.favorite.name}. Las demás órdenes siguen disponibles.`);
+  }
+  async function viewFavorites(){
+    const data=await request("/command-favorites"),box=document.getElementById("liam-conversation");
+    box?.querySelector(".liam-favorites-list")?.remove();
+    const node=document.createElement("section");node.className="liam-favorites-list";node.innerHTML=`<strong>Comandos favoritos</strong>${(data.favorites||[]).map(item=>`<div><span>${esc(item.nombre)}</span><button type="button" data-favorite-run="${esc(item.nombre)}">Ejecutar</button><button type="button" data-favorite-delete="${Number(item.id)}">Eliminar</button></div>`).join("")||"<p>No tienes favoritos guardados.</p>"}`;box?.appendChild(node);
+    node.querySelectorAll("[data-favorite-run]").forEach(button=>button.addEventListener("click",()=>ask(`Liam ejecuta ${button.dataset.favoriteRun}`)));
+    node.querySelectorAll("[data-favorite-delete]").forEach(button=>button.addEventListener("click",async()=>{await request(`/command-favorites/${Number(button.dataset.favoriteDelete)}`,{method:"DELETE"});button.parentElement?.remove()}));
   }
   async function loadHistory({ page = 1, appendOlder = false } = {}) {
     if (state.historyLoaded && page === 1 && !state.historySearch) return;
@@ -988,6 +1002,7 @@
     const input = document.getElementById("liam-question");
     const q = String(question || input?.value || "").trim();
     if (!q) return;
+    state.lastUserCommand = q;
     if (input) input.value = "";
     const prior = state.history.slice(-6);
     add("user", q);
@@ -1268,6 +1283,8 @@
     else if (action === "history-sessions") viewHistorySessions().catch((error) => add("liam", error.message));
     else if (action === "history-stats") viewHistoryStats().catch((error) => add("liam", error.message));
     else if (action === "history-audit") auditHistory().catch((error) => add("liam", error.message));
+    else if (action === "favorite-save") saveFavorite().catch((error) => add("liam", error.message));
+    else if (action === "favorite-list") viewFavorites().catch((error) => add("liam", error.message));
     else if (action === "stop") {
       window.LIAM_REALTIME?.stop();
       window.LIA_SPEECH?.stop();

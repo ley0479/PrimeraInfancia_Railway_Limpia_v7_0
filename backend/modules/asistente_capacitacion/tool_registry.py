@@ -2,6 +2,7 @@
 from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
+import re
 from modules.dbapi_compat import sqlite3
 from modules.calendario_inteligente.repository import CalendarioInteligenteRepository
 from modules.idp_documental.repository import IDPRepository
@@ -12,7 +13,7 @@ from .action_intents import propose_action
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
-ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_notification_center','prepare_communication_draft','run_command_favorite','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -579,6 +580,29 @@ def _communication_draft(database_path: str, tenant_id: int, args: dict, user: d
     body=f"Cordial saludo. Se identificaron {len(pending)} entregables que requieren atención dentro del alcance autorizado. Por favor revisa el Calendario Inteligente, valida fechas y soportes, y actualiza cada registro en su módulo de origen."
     return {'scope':supervision['scope'],'audience':audience,'period':period or None,'recipients':recipients,'recipient_count':len(recipients),'subject':subject,'message':body,'pending_count':len(pending),'source':'Calendario Inteligente','draft_only':True,'send_enabled':False,'requires_approval_before_send':True,'read_only':True}
 
+
+def _run_favorite(database_path: str, tenant_id: int, args: dict, user: dict) -> dict:
+    name=re.sub(r'\s+',' ',str(args.get('name') or '')).strip()
+    if not name:raise ValueError('Indica el nombre del comando favorito.')
+    uid=int(user.get('id') or user.get('usuario_id') or 0)
+    if not uid:raise PermissionError('No fue posible verificar el usuario de la sesión.')
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:row=conn.execute('SELECT id,nombre,comando FROM lia_command_favorites WHERE fundacion_id=? AND usuario_id=? AND LOWER(nombre)=LOWER(?)',(tenant_id,uid,name)).fetchone()
+    finally:conn.close()
+    if not row:raise LookupError('No encontré ese comando favorito en tu sesión.')
+    proposal=propose_action(row['comando'],screen_context=args.get('screen_context') if isinstance(args.get('screen_context'),dict) else {})
+    if not proposal:raise ValueError('El favorito ya no corresponde a una operación reconocida. Edita el comando guardado.')
+    nested=str(proposal.get('server_tool') or '')
+    if nested and nested!='run_command_favorite':
+        capability=__import__('modules.asistente_capacitacion.capability_registry',fromlist=['describe']).describe(nested)
+        if capability.get('read_only'):
+            result=execute(nested,args=proposal.get('arguments') or {},database_path=database_path,tenant_id=tenant_id,user=user)
+            return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'favorite':{'id':row['id'],'name':row['nombre']},'resolved_action':nested,'executed':True,'result':result,'read_only':True}
+    policy=action_decision(proposal.get('id'),str(user.get('rol') or ''))
+    if not policy.get('allowed'):raise PermissionError(policy.get('reason'))
+    proposal.update({'risk':policy['risk'],'confirmation_type':policy['confirmation']})
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'favorite':{'id':row['id'],'name':row['nombre']},'resolved_action':proposal.get('id'),'executed':False,'proposal':proposal,'confirmation_required':bool(proposal.get('confirmation_required')),'read_only':True}
+
 def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     period=str(args.get('period') or '').strip()
     if not period:
@@ -643,6 +667,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='get_incident_center': return _incident_center(database_path,tenant_id,args,user)
     if tool_name=='get_notification_center': return _notification_center(database_path,tenant_id,args,user)
     if tool_name=='prepare_communication_draft': return _communication_draft(database_path,tenant_id,args,user)
+    if tool_name=='run_command_favorite': return _run_favorite(database_path,tenant_id,args,user)
     if tool_name=='get_pending_activities_summary':
         scope=str(args.get('scope') or 'self').strip().lower()
         if scope not in {'self','team'}: raise ValueError('scope debe ser self o team.')

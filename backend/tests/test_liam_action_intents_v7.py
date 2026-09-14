@@ -141,6 +141,12 @@ def test_communication_intent_creates_draft_not_send_action():
     assert value['confirmation_required'] is False
 
 
+def test_favorite_intent_resolves_name_without_executing_locally():
+    value=propose_action('Liam ejecuta Pendientes docentes')
+    assert value['server_tool']=='run_command_favorite'
+    assert value['arguments']['name']=='pendientes docentes'
+
+
 if __name__=='__main__':
     test_rpp_action_requires_missing_group_instead_of_guessing()
     test_complete_rpp_action_is_still_confirmation_required()
@@ -160,4 +166,5 @@ if __name__=='__main__':
     test_incident_center_intent_filters_open_items()
     test_notification_center_intent_is_read_only()
     test_communication_intent_creates_draft_not_send_action()
+    test_favorite_intent_resolves_name_without_executing_locally()
     print('LIAM_ACTION_INTENTS_V7_PASS')
