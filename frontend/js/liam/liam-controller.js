@@ -23,6 +23,7 @@
     historySearch: "",
     historyFilters: {},
     realtimeSessionId: "",
+    dataPresentation: null,
     history: [],
   };
   const apiBase = () => `${window.backendUrl || ""}/api/asistente-capacitacion`;
@@ -322,23 +323,65 @@
     setTimeout(() => element.classList.remove("lia-spotlight"), Math.max(1000, Math.min(10000, duration)));
     return true;
   }
+  const normalizedSpeech = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  function presentationKeywords(label) {
+    const ignored = new Set(["total", "de", "del", "la", "las", "el", "los", "por", "con", "sin", "y"]);
+    return normalizedSpeech(label).split(" ").filter((word) => word.length > 2 && !ignored.has(word));
+  }
+  function activatePresentationItem(index) {
+    const presentation = state.dataPresentation;
+    if (!presentation?.items.length) return;
+    const bounded = Math.max(0, Math.min(index, presentation.items.length - 1));
+    presentation.items.forEach((item, position) => {
+      item.classList.toggle("lia-data-active", position === bounded);
+      item.classList.toggle("lia-data-explained", position < bounded);
+      item.setAttribute("aria-current", position === bounded ? "true" : "false");
+    });
+    presentation.index = bounded;
+    const label = presentation.items[bounded].dataset.liaLabel || "Indicador";
+    const status = document.querySelector("[data-lia-presenter-status]");
+    if (status) status.textContent = `Explicando: ${label}`;
+    document.querySelector("[data-lia-presenter-avatar]")?.setAttribute("data-state", "pointing_right");
+    presentation.items[bounded].scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  function syncDataPresentation(delta, completed = false) {
+    const presentation = state.dataPresentation;
+    if (!presentation?.items.length) return;
+    presentation.transcript += ` ${String(delta || "")}`;
+    const spoken = normalizedSpeech(presentation.transcript);
+    let matched = -1;
+    presentation.items.forEach((item, index) => {
+      const words = presentationKeywords(item.dataset.liaLabel);
+      if (words.length && words.every((word) => spoken.includes(word))) matched = Math.max(matched, index);
+    });
+    const wordCount = spoken ? spoken.split(" ").length : 0;
+    const progressive = Math.min(presentation.items.length - 1, Math.floor(Math.max(0, wordCount - 1) / 12));
+    activatePresentationItem(Math.max(presentation.index, matched, progressive));
+    if (completed) {
+      presentation.items.forEach((item) => item.classList.add("lia-data-explained"));
+      presentation.items[presentation.index]?.classList.add("lia-data-active");
+      const status = document.querySelector("[data-lia-presenter-status]");
+      if (status) status.textContent = "Explicación terminada";
+      document.querySelector("[data-lia-presenter-avatar]")?.setAttribute("data-state", "success");
+    }
+  }
   function richContent(payload) {
     const type = payload?.componentType, data = payload?.data || {};
     if (!["metric-card", "table", "list", "spotlight"].includes(type)) return null;
     const root = document.createElement("div"); root.className = "lia-rich"; root.dataset.componentType = type;
     if (type === "metric-card") {
       const grid = document.createElement("div"); grid.className = "lia-metrics";
-      for (const item of (data.metrics || []).slice(0, 16)) { const card = document.createElement("div"), value = document.createElement("strong"), label = document.createElement("span"); card.className = "lia-metric"; value.textContent = String(item.value ?? "—"); label.textContent = String(item.label || "Indicador"); card.append(value, label); grid.appendChild(card); }
+      for (const item of (data.metrics || []).slice(0, 16)) { const card = document.createElement("div"), value = document.createElement("strong"), label = document.createElement("span"); card.className = "lia-metric lia-data-point"; card.dataset.liaLabel = String(item.label || "Indicador"); value.textContent = String(item.value ?? "—"); label.textContent = String(item.label || "Indicador"); card.append(value, label); grid.appendChild(card); }
       root.appendChild(grid);
       if (Array.isArray(data.rows) && data.rows.length) { const detail = richContent({ componentType: "table", data: { columns: data.columns || [], rows: data.rows } }); if (detail) root.appendChild(detail); }
     } else if (type === "table") {
       const table = document.createElement("table"), head = document.createElement("thead"), body = document.createElement("tbody"), tr = document.createElement("tr");
       for (const label of (data.columns || []).slice(0, 8)) { const th = document.createElement("th"); th.textContent = String(label ?? ""); tr.appendChild(th); } head.appendChild(tr);
-      for (const row of (data.rows || []).slice(0, 50)) { const line = document.createElement("tr"); for (const value of (Array.isArray(row) ? row : []).slice(0, 8)) { const td = document.createElement("td"); td.textContent = String(value ?? "—"); line.appendChild(td); } body.appendChild(line); }
+      for (const row of (data.rows || []).slice(0, 50)) { const line = document.createElement("tr"); line.className = "lia-data-point"; line.dataset.liaLabel = String((Array.isArray(row) && row[0]) || "Registro"); for (const value of (Array.isArray(row) ? row : []).slice(0, 8)) { const td = document.createElement("td"); td.textContent = String(value ?? "—"); line.appendChild(td); } body.appendChild(line); }
       if (!body.children.length) { const line = document.createElement("tr"), td = document.createElement("td"); td.colSpan = Math.max(1, (data.columns || []).length); td.textContent = "La consulta no devolvió registros para mostrar."; line.appendChild(td); body.appendChild(line); }
       table.append(head, body); root.appendChild(table);
     } else if (type === "list") {
-      const list = document.createElement("ul"); for (const item of (data.items || []).slice(0, 30)) { const li = document.createElement("li"); li.textContent = `${item.label || "Dato"}: ${item.value ?? "—"}`; list.appendChild(li); } root.appendChild(list);
+      const list = document.createElement("ul"); for (const item of (data.items || []).slice(0, 30)) { const li = document.createElement("li"); li.className = "lia-data-point"; li.dataset.liaLabel = String(item.label || "Dato"); li.textContent = `${item.label || "Dato"}: ${item.value ?? "—"}`; list.appendChild(li); } root.appendChild(list);
     }
     return root;
   }
@@ -347,8 +390,12 @@
     const content = richContent(payload);
     if (payload.display === "drawer" && content) {
       let drawer = document.getElementById("lia-data-drawer");
-      if (!drawer) { drawer = document.createElement("aside"); drawer.id = "lia-data-drawer"; drawer.className = "lia-data-drawer"; drawer.innerHTML = '<header><strong>Datos consultados por Lía</strong><button type="button" aria-label="Cerrar panel">×</button></header><div data-lia-drawer-content></div>'; drawer.querySelector("button").onclick = () => drawer.dataset.open = "false"; document.body.appendChild(drawer); }
+      if (!drawer) { drawer = document.createElement("aside"); drawer.id = "lia-data-drawer"; drawer.className = "lia-data-drawer"; drawer.innerHTML = '<header><strong>Datos consultados por Lía</strong><button type="button" aria-label="Cerrar panel">×</button></header><div class="lia-data-layout"><div class="lia-data-presenter"><div data-lia-presenter-avatar></div><span data-lia-presenter-status>Preparando explicación…</span></div><div data-lia-drawer-content></div></div>'; drawer.querySelector("button").onclick = () => drawer.dataset.open = "false"; document.body.appendChild(drawer); }
       const destination = drawer.querySelector("[data-lia-drawer-content]"); destination.replaceChildren(content); drawer.dataset.open = "true";
+      window.IAN_AVATAR?.render("[data-lia-presenter-avatar]", { gender: state.visual?.avatar_gender || "female", variant: state.visual?.avatar_variant });
+      const items = Array.from(destination.querySelectorAll(".lia-data-point"));
+      state.dataPresentation = { items, index: -1, transcript: "" };
+      if (items.length) activatePresentationItem(0);
     } else if (content) document.querySelector("#liam-conversation > div:last-child")?.appendChild(content);
     if (payload.targetSelector) highlightElement(payload.targetSelector);
   }
@@ -1401,14 +1448,25 @@
       add("liam", text);
       remember("assistant", text);
       saveVoiceTranscript("assistant", text);
+      syncDataPresentation(text, true);
     }
     window.LIAM_LIP_SYNC?.stop();
     window.LIAM_STATE?.set("listening");
   });
-  document.addEventListener("liam:realtime-assistant-delta", () => {
+  document.addEventListener("liam:realtime-assistant-delta", (event) => {
+    syncDataPresentation(event.detail?.delta || "");
     window.LIAM_LIP_SYNC?.start();
     window.LIAM_STATE?.set("speaking");
   });
+  document.addEventListener("ian:speech:start", (event) => {
+    if (state.dataPresentation) state.dataPresentation.speechLength = Number(event.detail?.textLength || 0);
+  });
+  document.addEventListener("ian:speech:boundary", (event) => {
+    const presentation = state.dataPresentation, length = Number(presentation?.speechLength || 0);
+    if (!presentation?.items.length || !length) return;
+    activatePresentationItem(Math.floor((Number(event.detail?.charIndex || 0) / length) * presentation.items.length));
+  });
+  document.addEventListener("ian:speech:end", () => syncDataPresentation("", true));
   document.addEventListener("liam:realtime-audio-level", (event) =>
     window.LIAM_LIP_SYNC?.update(
       Math.max(0.08, Number(event.detail?.level || 0) * 2.8),
