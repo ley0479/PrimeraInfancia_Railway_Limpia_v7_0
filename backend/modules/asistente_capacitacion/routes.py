@@ -27,6 +27,7 @@ from .repair_registry import public_registry
 from .action_audit import record_proposal as audit_action_proposal, complete as complete_action_audit, complete_server_proposal, list_authorized as list_action_audit
 from .notification_providers import provider_catalog
 from .dev_sandbox_results import MAX_PAYLOAD_BYTES, SandboxResultError, ingest as ingest_sandbox_result, signing_key as sandbox_signing_key, verify_signature as verify_sandbox_signature
+from .dev_change_approval import approve as approve_dev_change
 import csv, io, json, uuid, os, tempfile, re, hashlib, requests
 
 
@@ -920,6 +921,24 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             return jsonify({'error':str(exc)}),exc.status_code
         audit_lia(ctx,'DEV_SANDBOX_RESULT_ACCEPTED',module='administracion',request_id=request_id,metadata={'artifact_id':result['artifact_id'],'status':result['status'],'tests':len(result['tests']),'changed_paths':result['changed_paths'],'deployment_started':False})
         return jsonify(result),201
+
+    @bp.post('/dev/change-requests/<string:request_id>/approve')
+    def approve_dev_change_request(request_id):
+        if not public_liam_flags().get('dev_enabled'):
+            return jsonify({'error':'La capacidad ADMIN/DEV de Liam está desactivada.'}),403
+        ctx=get_request_user_context()
+        if str(ctx.get('rol') or '').upper()!='SUPERADMIN':
+            return jsonify({'error':'Solo SUPERADMIN puede aprobar cambios técnicos.'}),403
+        data=request.get_json(silent=True) or {}
+        if str(data.get('confirmar') or '').strip().upper()!='APROBAR CAMBIO':
+            return jsonify({'error':'Debes confirmar expresamente con APROBAR CAMBIO.'}),400
+        try:
+            result=approve_dev_change(database_path,request_id,int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),str(data.get('password_actual') or ''),str(data.get('result_sha256') or ''))
+        except SandboxResultError as exc:
+            audit_lia(ctx,'DEV_CHANGE_APPROVAL_REJECTED',module='administracion',success=False,request_id=request_id,metadata={'reason':str(exc),'status_code':exc.status_code})
+            return jsonify({'error':str(exc)}),exc.status_code
+        audit_lia(ctx,'DEV_CHANGE_APPROVED',module='administracion',request_id=request_id,metadata={'result_sha256':result['approved_result_sha256'],'code_applied':False,'deployment_started':False})
+        return jsonify(result),200
 
     @bp.get('/notification-providers')
     def notification_provider_status():

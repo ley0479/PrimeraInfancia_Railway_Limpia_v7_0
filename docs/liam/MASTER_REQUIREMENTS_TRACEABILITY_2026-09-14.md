@@ -23,8 +23,8 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 | 17 | Diagnóstico automático | VERIFICADO | Incidencias con código, contexto sanitizado y tenant. |
 | 18 | Explicación por audiencia | VERIFICADO | Diagnóstico funcional, administrativo y técnico elevado sanitizado. |
 | 19 | Autorreparación controlada | VERIFICADO | Registro cerrado, flag, SUPERADMIN y confirmación explícita. |
-| 20 | Asistente de desarrollo | PARCIAL | Solicitud, plan y recepción HMAC de pruebas/diff existen; falta conectar un runner aislado real y la aprobación posterior. |
-| 21 | Protección de código | PARCIAL | Alcance cerrado, checksum, pruebas completas y cero despliegue están verificados; falta aprobación/rollback integrado. |
+| 20 | Asistente de desarrollo | PARCIAL | Solicitud, plan, recepción HMAC, pruebas/diff y aprobación reautenticada existen; falta conectar un runner aislado real. |
+| 21 | Protección de código | VERIFICADO | Alcance cerrado, checksum, pruebas completas, aprobación reautenticada, rollback y cero despliegue automático. |
 | 22 | Auditoría completa | VERIFICADO | `liam_action_audit`, estados confiables y vista administrativa. |
 | 23 | Permission Gateway | VERIFICADO | Política central antes de herramientas/acciones. |
 | 24 | Multi-tenant | VERIFICADO | Filtros obligatorios y pruebas cruzadas. |
@@ -79,5 +79,5 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 
 ## Orden de cierre restante
 
-1. Runner ADMIN/DEV aislado y aprobación/rollback del artefacto verificado, siempre sin despliegue automático (20–21).
+1. Runner ADMIN/DEV aislado que produzca el artefacto verificable, siempre sin despliegue automático (20).
 2. E2E autenticado en entorno objetivo cuando exista autorización y credenciales de prueba (64).

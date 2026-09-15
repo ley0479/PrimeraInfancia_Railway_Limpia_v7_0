@@ -66,7 +66,7 @@ def ingest(database_path: str, request_id: str, tenant_id: int, user_id: int, pa
     request_id = str(request_id or "").strip().upper()
     if not REQUEST_PATTERN.fullmatch(request_id):
         raise SandboxResultError("Identificador técnico inválido.")
-    if not isinstance(payload, dict) or set(payload) - {"plan_sha256", "diff", "git_diff_check", "tests", "runner"}:
+    if not isinstance(payload, dict) or set(payload) - {"plan_sha256", "diff", "git_diff_check", "tests", "runner", "base_commit"}:
         raise SandboxResultError("El resultado contiene campos no permitidos.")
     plan_sha = str(payload.get("plan_sha256") or "").lower()
     if not re.fullmatch(r"[a-f0-9]{64}", plan_sha):
@@ -131,10 +131,14 @@ def ingest(database_path: str, request_id: str, tenant_id: int, user_id: int, pa
             raise SandboxResultError("El runner debe reportar exactamente todas las pruebas del plan aprobado.")
         passed = diff_check == "PASS" and all(item["status"] == "PASS" for item in normalized_tests)
         runner = re.sub(r"[^a-zA-Z0-9._-]", "", str(payload.get("runner") or "external-isolated"))[:80] or "external-isolated"
+        base_commit = str(payload.get("base_commit") or "").lower()
+        if base_commit and not re.fullmatch(r"[a-f0-9]{40}", base_commit):
+            raise SandboxResultError("El commit base reportado por el runner no es válido.")
         content = {
             "request_id": request_id,
             "plan_sha256": plan_sha,
             "runner": runner,
+            "base_commit": base_commit or None,
             "changed_paths": changed_paths,
             "git_diff_check": diff_check,
             "tests": normalized_tests,
