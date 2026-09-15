@@ -427,4 +427,91 @@ CREATE TABLE IF NOT EXISTS sn_evidencias_integrales (
 );
 CREATE INDEX IF NOT EXISTS idx_sn_evidencia_actividad ON sn_evidencias_integrales(fundacion_id, actividad_id, activo);
 CREATE INDEX IF NOT EXISTS idx_sn_evidencia_canalizacion ON sn_evidencias_integrales(fundacion_id, canalizacion_id, activo);
+
+CREATE TABLE IF NOT EXISTS sn_periodos_mensuales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER NOT NULL,
+    anio_mes TEXT NOT NULL,
+    estado TEXT NOT NULL DEFAULT 'BORRADOR',
+    temas_json TEXT NOT NULL DEFAULT '[]',
+    variables_json TEXT NOT NULL DEFAULT '{}',
+    observaciones TEXT,
+    creado_por INTEGER,
+    fecha_creacion TEXT NOT NULL,
+    actualizado_por INTEGER,
+    fecha_actualizacion TEXT NOT NULL,
+    aprobado_por INTEGER,
+    fecha_aprobacion TEXT,
+    bloqueado_en TEXT,
+    integridad_sha256 TEXT,
+    UNIQUE(fundacion_id, anio_mes)
+);
+CREATE INDEX IF NOT EXISTS idx_sn_periodos_scope ON sn_periodos_mensuales(fundacion_id, anio_mes, estado);
+
+CREATE TABLE IF NOT EXISTS sn_informes_mensuales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER NOT NULL,
+    periodo_id INTEGER NOT NULL,
+    formato TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    nombre_archivo TEXT NOT NULL,
+    ruta_archivo TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    tamano_bytes INTEGER NOT NULL DEFAULT 0,
+    sha256 TEXT NOT NULL,
+    plantilla_codigo TEXT NOT NULL DEFAULT 'SN-MENSUAL',
+    plantilla_version TEXT NOT NULL DEFAULT 'INTERNA-1',
+    estado TEXT NOT NULL DEFAULT 'GENERADO',
+    generado_por INTEGER,
+    fecha_generacion TEXT NOT NULL,
+    activo INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (periodo_id) REFERENCES sn_periodos_mensuales(id),
+    UNIQUE(fundacion_id, periodo_id, formato, version)
+);
+CREATE INDEX IF NOT EXISTS idx_sn_informes_scope ON sn_informes_mensuales(fundacion_id, periodo_id, activo);
+
+CREATE TABLE IF NOT EXISTS sn_actas_institucionales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER NOT NULL,
+    actividad_id INTEGER,
+    anio INTEGER NOT NULL,
+    consecutivo INTEGER NOT NULL,
+    numero_acta TEXT NOT NULL,
+    fecha TEXT NOT NULL,
+    lugar TEXT,
+    tema TEXT NOT NULL,
+    puntos_json TEXT NOT NULL DEFAULT '[]',
+    decisiones_json TEXT NOT NULL DEFAULT '[]',
+    estado TEXT NOT NULL DEFAULT 'BORRADOR',
+    creado_por INTEGER,
+    fecha_creacion TEXT NOT NULL,
+    actualizado_por INTEGER,
+    fecha_actualizacion TEXT NOT NULL,
+    cerrado_por INTEGER,
+    fecha_cierre TEXT,
+    integridad_sha256 TEXT,
+    producto_id INTEGER,
+    FOREIGN KEY (actividad_id) REFERENCES sn_actividades_integrales(id),
+    FOREIGN KEY (producto_id) REFERENCES sn_productos_actividad(id),
+    UNIQUE(fundacion_id, anio, consecutivo),
+    UNIQUE(fundacion_id, numero_acta)
+);
+CREATE INDEX IF NOT EXISTS idx_sn_actas_scope ON sn_actas_institucionales(fundacion_id, anio, estado);
+
+CREATE TABLE IF NOT EXISTS sn_acta_tareas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER NOT NULL,
+    acta_id INTEGER NOT NULL,
+    descripcion TEXT NOT NULL,
+    responsable_id INTEGER,
+    responsable_nombre TEXT NOT NULL,
+    fecha_limite TEXT NOT NULL,
+    estado TEXT NOT NULL DEFAULT 'PENDIENTE',
+    creado_por INTEGER,
+    fecha_creacion TEXT NOT NULL,
+    actualizado_por INTEGER,
+    fecha_actualizacion TEXT NOT NULL,
+    FOREIGN KEY (acta_id) REFERENCES sn_actas_institucionales(id)
+);
+CREATE INDEX IF NOT EXISTS idx_sn_acta_tareas_scope ON sn_acta_tareas(fundacion_id, acta_id, estado, fecha_limite);
 """

@@ -7,7 +7,7 @@ let snEstado = {
     dashboard: null,
     alertas: [],
     calendario: [],
-    integral: { expedientes: [], actividades: [], rutas: [] }
+    integral: { expedientes: [], actividades: [], rutas: [], periodos: [], actas: [] }
 };
 
 function snMensaje(texto, tipo = 'success') {
@@ -27,7 +27,7 @@ function snInit() {
 }
 
 function snMostrarVista(vista) {
-    ['dashboard', 'integral', 'jornadas', 'rutas', 'importar', 'cruce', 'historial', 'alertas', 'calendario', 'entregables'].forEach((id) => {
+    ['dashboard', 'integral', 'jornadas', 'mensuales', 'actas', 'rutas', 'importar', 'cruce', 'historial', 'alertas', 'calendario', 'entregables'].forEach((id) => {
         const el = document.getElementById(`sn-view-${id}`);
         if (el) el.classList.toggle('hidden', id !== vista);
     });
@@ -39,6 +39,8 @@ function snMostrarVista(vista) {
     if (vista === 'calendario') snCargarCalendario();
     if (vista === 'integral') snIntegralCargar();
     if (vista === 'jornadas') snIntegralCargarActividades();
+    if (vista === 'mensuales') snCargarPeriodosMensuales();
+    if (vista === 'actas') snCargarActasInstitucionales();
     if (vista === 'rutas') snIntegralCargarRutas();
     if (vista === 'entregables' && typeof snEntregablesInit === 'function') snEntregablesInit();
 }
@@ -487,6 +489,60 @@ function snIntegralPrepararDocumentos(activityId) {
             (data.resultado?.documentos || []).forEach((p) => window.descargarArchivoAutenticado(`${backendUrl}/api/salud-nutricion/integral/productos/${p.id}/descargar`).catch(() => {}));
             snIntegralCargarActividades();
         }).catch((error) => snMensaje(error.message, 'error'));
+}
+
+function snLineas(id) {
+    return String(document.getElementById(id)?.value || '').split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
+}
+
+function snCargarPeriodosMensuales() {
+    snIntegralFetch('/api/salud-nutricion/integral/periodos-mensuales').then((data) => {
+        snEstado.integral.periodos = data.periodos || [];
+        const body = document.getElementById('sn-month-list');
+        if (!body) return;
+        body.innerHTML = snEstado.integral.periodos.length ? snEstado.integral.periodos.map((row) => `<tr><td>${escaparHtml(row.anio_mes || '')}</td><td>${escaparHtml(row.estado || '')}</td><td>${escaparHtml((row.temas || []).join(', '))}</td><td>${row.integridad_sha256 ? escaparHtml(row.integridad_sha256.slice(0, 12)) + '…' : 'Pendiente'}</td><td>${row.estado === 'APROBADO' ? `<button class="sn-ent-btn" onclick="snGenerarInformeMensual(${Number(row.id)})">Generar PDF/Excel</button>` : `<button class="sn-ent-btn sn-ent-btn-validar" onclick="snAprobarPeriodoMensual(${Number(row.id)})">Aprobar</button>`}</td></tr>`).join('') : '<tr><td colspan="5" class="text-center text-slate-500">Sin periodos registrados.</td></tr>';
+    }).catch((error) => snMensaje(error.message, 'error'));
+}
+
+function snGuardarPeriodoMensual() {
+    let variables = {};
+    try { variables = JSON.parse(document.getElementById('sn-month-variables')?.value || '{}'); }
+    catch (_) { snMensaje('Las variables deben estar en formato JSON válido.', 'error'); return; }
+    const payload = { anio_mes: document.getElementById('sn-month-period')?.value, temas: String(document.getElementById('sn-month-topics')?.value || '').split(',').map((value) => value.trim()).filter(Boolean), observaciones: document.getElementById('sn-month-observations')?.value?.trim(), variables };
+    snIntegralFetch('/api/salud-nutricion/integral/periodos-mensuales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then((data) => { snMensaje(data.message, 'success'); snCargarPeriodosMensuales(); }).catch((error) => snMensaje(error.message, 'error'));
+}
+
+function snAprobarPeriodoMensual(id) {
+    if (!window.confirm('Al aprobar, el periodo quedará bloqueado e inmutable. ¿Continuar?')) return;
+    snIntegralFetch(`/api/salud-nutricion/integral/periodos-mensuales/${encodeURIComponent(id)}/aprobar`, { method: 'POST' }).then((data) => { snMensaje(data.message, 'success'); snCargarPeriodosMensuales(); }).catch((error) => snMensaje(error.message, 'error'));
+}
+
+function snGenerarInformeMensual(id) {
+    mostrarCargando('Generando informe mensual aprobado...');
+    snIntegralFetch(`/api/salud-nutricion/integral/periodos-mensuales/${encodeURIComponent(id)}/generar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ formatos: ['XLSX', 'PDF'] }) }).then((data) => {
+        ocultarCargando(); snMensaje(data.message, 'success');
+        (data.resultado?.productos || []).forEach((product) => window.descargarArchivoAutenticado(`${backendUrl}/api/salud-nutricion/integral/informes-mensuales/${product.id}/descargar`).catch(() => {}));
+    }).catch((error) => { ocultarCargando(); snMensaje(error.message, 'error'); });
+}
+
+function snCargarActasInstitucionales() {
+    snIntegralFetch('/api/salud-nutricion/integral/actas').then((data) => {
+        snEstado.integral.actas = data.actas || [];
+        const body = document.getElementById('sn-minutes-list');
+        if (!body) return;
+        body.innerHTML = snEstado.integral.actas.length ? snEstado.integral.actas.map((row) => `<tr><td>${escaparHtml(row.numero_acta || '')}</td><td>${escaparHtml(row.fecha || '')}</td><td>${escaparHtml(row.tema || '')}</td><td>${Number((row.tareas || []).length)}</td><td>${escaparHtml(row.estado || '')}</td><td>${row.estado === 'CERRADO' ? '<span class="text-emerald-300">Sellada</span>' : `<button class="sn-ent-btn sn-ent-btn-validar" onclick="snCerrarActaInstitucional(${Number(row.id)})">Cerrar</button>`}</td></tr>`).join('') : '<tr><td colspan="6" class="text-center text-slate-500">Sin actas registradas.</td></tr>';
+    }).catch((error) => snMensaje(error.message, 'error'));
+}
+
+function snCrearActaInstitucional() {
+    const tasks = snLineas('sn-minutes-tasks').map((line) => { const parts = line.split('|').map((value) => value.trim()); return { descripcion: parts[0], responsable_nombre: parts[1], fecha_limite: parts[2] }; });
+    const payload = { fecha: document.getElementById('sn-minutes-date')?.value, lugar: document.getElementById('sn-minutes-place')?.value?.trim(), tema: document.getElementById('sn-minutes-topic')?.value?.trim(), puntos: snLineas('sn-minutes-points'), decisiones: snLineas('sn-minutes-decisions'), tareas: tasks };
+    snIntegralFetch('/api/salud-nutricion/integral/actas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then((data) => { snMensaje(`${data.message} ${data.acta?.numero_acta || ''}`, 'success'); snCargarActasInstitucionales(); }).catch((error) => snMensaje(error.message, 'error'));
+}
+
+function snCerrarActaInstitucional(id) {
+    if (!window.confirm('El acta quedará cerrada, sellada e inmutable. ¿Continuar?')) return;
+    snIntegralFetch(`/api/salud-nutricion/integral/actas/${encodeURIComponent(id)}/cerrar`, { method: 'POST' }).then((data) => { snMensaje(data.message, 'success'); snCargarActasInstitucionales(); }).catch((error) => snMensaje(error.message, 'error'));
 }
 
 function snIntegralSubirEvidencia(activityId) {

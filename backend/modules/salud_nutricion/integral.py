@@ -11,6 +11,7 @@ import hashlib
 import json
 import mimetypes
 import os
+import re
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -52,6 +53,7 @@ HEALTH_LINES = {
     "L5_SEGUIMIENTO_NUTRICIONAL",
 }
 CLOSED_STATES = {"CERRADA", "CERRADO", "APROBADA", "APROBADO", "COMPLETADA", "COMPLETADO"}
+LOCKED_STATES = {"APROBADO", "CERRADO"}
 
 
 def _norm(value: Any) -> str:
@@ -129,6 +131,199 @@ class SaludNutricionIntegralService:
 
     def init_schema(self) -> None:
         self.repo.execute_script(INTEGRAL_SCHEMA_SQL)
+
+    @staticmethod
+    def _period(value: Any) -> str:
+        period = str(value or "").strip()
+        if not re.fullmatch(r"20\d{2}-(0[1-9]|1[0-2])", period):
+            raise ValueError("El periodo debe tener formato AAAA-MM.")
+        return period
+
+    @staticmethod
+    def _digest_payload(payload: dict[str, Any]) -> str:
+        canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def list_monthly_periods(self, fundacion_id: int) -> list[dict[str, Any]]:
+        rows = self.repo.fetch_all(
+            "SELECT * FROM sn_periodos_mensuales WHERE fundacion_id=? ORDER BY anio_mes DESC LIMIT 240",
+            (fundacion_id,),
+        )
+        for row in rows:
+            row["temas"] = json.loads(row.pop("temas_json") or "[]")
+            row["variables"] = json.loads(row.pop("variables_json") or "{}")
+        return rows
+
+    def save_monthly_period(self, fundacion_id: int, data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+        period = self._period(data.get("anio_mes"))
+        current = self.repo.fetch_one("SELECT * FROM sn_periodos_mensuales WHERE fundacion_id=? AND anio_mes=?", (fundacion_id, period))
+        if current and _norm(current.get("estado")) in LOCKED_STATES:
+            raise ValueError("El periodo est\u00e1 aprobado y es inmutable.")
+        topics = data.get("temas") or []
+        variables = data.get("variables") or {}
+        if not isinstance(topics, list) or not isinstance(variables, dict):
+            raise ValueError("Temas debe ser una lista y variables un objeto.")
+        topics = [str(value).strip()[:300] for value in topics if str(value).strip()][:50]
+        variables = {str(key).strip()[:80]: value for key, value in list(variables.items())[:200] if str(key).strip()}
+        now = now_iso()
+        if current:
+            self.repo.execute_update(
+                "UPDATE sn_periodos_mensuales SET temas_json=?,variables_json=?,observaciones=?,actualizado_por=?,fecha_actualizacion=? WHERE fundacion_id=? AND id=?",
+                (_json(topics), _json(variables), data.get("observaciones"), user.get("id"), now, fundacion_id, current["id"]),
+            )
+            period_id = int(current["id"])
+        else:
+            with self.repo.connect() as conn:
+                cur = conn.execute(
+                    "INSERT INTO sn_periodos_mensuales(fundacion_id,anio_mes,estado,temas_json,variables_json,observaciones,creado_por,fecha_creacion,actualizado_por,fecha_actualizacion) VALUES(?,?,'BORRADOR',?,?,?,?,?,?,?)",
+                    (fundacion_id, period, _json(topics), _json(variables), data.get("observaciones"), user.get("id"), now, user.get("id"), now),
+                )
+                period_id = int(cur.lastrowid); conn.commit()
+        self.repo.log("GUARDAR_PERIODO_SALUD", "sn_periodos_mensuales", period_id, usuario=user.get("username", "sistema"), nuevos={"anio_mes": period})
+        return next(row for row in self.list_monthly_periods(fundacion_id) if int(row["id"]) == period_id)
+
+    def approve_monthly_period(self, fundacion_id: int, period_id: int, user: dict[str, Any]) -> dict[str, Any]:
+        row = self.repo.fetch_one("SELECT * FROM sn_periodos_mensuales WHERE fundacion_id=? AND id=?", (fundacion_id, period_id))
+        if not row:
+            raise LookupError("Periodo mensual no encontrado.")
+        if _norm(row.get("estado")) == "APROBADO":
+            return next(item for item in self.list_monthly_periods(fundacion_id) if int(item["id"]) == period_id)
+        payload = {"fundacion_id": fundacion_id, "anio_mes": row["anio_mes"], "temas": json.loads(row.get("temas_json") or "[]"), "variables": json.loads(row.get("variables_json") or "{}")}
+        now = now_iso(); digest = self._digest_payload(payload)
+        self.repo.execute_update(
+            "UPDATE sn_periodos_mensuales SET estado='APROBADO',aprobado_por=?,fecha_aprobacion=?,bloqueado_en=?,integridad_sha256=?,actualizado_por=?,fecha_actualizacion=? WHERE fundacion_id=? AND id=?",
+            (user.get("id"), now, now, digest, user.get("id"), now, fundacion_id, period_id),
+        )
+        self.repo.log("APROBAR_PERIODO_SALUD", "sn_periodos_mensuales", period_id, usuario=user.get("username", "sistema"), nuevos={"sha256": digest})
+        return next(item for item in self.list_monthly_periods(fundacion_id) if int(item["id"]) == period_id)
+
+    def generate_monthly_report(self, fundacion_id: int, period_id: int, user: dict[str, Any], formats: Iterable[str]) -> dict[str, Any]:
+        period = next((item for item in self.list_monthly_periods(fundacion_id) if int(item["id"]) == period_id), None)
+        if not period:
+            raise LookupError("Periodo mensual no encontrado.")
+        if _norm(period.get("estado")) != "APROBADO":
+            raise ValueError("Aprueba el periodo antes de generar el informe definitivo.")
+        identity = self.repo.fetch_one("SELECT nombre_corporacion,sigla FROM configuracion_institucional WHERE fundacion_id=? AND COALESCE(activo,1)=1 ORDER BY id DESC LIMIT 1", (fundacion_id,)) if self.repo.table_exists("configuracion_institucional") else None
+        folder = self._tenant_dir(fundacion_id, "informes_mensuales", period["anio_mes"])
+        generated: list[dict[str, Any]] = []
+        for requested in formats:
+            fmt = _norm(requested)
+            if fmt not in {"XLSX", "PDF"}:
+                continue
+            previous = self.repo.fetch_one("SELECT COALESCE(MAX(version),0) version FROM sn_informes_mensuales WHERE fundacion_id=? AND periodo_id=? AND formato=?", (fundacion_id, period_id, fmt)) or {}
+            version = int(previous.get("version") or 0) + 1
+            path = folder / f"INFORME_SALUD_NUTRICION_{period['anio_mes']}_v{version}.{fmt.lower()}"
+            if fmt == "XLSX": self._write_monthly_xlsx(path, period, identity or {})
+            else: self._write_monthly_pdf(path, period, identity or {})
+            digest = _file_sha256(path); now = now_iso(); mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+            with self.repo.connect() as conn:
+                cur = conn.execute("INSERT INTO sn_informes_mensuales(fundacion_id,periodo_id,formato,version,nombre_archivo,ruta_archivo,mime_type,tamano_bytes,sha256,plantilla_codigo,plantilla_version,estado,generado_por,fecha_generacion,activo) VALUES(?,?,?,?,?,?,?,?,?,'SN-MENSUAL','INTERNA-1','GENERADO',?,?,1)", (fundacion_id, period_id, fmt, version, path.name, str(path), mime, path.stat().st_size, digest, user.get("id"), now))
+                report_id = int(cur.lastrowid); conn.commit()
+            generated.append({"id": report_id, "formato": fmt, "version": version, "nombre_archivo": path.name, "sha256": digest})
+        if not generated:
+            raise ValueError("Selecciona al menos un formato XLSX o PDF.")
+        self.repo.log("GENERAR_INFORME_MENSUAL_SALUD", "sn_informes_mensuales", period_id, usuario=user.get("username", "sistema"), nuevos={"productos": len(generated)})
+        return {"periodo": period["anio_mes"], "productos": generated, "plantilla": "INTERNA-1"}
+
+    def monthly_report_path(self, fundacion_id: int, report_id: int) -> tuple[Path, str, str] | None:
+        row = self.repo.fetch_one("SELECT * FROM sn_informes_mensuales WHERE fundacion_id=? AND id=? AND activo=1", (fundacion_id, report_id))
+        if not row: return None
+        path = Path(row["ruta_archivo"]).resolve()
+        try: path.relative_to(tenant_storage_root(self.data_dir, fundacion_id).resolve())
+        except ValueError: return None
+        if not path.is_file() or _file_sha256(path) != row.get("sha256"): return None
+        return path, row["nombre_archivo"], row["mime_type"]
+
+    def _write_monthly_xlsx(self, path: Path, period: dict[str, Any], identity: dict[str, Any]) -> None:
+        wb = Workbook(); ws = wb.active; ws.title = "Informe mensual"
+        ws.append(["INFORME MENSUAL DE SALUD Y NUTRICION"]); ws.merge_cells("A1:B1")
+        ws["A1"].font = Font(bold=True, color="FFFFFF", size=14); ws["A1"].fill = PatternFill("solid", fgColor="047857")
+        ws.append(["Fundacion", identity.get("nombre_corporacion") or identity.get("sigla") or "Fundacion activa"])
+        ws.append(["Periodo", period["anio_mes"]]); ws.append(["Estado", period["estado"]]); ws.append(["Integridad", period.get("integridad_sha256") or ""])
+        ws.append([]); ws.append(["Temas del periodo", "Detalle"])
+        for index, topic in enumerate(period.get("temas") or [], 1): ws.append([index, topic])
+        ws.append([]); ws.append(["Indicador", "Valor"])
+        for key, value in (period.get("variables") or {}).items(): ws.append([key, json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else value])
+        ws.column_dimensions["A"].width = 34; ws.column_dimensions["B"].width = 80
+        wb.save(path)
+
+    def _write_monthly_pdf(self, path: Path, period: dict[str, Any], identity: dict[str, Any]) -> None:
+        styles = getSampleStyleSheet(); doc = SimpleDocTemplate(str(path), pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm, topMargin=1.4*cm, bottomMargin=1.4*cm)
+        story = [Paragraph("INFORME MENSUAL DE SALUD Y NUTRICION", styles["Title"]), Paragraph(str(identity.get("nombre_corporacion") or identity.get("sigla") or "Fundacion activa"), styles["Heading2"]), Paragraph(f"Periodo: {period['anio_mes']}", styles["BodyText"]), Spacer(1, 10)]
+        topics = [["#", "Temas del periodo"]] + [[str(index), str(topic)] for index, topic in enumerate(period.get("temas") or [], 1)]
+        metrics = [["Indicador", "Valor"]] + [[str(key), json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else str(value)] for key, value in (period.get("variables") or {}).items()]
+        for rows in (topics, metrics):
+            table = Table([[Paragraph(cell, styles["BodyText"]) for cell in row] for row in rows], colWidths=[5*cm, 12*cm]); table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor("#047857")),("TEXTCOLOR",(0,0),(-1,0),colors.white),("GRID",(0,0),(-1,-1),.35,colors.grey),("VALIGN",(0,0),(-1,-1),"TOP")]))
+            story.extend([table, Spacer(1, 12)])
+        story.append(Paragraph(f"Integridad: {period.get('integridad_sha256') or ''}", styles["Italic"])); doc.build(story)
+
+    def list_institutional_minutes(self, fundacion_id: int) -> list[dict[str, Any]]:
+        rows = self.repo.fetch_all("SELECT * FROM sn_actas_institucionales WHERE fundacion_id=? ORDER BY anio DESC,consecutivo DESC LIMIT 1000", (fundacion_id,))
+        for row in rows:
+            row["puntos"] = json.loads(row.pop("puntos_json") or "[]")
+            row["decisiones"] = json.loads(row.pop("decisiones_json") or "[]")
+            row["tareas"] = self.repo.fetch_all("SELECT * FROM sn_acta_tareas WHERE fundacion_id=? AND acta_id=? ORDER BY id", (fundacion_id, row["id"]))
+        return rows
+
+    def create_institutional_minutes(self, fundacion_id: int, data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+        topic = str(data.get("tema") or "").strip()
+        meeting_date = str(data.get("fecha") or date.today().isoformat()).strip()
+        if not topic:
+            raise ValueError("El tema del acta es obligatorio.")
+        try: year = datetime.strptime(meeting_date, "%Y-%m-%d").year
+        except ValueError as exc: raise ValueError("La fecha debe tener formato AAAA-MM-DD.") from exc
+        points = [str(value).strip()[:1000] for value in (data.get("puntos") or []) if str(value).strip()][:100]
+        decisions = [str(value).strip()[:1000] for value in (data.get("decisiones") or []) if str(value).strip()][:100]
+        tasks = data.get("tareas") or []
+        now = now_iso()
+        with self.repo.connect() as conn:
+            latest = conn.execute("SELECT COALESCE(MAX(consecutivo),0) FROM sn_actas_institucionales WHERE fundacion_id=? AND anio=?", (fundacion_id, year)).fetchone()
+            consecutive = int(latest[0] or 0) + 1
+            number = f"ACTA-SN-{year}-{consecutive:04d}"
+            cur = conn.execute(
+                "INSERT INTO sn_actas_institucionales(fundacion_id,actividad_id,anio,consecutivo,numero_acta,fecha,lugar,tema,puntos_json,decisiones_json,estado,creado_por,fecha_creacion,actualizado_por,fecha_actualizacion) VALUES(?,?,?,?,?,?,?,?,?,?,'BORRADOR',?,?,?,?)",
+                (fundacion_id, data.get("actividad_id"), year, consecutive, number, meeting_date, data.get("lugar"), topic, _json(points), _json(decisions), user.get("id"), now, user.get("id"), now),
+            )
+            minutes_id = int(cur.lastrowid)
+            for task in tasks[:100]:
+                description = str(task.get("descripcion") or "").strip(); responsible = str(task.get("responsable_nombre") or "").strip(); due = str(task.get("fecha_limite") or "").strip()
+                if not description or not responsible or not re.fullmatch(r"20\d{2}-\d{2}-\d{2}", due):
+                    raise ValueError("Cada tarea exige descripci\u00f3n, responsable y fecha l\u00edmite.")
+                conn.execute("INSERT INTO sn_acta_tareas(fundacion_id,acta_id,descripcion,responsable_id,responsable_nombre,fecha_limite,estado,creado_por,fecha_creacion,actualizado_por,fecha_actualizacion) VALUES(?,?,?,?,?,?,'PENDIENTE',?,?,?,?)", (fundacion_id, minutes_id, description, task.get("responsable_id"), responsible, due, user.get("id"), now, user.get("id"), now))
+            conn.commit()
+        self.repo.log("CREAR_ACTA_INSTITUCIONAL", "sn_actas_institucionales", minutes_id, usuario=user.get("username", "sistema"), nuevos={"numero_acta": number})
+        return next(row for row in self.list_institutional_minutes(fundacion_id) if int(row["id"]) == minutes_id)
+
+    def close_institutional_minutes(self, fundacion_id: int, minutes_id: int, user: dict[str, Any]) -> dict[str, Any]:
+        row = self.repo.fetch_one("SELECT * FROM sn_actas_institucionales WHERE fundacion_id=? AND id=?", (fundacion_id, minutes_id))
+        if not row:
+            raise LookupError("Acta no encontrada.")
+        if _norm(row.get("estado")) == "CERRADO":
+            return next(item for item in self.list_institutional_minutes(fundacion_id) if int(item["id"]) == minutes_id)
+        tasks = self.repo.fetch_all("SELECT descripcion,responsable_nombre,fecha_limite FROM sn_acta_tareas WHERE fundacion_id=? AND acta_id=? ORDER BY id", (fundacion_id, minutes_id))
+        payload = {"fundacion_id": fundacion_id, "numero_acta": row["numero_acta"], "fecha": row["fecha"], "tema": row["tema"], "puntos": json.loads(row.get("puntos_json") or "[]"), "decisiones": json.loads(row.get("decisiones_json") or "[]"), "tareas": tasks}
+        digest = self._digest_payload(payload); now = now_iso()
+        detail = {**row, "puntos": payload["puntos"], "decisiones": payload["decisiones"], "tareas": tasks, "integridad_sha256": digest}
+        folder = self._tenant_dir(fundacion_id, "actas", str(row["anio"])); path = folder / f"{row['numero_acta']}.pdf"
+        self._write_institutional_minutes_pdf(path, detail)
+        product = self._store_product(fundacion_id, path, "ACTA_INSTITUCIONAL", user, activity_id=row.get("actividad_id"), template_code="SN-ACTA", template_version="INTERNA-1")
+        self.repo.execute_update("UPDATE sn_actas_institucionales SET estado='CERRADO',cerrado_por=?,fecha_cierre=?,integridad_sha256=?,producto_id=?,actualizado_por=?,fecha_actualizacion=? WHERE fundacion_id=? AND id=?", (user.get("id"), now, digest, product["id"], user.get("id"), now, fundacion_id, minutes_id))
+        self.repo.log("CERRAR_ACTA_INSTITUCIONAL", "sn_actas_institucionales", minutes_id, usuario=user.get("username", "sistema"), nuevos={"sha256": digest})
+        return next(item for item in self.list_institutional_minutes(fundacion_id) if int(item["id"]) == minutes_id)
+
+    def _write_institutional_minutes_pdf(self, path: Path, minutes: dict[str, Any]) -> None:
+        styles = getSampleStyleSheet(); doc = SimpleDocTemplate(str(path), pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm, topMargin=1.4*cm, bottomMargin=1.4*cm)
+        story = [Paragraph("ACTA INSTITUCIONAL DE SALUD Y NUTRICION", styles["Title"]), Paragraph(str(minutes["numero_acta"]), styles["Heading2"]), Spacer(1, 8)]
+        header = [["Fecha", minutes.get("fecha") or ""], ["Lugar", minutes.get("lugar") or ""], ["Tema", minutes.get("tema") or ""]]
+        table = Table([[Paragraph(str(cell), styles["BodyText"]) for cell in row] for row in header], colWidths=[4*cm, 13*cm]); table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),.35,colors.grey),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        story.extend([table, Spacer(1, 10), Paragraph("Puntos tratados", styles["Heading2"])])
+        for index, value in enumerate(minutes.get("puntos") or [], 1): story.append(Paragraph(f"{index}. {value}", styles["BodyText"]))
+        story.extend([Spacer(1, 8), Paragraph("Decisiones", styles["Heading2"])])
+        for index, value in enumerate(minutes.get("decisiones") or [], 1): story.append(Paragraph(f"{index}. {value}", styles["BodyText"]))
+        story.extend([Spacer(1, 8), Paragraph("Compromisos", styles["Heading2"])])
+        task_rows = [["Compromiso", "Responsable", "Fecha limite"]] + [[str(item.get("descripcion") or ""), str(item.get("responsable_nombre") or ""), str(item.get("fecha_limite") or "")] for item in minutes.get("tareas") or []]
+        tasks = Table([[Paragraph(cell, styles["BodyText"]) for cell in row] for row in task_rows], colWidths=[8*cm, 5*cm, 4*cm]); tasks.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor("#047857")),("TEXTCOLOR",(0,0),(-1,0),colors.white),("GRID",(0,0),(-1,-1),.35,colors.grey),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        story.extend([tasks, Spacer(1, 14), Paragraph(f"Sello de integridad SHA-256: {minutes.get('integridad_sha256') or ''}", styles["Italic"])]); doc.build(story)
 
     def _columns(self, table: str) -> set[str]:
         return set(self.repo.columns(table)) if self.repo.table_exists(table) else set()
@@ -1000,6 +1195,78 @@ def register_integral_routes(bp: Blueprint, repo: Any, data_dir: str) -> SaludNu
             return jsonify({"error": str(exc)}), 404
         except PermissionError as exc:
             return jsonify({"error": str(exc)}), 403
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @bp.route("/integral/periodos-mensuales", methods=["GET", "POST"])
+    @require_roles(*READ_ROLES)
+    def integral_monthly_periods():
+        user = _user()
+        if request.method == "GET":
+            return jsonify({"periodos": service.list_monthly_periods(user["fundacion_id"])}), 200
+        if user.get("rol") not in EDIT_ROLES:
+            return jsonify({"error": "Tu rol solo puede consultar periodos mensuales."}), 403
+        try:
+            item = service.save_monthly_period(user["fundacion_id"], request.get_json(silent=True) or {}, user)
+            return jsonify({"message": "Periodo mensual guardado como borrador.", "periodo": item}), 201
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @bp.post("/integral/periodos-mensuales/<int:period_id>/aprobar")
+    @require_roles(*COORDINATION_ROLES)
+    def approve_integral_monthly_period(period_id: int):
+        user = _user()
+        try:
+            item = service.approve_monthly_period(user["fundacion_id"], period_id, user)
+            return jsonify({"message": "Periodo aprobado y bloqueado para auditor\u00eda.", "periodo": item}), 200
+        except LookupError as exc:
+            return jsonify({"error": str(exc)}), 404
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @bp.post("/integral/periodos-mensuales/<int:period_id>/generar")
+    @require_roles(*EDIT_ROLES)
+    def generate_integral_monthly_report(period_id: int):
+        user = _user(); data = request.get_json(silent=True) or {}
+        try:
+            result = service.generate_monthly_report(user["fundacion_id"], period_id, user, data.get("formatos") or ["XLSX", "PDF"])
+            return jsonify({"message": "Informe mensual generado desde el periodo aprobado.", "resultado": result}), 201
+        except LookupError as exc:
+            return jsonify({"error": str(exc)}), 404
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @bp.get("/integral/informes-mensuales/<int:report_id>/descargar")
+    @require_roles(*READ_ROLES)
+    def download_integral_monthly_report(report_id: int):
+        user = _user(); item = service.monthly_report_path(user["fundacion_id"], report_id)
+        if not item: return jsonify({"error": "Informe no disponible o integridad inv\u00e1lida."}), 404
+        path, name, mime = item
+        return send_file(path, as_attachment=True, download_name=name, mimetype=mime)
+
+    @bp.route("/integral/actas", methods=["GET", "POST"])
+    @require_roles(*READ_ROLES)
+    def integral_institutional_minutes():
+        user = _user()
+        if request.method == "GET":
+            return jsonify({"actas": service.list_institutional_minutes(user["fundacion_id"])}), 200
+        if user.get("rol") not in EDIT_ROLES:
+            return jsonify({"error": "Tu rol no puede crear actas."}), 403
+        try:
+            item = service.create_institutional_minutes(user["fundacion_id"], request.get_json(silent=True) or {}, user)
+            return jsonify({"message": "Acta creada con consecutivo anual.", "acta": item}), 201
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @bp.post("/integral/actas/<int:minutes_id>/cerrar")
+    @require_roles(*COORDINATION_ROLES)
+    def close_integral_institutional_minutes(minutes_id: int):
+        user = _user()
+        try:
+            item = service.close_institutional_minutes(user["fundacion_id"], minutes_id, user)
+            return jsonify({"message": "Acta cerrada, bloqueada y sellada para auditor\u00eda.", "acta": item}), 200
+        except LookupError as exc:
+            return jsonify({"error": str(exc)}), 404
         except Exception as exc:
             return jsonify({"error": str(exc)}), 400
 

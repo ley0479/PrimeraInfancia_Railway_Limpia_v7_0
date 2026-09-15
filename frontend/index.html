@@ -2344,6 +2344,8 @@
                                 <button data-help-id="salud-nutricion.tab.dashboard" onclick="snMostrarVista('dashboard')" class="sn-tab active" data-sn-tab="dashboard">Dashboard</button>
                                 <button data-help-id="salud-nutricion.tab.integral" onclick="snMostrarVista('integral')" class="sn-tab" data-sn-tab="integral">Expediente Integral</button>
                                 <button onclick="snMostrarVista('jornadas')" class="sn-tab" data-sn-tab="jornadas">Jornadas</button>
+                                <button onclick="snMostrarVista('mensuales')" class="sn-tab" data-sn-tab="mensuales">Informes mensuales</button>
+                                <button onclick="snMostrarVista('actas')" class="sn-tab" data-sn-tab="actas">Actas</button>
                                 <button onclick="snMostrarVista('rutas')" class="sn-tab" data-sn-tab="rutas">Rutas y Seguimientos</button>
                                 <button onclick="snMostrarVista('importar')" class="sn-tab" data-sn-tab="importar">Importar</button>
                                 <button onclick="snMostrarVista('cruce')" class="sn-tab" data-sn-tab="cruce">Cruce Bases</button>
@@ -2445,6 +2447,38 @@
                             <div class="mt-4 flex flex-wrap gap-2"><button onclick="snIntegralCrearActividad()" class="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Crear y convocar UCA</button><button onclick="snIntegralCargarActividades()" class="rounded-xl bg-cyan-600 hover:bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Actualizar jornadas</button></div>
                         </div>
                         <div class="sn-card overflow-x-auto"><table class="w-full text-left text-xs text-slate-400 sn-table"><thead><tr><th>Fecha</th><th>UCA</th><th>Línea</th><th>Actividad</th><th>Estado</th><th>Asistencia</th><th>Evidencias</th><th>Acciones</th></tr></thead><tbody id="sn-integral-actividades"><tr><td colspan="8" class="text-center text-slate-500">Sin jornadas registradas.</td></tr></tbody></table></div>
+                    </div>
+
+                    <div id="sn-view-mensuales" class="hidden space-y-6">
+                        <div class="sn-card">
+                            <h3 class="font-semibold mb-2">Informe mensual automatizado</h3>
+                            <p class="text-sm text-slate-400 mb-4">Registra los datos mínimos y temas variables. Al aprobar el periodo queda bloqueado y sellado para auditoría.</p>
+                            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                <input id="sn-month-period" class="sn-ent-input" type="month">
+                                <input id="sn-month-topics" class="sn-ent-input xl:col-span-2" placeholder="Temas del mes, separados por coma">
+                                <input id="sn-month-observations" class="sn-ent-input" placeholder="Observaciones">
+                                <textarea id="sn-month-variables" class="sn-ent-input md:col-span-2 xl:col-span-4" rows="3" placeholder='Variables en JSON, por ejemplo: {"jornadas_desparasitacion":2,"ninos_atendidos":38}'></textarea>
+                            </div>
+                            <div class="mt-4 flex gap-2"><button onclick="snGuardarPeriodoMensual()" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Guardar borrador</button><button onclick="snCargarPeriodosMensuales()" class="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white">Actualizar</button></div>
+                        </div>
+                        <div class="sn-card overflow-x-auto"><table class="w-full text-left text-xs text-slate-400 sn-table"><thead><tr><th>Periodo</th><th>Estado</th><th>Temas</th><th>Integridad</th><th>Acción</th></tr></thead><tbody id="sn-month-list"><tr><td colspan="5" class="text-center text-slate-500">Sin periodos registrados.</td></tr></tbody></table></div>
+                    </div>
+
+                    <div id="sn-view-actas" class="hidden space-y-6">
+                        <div class="sn-card">
+                            <h3 class="font-semibold mb-2">Acta institucional automatizada</h3>
+                            <p class="text-sm text-slate-400 mb-4">El consecutivo se asigna automáticamente por fundación y año. Las tareas usan una línea por compromiso: descripción | responsable | AAAA-MM-DD.</p>
+                            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                <input id="sn-minutes-date" type="date" class="sn-ent-input">
+                                <input id="sn-minutes-place" class="sn-ent-input" placeholder="Lugar">
+                                <input id="sn-minutes-topic" class="sn-ent-input xl:col-span-2" placeholder="Tema de la reunión">
+                                <textarea id="sn-minutes-points" class="sn-ent-input md:col-span-2" rows="4" placeholder="Puntos tratados, uno por línea"></textarea>
+                                <textarea id="sn-minutes-decisions" class="sn-ent-input md:col-span-2" rows="4" placeholder="Decisiones, una por línea"></textarea>
+                                <textarea id="sn-minutes-tasks" class="sn-ent-input md:col-span-2 xl:col-span-4" rows="4" placeholder="Revisar carnés | Coordinador | 2026-09-30"></textarea>
+                            </div>
+                            <div class="mt-4 flex gap-2"><button onclick="snCrearActaInstitucional()" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Crear acta</button><button onclick="snCargarActasInstitucionales()" class="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white">Actualizar</button></div>
+                        </div>
+                        <div class="sn-card overflow-x-auto"><table class="w-full text-left text-xs text-slate-400 sn-table"><thead><tr><th>Número</th><th>Fecha</th><th>Tema</th><th>Tareas</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="sn-minutes-list"><tr><td colspan="6" class="text-center text-slate-500">Sin actas registradas.</td></tr></tbody></table></div>
                     </div>
 
                     <div id="sn-view-rutas" class="hidden space-y-6">
@@ -3857,7 +3891,7 @@
     <script src="./js/modules/asistente-capacitacion.js?v=2.7.3-mic-diagnostics"></script>
     <script src="./js/modules/gestion-pedagogica.js?v=2.1.3"></script>
     <script src="./js/modules/gestion-coordinador.js?v=2.1.6"></script>
-    <script src="./js/modules/salud-nutricion.js?v=2.6.0-integral-postgresql"></script>
+    <script src="./js/modules/salud-nutricion.js?v=2.7.0-informes-actas-1"></script>
     <script src="./js/modules/entregables-salud-nutricion.js?v=2.3.0-alpha.51-entregables-sn"></script>
     <script src="./js/modules/facturacion.js?v=2.7.0-credit-visibility-2"></script>
     <script src="./js/modules/administrativo-financiero.js?v=2.7.0"></script>
