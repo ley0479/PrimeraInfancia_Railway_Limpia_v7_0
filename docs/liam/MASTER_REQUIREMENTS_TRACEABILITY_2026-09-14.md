@@ -67,7 +67,7 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 | 61 | Responsive | VERIFICADO | Desktop/tablet/móvil con drawer y safe zones. |
 | 62 | Accesibilidad | VERIFICADO | ARIA, teclado, contraste, reduced motion y subtítulos/transcripción. |
 | 63 | Pruebas obligatorias | VERIFICADO | Unitarias, integración, permisos, tenant, UI y regresión. |
-| 64 | Regresión | PARCIAL | Suite local amplia; falta evidencia E2E autenticada de todos los módulos en entorno objetivo. |
+| 64 | Regresión | PARCIAL | Suite local amplia y runner E2E autenticado de solo lectura implementado; falta ejecutarlo con cuenta autorizada en el entorno objetivo. |
 | 65 | Migraciones | VERIFICADO | Migraciones aditivas versionadas y sin borrados. |
 | 66 | Compatibilidad | VERIFICADO | Esquema aditivo y formatos oficiales preservados. |
 | 67 | UX | VERIFICADO | Panel no invasivo, presentador y navegación contextual. |
