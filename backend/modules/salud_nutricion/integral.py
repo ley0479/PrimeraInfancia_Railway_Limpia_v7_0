@@ -28,6 +28,7 @@ from werkzeug.utils import secure_filename
 
 from modules.seguridad.services import require_roles
 from modules.seguridad.tenant_context import tenant_storage_root
+from modules.operational_jobs import start_job
 
 from .schema import INTEGRAL_SCHEMA_SQL
 from .services import now_iso
@@ -1229,8 +1230,14 @@ def register_integral_routes(bp: Blueprint, repo: Any, data_dir: str) -> SaludNu
     def generate_integral_monthly_report(period_id: int):
         user = _user(); data = request.get_json(silent=True) or {}
         try:
-            result = service.generate_monthly_report(user["fundacion_id"], period_id, user, data.get("formatos") or ["XLSX", "PDF"])
-            return jsonify({"message": "Informe mensual generado desde el periodo aprobado.", "resultado": result}), 201
+            formats = list(data.get("formatos") or ["XLSX", "PDF"])
+            def _generate(update):
+                update(progreso=15, etapa="Validando periodo aprobado")
+                result = service.generate_monthly_report(user["fundacion_id"], period_id, user, formats)
+                update(progreso=100, etapa="Informe mensual generado")
+                return result
+            job = start_job("INFORME_MENSUAL_SALUD", _generate, metadata={"periodo_id": period_id}, descripcion="Generaci\u00f3n de informe mensual de Salud y Nutrici\u00f3n")
+            return jsonify({"message": "Informe mensual enviado a procesamiento en segundo plano.", "job_id": job["id"], "status_url": f"/api/jobs/{job['id']}"}), 202
         except LookupError as exc:
             return jsonify({"error": str(exc)}), 404
         except Exception as exc:

@@ -520,8 +520,12 @@ function snAprobarPeriodoMensual(id) {
 function snGenerarInformeMensual(id) {
     mostrarCargando('Generando informe mensual aprobado...');
     snIntegralFetch(`/api/salud-nutricion/integral/periodos-mensuales/${encodeURIComponent(id)}/generar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ formatos: ['XLSX', 'PDF'] }) }).then((data) => {
-        ocultarCargando(); snMensaje(data.message, 'success');
-        (data.resultado?.productos || []).forEach((product) => window.descargarArchivoAutenticado(`${backendUrl}/api/salud-nutricion/integral/informes-mensuales/${product.id}/descargar`).catch(() => {}));
+        const complete = (result) => {
+            ocultarCargando(); snMensaje('Informe mensual generado correctamente.', 'success');
+            (result?.productos || []).forEach((product) => window.descargarArchivoAutenticado(`${backendUrl}/api/salud-nutricion/integral/informes-mensuales/${product.id}/descargar`).catch(() => {}));
+        };
+        if (data.job_id && typeof esperarJobOperativo === 'function') esperarJobOperativo(data.job_id, complete, 'sn-message');
+        else { ocultarCargando(); snMensaje('No fue posible iniciar el procesamiento en segundo plano.', 'error'); }
     }).catch((error) => { ocultarCargando(); snMensaje(error.message, 'error'); });
 }
 

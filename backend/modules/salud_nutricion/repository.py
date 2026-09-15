@@ -13,6 +13,8 @@ import json
 from typing import Any, Iterable
 
 from modules.sqlalchemy_compat import CoreCompatRepository
+from database import database
+from sqlalchemy import text
 from modules.seguridad.tenant_context import current_tenant_context
 from .schema import SCHEMA_SQL
 from .services import now_iso
@@ -63,6 +65,7 @@ class SaludNutricionRepository(CoreCompatRepository):
 
     def init_schema(self) -> None:
         self.execute_script(SCHEMA_SQL)
+        self._enable_institutional_rls()
 
         # Compatibilidad incremental para bases creadas en versiones anteriores.
         for table in (
@@ -97,6 +100,23 @@ class SaludNutricionRepository(CoreCompatRepository):
                 'fecha_actualizacion': 'TEXT',
             }.items():
                 self.ensure_column('peso_talla', column, definition)
+
+    def _enable_institutional_rls(self) -> None:
+        """Activa RLS solo para las tablas nuevas cuyo acceso ya propaga tenant transaccional."""
+        if not database.is_postgresql or database.engine is None:
+            return
+        tables = ('sn_periodos_mensuales', 'sn_informes_mensuales', 'sn_actas_institucionales', 'sn_acta_tareas')
+        predicate = "(fundacion_id = NULLIF(current_setting('app.current_fundacion_id', true), '')::integer OR current_setting('app.allow_global', true) = 'true')"
+        with database.transaction() as connection:
+            existing = {row[0] for row in connection.execute(text("SELECT policyname FROM pg_policies WHERE schemaname=current_schema() AND tablename=:table"), {'table': tables[0]}).fetchall()}
+            for table in tables:
+                connection.execute(text(f'ALTER TABLE {table} ENABLE ROW LEVEL SECURITY'))
+                connection.execute(text(f'ALTER TABLE {table} FORCE ROW LEVEL SECURITY'))
+                policy = f'{table}_tenant_policy'
+                if table != tables[0]:
+                    existing = {row[0] for row in connection.execute(text("SELECT policyname FROM pg_policies WHERE schemaname=current_schema() AND tablename=:table"), {'table': table}).fetchall()}
+                if policy not in existing:
+                    connection.execute(text(f'CREATE POLICY {policy} ON {table} FOR ALL USING {predicate} WITH CHECK {predicate}'))
 
     def fetch_all(self, sql: str, params: Iterable[Any] | None = None) -> list[dict[str, Any]]:
         return _scope_rows(super().fetch_all(sql, params))

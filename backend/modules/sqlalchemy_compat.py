@@ -273,6 +273,14 @@ class CoreConnection:
             except Exception:
                 pass
         self.transaction = self.connection.begin()
+        if database.is_postgresql:
+            context = current_tenant_context()
+            tenant_value = str(int(context.tenant_id)) if context.tenant_id else ""
+            allow_global = "true" if context.role == "SUPERADMIN" and context.allow_global else "false"
+            self.connection.execute(
+                text("SELECT set_config('app.current_fundacion_id', :tenant, true), set_config('app.allow_global', :allow_global, true)"),
+                {"tenant": tenant_value, "allow_global": allow_global},
+            )
         self._cursor = CoreCursor(self.connection)
 
     def __enter__(self) -> "CoreConnection":
