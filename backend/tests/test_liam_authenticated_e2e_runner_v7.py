@@ -4,6 +4,12 @@ import sys
 ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'tools'))
 import liam_authenticated_e2e as runner
 
+app_source=(ROOT/'backend/app.py').read_text(encoding='utf-8')
+assert "@app.route('/api/rpp/descargar', methods=['GET'])" in app_source
+assert "@app.route('/api/descargar/<unidad>/<formato>', methods=['GET'])" in app_source
+assert "@app.route('/api/bienestarina/auditoria', methods=['GET'])" in app_source
+probe_names={item[0] for item in runner.PROBES};assert {'rpp','ram','ran','rran','bienestarina'}<=probe_names
+
 class Response:
     def __init__(self,status,data=None):self.status_code=status;self._data=data or {};self.headers={'X-Trace-ID':'trace-test'}
     def json(self):return self._data
@@ -11,7 +17,8 @@ class Session:
     last=None
     def __init__(self):self.headers={};self.calls=[];Session.last=self
     def post(self,url,**kwargs):self.calls.append(('POST',url,kwargs));return Response(200,{'token':'opaque-secret','usuario':{'rol':'SUPERADMIN','fundacion_id':7}})
-    def get(self,url,**kwargs):self.calls.append(('GET',url,kwargs));return Response(200,{'data':[]})
+    def get(self,url,**kwargs):
+        self.calls.append(('GET',url,kwargs));probe=next((item for item in runner.PROBES if url.endswith(item[1])),None);return Response(probe[2][0] if probe else 200,{'data':[]})
 
 original=runner.requests.Session;runner.requests.Session=Session
 try:
