@@ -20,7 +20,7 @@ def _trusted_state(action,value):
     return _financial_state(value)
 
 def record_proposal(database_path,ctx,proposal,trace_id,module=''):
-    trace=_text(trace_id,80);action=_text(proposal.get('id') or proposal.get('action'),100);before={};resource_id=_text((proposal.get('arguments') or {}).get('id'),100) or None
+    trace=_text(trace_id,80);action=_text(proposal.get('id') or proposal.get('action'),100);before={};arguments=proposal.get('arguments') or {};resource_id=_text(arguments.get('id') or arguments.get('backup_id'),100) or None
     conn=sqlite3.connect(database_path)
     if proposal.get('server_confirmation') and proposal.get('proposal_id'):
         row=conn.execute('SELECT action_name,target_fundacion_id,before_json FROM lia_action_proposals WHERE proposal_id=? AND usuario_id=?',(str(proposal['proposal_id']),int(ctx.get('usuario_id') or 0))).fetchone()

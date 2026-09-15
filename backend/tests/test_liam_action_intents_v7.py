@@ -163,6 +163,14 @@ def test_incident_transition_requires_resolution_and_confirmation():
     assert value['confirmation_required'] is True and value['server_confirmation'] is True
 
 
+def test_backup_restore_is_critical_and_requires_id():
+    missing=propose_action('Liam restaura el backup')
+    assert missing['id']=='restore_backup' and missing['missing']==['identificador del backup']
+    value=propose_action('Liam restaura el backup 12')
+    assert value['id']=='restore_backup' and value['arguments']['backup_id']==12
+    assert value['confirmation_required'] is True and value['client_handler']=='restore_backup'
+
+
 def test_notification_center_intent_is_read_only():
     value=propose_action('Liam qué notificaciones tengo')
     assert value['server_tool']=='get_notification_center'
@@ -250,6 +258,7 @@ if __name__=='__main__':
     test_known_solution_intent_requires_explicit_error_code()
     test_technical_diagnostic_intent_requires_incident_id()
     test_incident_transition_requires_resolution_and_confirmation()
+    test_backup_restore_is_critical_and_requires_id()
     test_notification_center_intent_is_read_only()
     test_communication_intent_creates_draft_not_send_action()
     test_favorite_intent_resolves_name_without_executing_locally()

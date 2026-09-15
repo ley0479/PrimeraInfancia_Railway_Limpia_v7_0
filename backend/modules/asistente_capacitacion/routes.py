@@ -698,7 +698,7 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         action=str(data.get('action') or '')
         requested_action=action
         if action in {'safe_repair_preview','safe_repair_apply'}:action='open_module'
-        if action not in {'open_module','search_beneficiary','download_rpp','download_bienestarina','download_ram','generate_monthly_reports','publish_master_database','consolidate_master_database','create_user','update_user','create_foundation','update_foundation'}: return jsonify({'error':'Acción de cliente no registrada.'}),422
+        if action not in {'open_module','search_beneficiary','download_rpp','download_bienestarina','download_ram','generate_monthly_reports','publish_master_database','consolidate_master_database','create_user','update_user','create_foundation','update_foundation','restore_backup'}: return jsonify({'error':'Acción de cliente no registrada.'}),422
         action=requested_action
         status=str(data.get('status') or '')
         if status not in {'completed','failed','cancelled'}: return jsonify({'error':'Estado de acción no válido.'}),422

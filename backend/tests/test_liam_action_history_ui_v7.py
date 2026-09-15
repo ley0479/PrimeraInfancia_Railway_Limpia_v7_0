@@ -10,5 +10,5 @@ assert "cell.textContent=String(value??'—')" in controller
 assert "host.setAttribute('aria-busy','true')" in controller and "cell.scope='col'" in controller
 assert 'Acciones ejecutadas mediante LIAM en la fundación activa' in controller
 assert 'innerHTML' not in controller[controller.index('async function viewActionHistory'):controller.index('async function viewHistoryStats')]
-assert 'liam-controller.js?v=2.7.5-action-history-2' in index
+assert 'liam-controller.js?v=2.7.5-backup-restore-1' in index
 print('LIAM_ACTION_HISTORY_UI_V7_PASS')

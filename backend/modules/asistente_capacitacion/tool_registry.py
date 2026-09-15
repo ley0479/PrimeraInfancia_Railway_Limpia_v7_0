@@ -474,7 +474,7 @@ def _backup_status(database_path: str) -> dict:
           FROM backups_sistema ORDER BY fecha_creacion DESC,id DESC LIMIT 1''').fetchone()
     finally:conn.close()
     item=dict(latest) if latest else None
-    return {'scope':{'type':'authorized_system_backup','cross_foundation':True,'role':'SUPERADMIN'},'summary':{key:int(value or 0) for key,value in summary.items()},'latest':item,'has_backup':bool(item),'source':'Registro de Copias de Seguridad','sanitized':True,'paths_included':False,'hashes_included':False,'restore_available':False,'restore_requires_elevated_confirmation':True,'read_only':True}
+    return {'scope':{'type':'authorized_system_backup','cross_foundation':True,'role':'SUPERADMIN'},'summary':{key:int(value or 0) for key,value in summary.items()},'latest':item,'has_backup':bool(item),'source':'Registro de Copias de Seguridad','sanitized':True,'paths_included':False,'hashes_included':False,'restore_available':False,'restore_proposal_available':True,'restore_automatic':False,'restore_requires_elevated_confirmation':True,'read_only':True}
 
 
 def _foundation_portfolio(database_path: str, args: dict) -> dict:

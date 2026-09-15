@@ -795,6 +795,12 @@
       });
       return result.message || "La reparación segura fue iniciada y quedará auditada.";
     }
+    if (handler === "restore_backup") {
+      const passwordActual=prompt('Confirma tu identidad ingresando tu contraseña actual:');
+      if (!passwordActual) throw new Error('La restauración fue cancelada: falta reautenticación.');
+      const result=await platformRequest(`/api/backups/${Number(a.backup_id)}/restaurar`,{method:'POST',body:JSON.stringify({confirmar:'RESTAURAR',password_actual:passwordActual})});
+      return result.message || 'La restauración fue aceptada. Reinicia el backend cuando la plataforma lo indique.';
+    }
     throw new Error("La acción protegida no tiene un ejecutor registrado.");
   }
   function showProposal(proposal) {

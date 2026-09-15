@@ -46,7 +46,7 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 | 40 | Incidencias | VERIFICADO | Creación, consulta y transición confirmable de estados con auditoría. |
 | 41 | Base de conocimiento | VERIFICADO | Catálogo y soluciones conocidas tenant-scoped. |
 | 42 | Salud sistema | VERIFICADO | Estado sanitizado exclusivo de SUPERADMIN. |
-| 43 | Copias seguridad | PARCIAL | Estado visible; restauración continúa sin ejecutor confirmado. |
+| 43 | Copias seguridad | VERIFICADO | Estado visible y restauración crítica con confirmación, reautenticación y backup preventivo. |
 | 44 | Módulos poco usados | VERIFICADO | Analítica sin eliminación automática. |
 | 45 | Personalización por rol | VERIFICADO | Dashboard y alcance por rol. |
 | 46 | Comandos favoritos | VERIFICADO | Persistencia por usuario/tenant y ejecución segura. |
@@ -74,11 +74,10 @@ Estados: **VERIFICADO** cuenta con implementación y prueba directa; **PARCIAL**
 | 68 | Implementación fases | VERIFICADO | Fases independientes documentadas. |
 | 69 | Detener ante regresión | VERIFICADO | Las fallas encontradas se corrigieron antes de avanzar. |
 | 70 | Entrega por fase | VERIFICADO | Documentos de cambios, pruebas, riesgo y rollback. |
-| 71 | Éxito final | PARCIAL | Funciones principales operan; depende del cierre de 20, 21, 43 y 64. |
+| 71 | Éxito final | PARCIAL | Funciones principales operan; depende del cierre de 20, 21 y 64. |
 | 72 | Instrucción final | VERIFICADO | Auditoría inicial, cambios pequeños, pruebas, commits y cero despliegue automático. |
 
 ## Orden de cierre restante
 
 1. Flujo ADMIN/DEV de artefactos sandbox, pruebas y diff sin despliegue (20–21).
-2. Propuesta reforzada de restauración, todavía sin ejecución automática (43).
-3. E2E autenticado en entorno objetivo cuando exista autorización y credenciales de prueba (64).
+2. E2E autenticado en entorno objetivo cuando exista autorización y credenciales de prueba (64).

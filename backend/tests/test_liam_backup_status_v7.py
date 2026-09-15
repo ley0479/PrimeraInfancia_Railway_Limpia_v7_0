@@ -14,6 +14,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert result['summary']=={'total':1,'valid':1,'errors':0}
     assert result['latest']['tamano_bytes']==2048 and 'archivo' not in result['latest'] and 'ruta_archivo' not in result['latest'] and 'sha256' not in result['latest']
     assert result['restore_available'] is False and result['paths_included'] is False
+    assert result['restore_proposal_available'] is True and result['restore_automatic'] is False
     try:execute('get_backup_status',args={},database_path=database,tenant_id=1,user={'id':2,'rol':'GERENTE'})
     except PermissionError:pass
     else:raise AssertionError('Un rol no autorizado consultó los backups globales.')
