@@ -117,6 +117,21 @@ CREATE TABLE IF NOT EXISTS lia_dev_change_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_lia_dev_change_scope
 ON lia_dev_change_requests(fundacion_id, usuario_id, status, created_at);
+CREATE TABLE IF NOT EXISTS lia_dev_change_artifacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    artifact_id TEXT NOT NULL UNIQUE,
+    request_id TEXT NOT NULL,
+    fundacion_id INTEGER NOT NULL,
+    usuario_id INTEGER NOT NULL,
+    artifact_type TEXT NOT NULL,
+    content_json TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(fundacion_id,usuario_id,request_id,artifact_type)
+);
+CREATE INDEX IF NOT EXISTS idx_lia_dev_artifact_scope ON lia_dev_change_artifacts(fundacion_id,usuario_id,request_id,created_at);
 CREATE TABLE IF NOT EXISTS elian_platform_tour_progress (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fundacion_id INTEGER NOT NULL,

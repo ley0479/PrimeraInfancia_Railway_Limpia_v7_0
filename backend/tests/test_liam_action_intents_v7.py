@@ -171,6 +171,13 @@ def test_backup_restore_is_critical_and_requires_id():
     assert value['confirmation_required'] is True and value['client_handler']=='restore_backup'
 
 
+def test_dev_sandbox_plan_intent_is_non_executing():
+    value=propose_action('Liam prepara el plan de sandbox para DEV-20260914-ABC12345')
+    assert value['server_tool']=='prepare_dev_sandbox_plan'
+    assert value['arguments']['request_id']=='DEV-20260914-ABC12345'
+    assert value['confirmation_required'] is False
+
+
 def test_notification_center_intent_is_read_only():
     value=propose_action('Liam qué notificaciones tengo')
     assert value['server_tool']=='get_notification_center'
@@ -259,6 +266,7 @@ if __name__=='__main__':
     test_technical_diagnostic_intent_requires_incident_id()
     test_incident_transition_requires_resolution_and_confirmation()
     test_backup_restore_is_critical_and_requires_id()
+    test_dev_sandbox_plan_intent_is_non_executing()
     test_notification_center_intent_is_read_only()
     test_communication_intent_creates_draft_not_send_action()
     test_favorite_intent_resolves_name_without_executing_locally()

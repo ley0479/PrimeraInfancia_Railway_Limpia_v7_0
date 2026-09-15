@@ -26,6 +26,7 @@ RULES = {
     'prepare_dev_change_request': ActionRule('prepare_dev_change_request','generation',frozenset({'SUPERADMIN'})),
     'list_dev_change_requests': ActionRule('list_dev_change_requests','read',frozenset({'SUPERADMIN'})),
     'get_dev_change_review': ActionRule('get_dev_change_review','read',frozenset({'SUPERADMIN'})),
+    'prepare_dev_sandbox_plan': ActionRule('prepare_dev_sandbox_plan','generation',frozenset({'SUPERADMIN'})),
     'get_monthly_relation_summary': ActionRule('get_monthly_relation_summary','read',ALL_AUTHENTICATED),
     'list_foundation_profiles': ActionRule('list_foundation_profiles','read',ALL_AUTHENTICATED),
     'search_foundation_beneficiaries': ActionRule('search_foundation_beneficiaries','read',ALL_AUTHENTICATED),

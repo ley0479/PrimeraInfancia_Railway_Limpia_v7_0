@@ -91,6 +91,9 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     if any(text in q for text in ('centro liam','centro de liam','centro inteligente')):
         return {'id':'get_liam_center','label':'Consultar Centro Liam','summary':'Consolidaré el centro administrativo autorizado con datos sanitizados y disponibilidad por fuente.','arguments':{},'missing':[],'confirmation_required':False,'server_tool':'get_liam_center'}
     dev_review=re.search(r'\bdev-\d{8}-[a-f0-9]{8}\b',q)
+    if dev_review and any(text in q for text in ('plan de sandbox','prepara el sandbox','plan tecnico','alcance tecnico')):
+        request_id=dev_review.group(0).upper()
+        return {'id':'prepare_dev_sandbox_plan','label':'Preparar plan de sandbox','summary':'Crearé un artefacto verificable con archivos permitidos, riesgos y pruebas. No modificaré código ni ejecutaré comandos.','arguments':{'request_id':request_id},'missing':[],'confirmation_required':False,'server_tool':'prepare_dev_sandbox_plan'}
     if dev_review and any(text in q for text in ('revisa','revisar','analiza','analizar','impacto','estado')):
         request_id=dev_review.group(0).upper()
         return {'id':'get_dev_change_review','label':'Revisar solicitud técnica','summary':'Prepararé el paquete de revisión con hechos registrados y compuertas pendientes. No inferiré archivos ni modificaré código.','arguments':{'request_id':request_id},'missing':[],'confirmation_required':False,'server_tool':'get_dev_change_review'}

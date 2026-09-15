@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-import re,uuid,json
+import re,uuid,json,hashlib
 from modules.dbapi_compat import sqlite3
 from modules.calendario_inteligente.repository import CalendarioInteligenteRepository
 from modules.idp_documental.repository import IDPRepository
@@ -13,6 +13,7 @@ from .action_intents import propose_action
 from .notification_providers import provider_catalog
 from .privacy_service import redact
 from .elian_module_registry import ELIAN_MODULE_REGISTRY
+from .dev_scope_registry import plan_for as dev_plan_for
 from modules.seguridad.services import ROLE_MENU_PERMISSIONS
 from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente, cantidades
 
@@ -20,6 +21,7 @@ ALLOWED_TOOLS = frozenset({'get_pending_activities_summary','get_role_dashboard'
 ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_dev_change_review'})
 ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_known_solution'})
 ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_technical_diagnostic'})
+ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'prepare_dev_sandbox_plan'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -703,18 +705,36 @@ def _list_dev_changes(database_path:str,tenant_id:int,args:dict,user:dict)->dict
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'requests':rows,'total':len(rows),'source':'Centro Liam ADMIN/DEV','read_only':True}
 
 
+def _prepare_dev_sandbox_plan(database_path:str,tenant_id:int,args:dict,user:dict)->dict:
+    request_id=str(args.get('request_id') or '').strip().upper()[:40];uid=int(user.get('id') or user.get('usuario_id') or 0)
+    if not re.fullmatch(r'DEV-\d{8}-[A-F0-9]{8}',request_id):raise ValueError('Indica un identificador técnico válido.')
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        row=conn.execute('SELECT request_id,module,objective,status FROM lia_dev_change_requests WHERE request_id=? AND fundacion_id=? AND usuario_id=?',(request_id,tenant_id,uid)).fetchone()
+        if not row:raise LookupError('No encontré esa solicitud dentro de tu usuario y fundación activa.')
+        request_item=dict(row);scope=dev_plan_for(request_item['module']);content={'request_id':request_id,'objective':request_item['objective'],'architecture':{'module':scope['module'],'files':scope['allowed_files']},'risk':{'level':'HIGH' if scope['module'] in {'administracion','backups','facturacion'} else 'MEDIUM','tenant_review_required':True,'permission_review_required':True},'tests':scope['test_files'],'sandbox':{'isolated_workspace_required':True,'production_writes':False,'network_default':'disabled','commands_generated':False},'forbidden_paths':scope['forbidden_paths'],'rollback':'Revertir únicamente el commit aprobado de la solicitud.'}
+        encoded=json.dumps(content,ensure_ascii=False,sort_keys=True,separators=(',',':'));digest=hashlib.sha256(encoded.encode()).hexdigest();artifact_id='ART-'+uuid.uuid4().hex[:12].upper();now=datetime.now(ZoneInfo('America/Bogota')).isoformat(timespec='seconds')
+        conn.execute('''INSERT INTO lia_dev_change_artifacts(artifact_id,request_id,fundacion_id,usuario_id,artifact_type,content_json,content_sha256,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(fundacion_id,usuario_id,request_id,artifact_type) DO UPDATE SET artifact_id=excluded.artifact_id,content_json=excluded.content_json,content_sha256=excluded.content_sha256,status=excluded.status,updated_at=excluded.updated_at''',(artifact_id,request_id,tenant_id,uid,'SANDBOX_PLAN',encoded,digest,'READY',now,now))
+        conn.execute("UPDATE lia_dev_change_requests SET status='PLANNED',updated_at=? WHERE request_id=? AND fundacion_id=? AND usuario_id=?",(now,request_id,tenant_id,uid));conn.commit()
+    except Exception:conn.rollback();raise
+    finally:conn.close()
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'request_id':request_id,'artifact':{'artifact_id':artifact_id,'type':'SANDBOX_PLAN','status':'READY','sha256':digest,**content},'code_modified':False,'tests_executed':False,'diff_generated':False,'deployment_started':False,'requires_external_isolated_runner':True,'source':'Centro Liam ADMIN/DEV','read_only':False}
+
+
 def _dev_change_review(database_path:str,tenant_id:int,args:dict,user:dict)->dict:
     request_id=str(args.get('request_id') or '').strip().upper()[:40];uid=int(user.get('id') or user.get('usuario_id') or 0)
     if not re.fullmatch(r'DEV-\d{8}-[A-F0-9]{8}',request_id):raise ValueError('Indica un identificador técnico válido, por ejemplo DEV-20260914-ABC12345.')
     conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
-    try:row=conn.execute('''SELECT request_id,module,objective,impact_summary,status,created_at,updated_at FROM lia_dev_change_requests WHERE request_id=? AND fundacion_id=? AND usuario_id=?''',(request_id,tenant_id,uid)).fetchone()
+    try:
+        row=conn.execute('''SELECT request_id,module,objective,impact_summary,status,created_at,updated_at FROM lia_dev_change_requests WHERE request_id=? AND fundacion_id=? AND usuario_id=?''',(request_id,tenant_id,uid)).fetchone()
+        artifact=conn.execute("SELECT artifact_id,content_sha256,status FROM lia_dev_change_artifacts WHERE request_id=? AND fundacion_id=? AND usuario_id=? AND artifact_type='SANDBOX_PLAN'",(request_id,tenant_id,uid)).fetchone()
     finally:conn.close()
     if not row:raise LookupError('No encontré esa solicitud dentro de tu usuario y fundación activa.')
     request_item=dict(row);module=next((dict(item) for item in ELIAN_MODULE_REGISTRY if item['module_id']==request_item['module']),None)
     if not module:raise LookupError('El módulo de la solicitud ya no está disponible en el registro autorizado.')
     review={'module':module['module_id'],'title':module['title'],'route':module['route'],'purpose':module['purpose'],'data_source':module['data_source'],'validations':module['validations'],'outputs':module['outputs'],'downstream_use':module['downstream_use'],'registered_controls':bool(module['controls_registered'])}
-    gates=[{'gate':'Arquitectura','status':'PENDING','requirement':'Identificar servicios, endpoints, tablas, frontend, permisos y tenant afectados.'},{'gate':'Riesgo','status':'PENDING','requirement':'Clasificar impacto, compatibilidad, seguridad y rollback.'},{'gate':'Pruebas','status':'PENDING','requirement':'Definir pruebas unitarias, integración, permisos, tenant y regresión.'},{'gate':'Diff','status':'PENDING','requirement':'Preparar cambios pequeños y mostrar el diff antes de aprobación.'},{'gate':'Aprobación','status':'BLOCKED','requirement':'Requiere aprobación explícita después de pruebas satisfactorias.'},{'gate':'Despliegue','status':'DISABLED','requirement':'No se despliega automáticamente a producción.'}]
-    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'request':request_item,'module_review':review,'gates':gates,'facts_verified_from_registry':True,'files_inferred':False,'code_modified':False,'tests_executed':False,'deployment_started':False,'source':'Centro Liam ADMIN/DEV','read_only':True}
+    planned=bool(artifact);gates=[{'gate':'Arquitectura','status':'READY' if planned else 'PENDING','requirement':'Identificar servicios, endpoints, tablas, frontend, permisos y tenant afectados.'},{'gate':'Riesgo','status':'READY' if planned else 'PENDING','requirement':'Clasificar impacto, compatibilidad, seguridad y rollback.'},{'gate':'Pruebas','status':'PLANNED' if planned else 'PENDING','requirement':'Definir pruebas unitarias, integración, permisos, tenant y regresión.'},{'gate':'Diff','status':'PENDING','requirement':'Preparar cambios pequeños y mostrar el diff antes de aprobación.'},{'gate':'Aprobación','status':'BLOCKED','requirement':'Requiere aprobación explícita después de pruebas satisfactorias.'},{'gate':'Despliegue','status':'DISABLED','requirement':'No se despliega automáticamente a producción.'}]
+    return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'request':request_item,'module_review':review,'gates':gates,'sandbox_plan':dict(artifact) if artifact else None,'facts_verified_from_registry':True,'files_inferred':False,'code_modified':False,'tests_executed':False,'deployment_started':False,'source':'Centro Liam ADMIN/DEV','read_only':True}
 
 
 def _meeting_followup(tenant_id: int,args: dict,user: dict) -> dict:
@@ -868,6 +888,7 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
     if tool_name=='prepare_dev_change_request': return _prepare_dev_change(database_path,tenant_id,args,user)
     if tool_name=='list_dev_change_requests': return _list_dev_changes(database_path,tenant_id,args,user)
     if tool_name=='get_dev_change_review': return _dev_change_review(database_path,tenant_id,args,user)
+    if tool_name=='prepare_dev_sandbox_plan': return _prepare_dev_sandbox_plan(database_path,tenant_id,args,user)
     if tool_name=='compare_periods': return _compare_periods(database_path,tenant_id,args)
     if tool_name=='build_custom_report_preview': return _custom_report_preview(database_path,tenant_id,args,user)
     if tool_name=='supervise_deliverables': return _deliverable_supervision(database_path,tenant_id,args,user)
