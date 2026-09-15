@@ -158,10 +158,15 @@ async function backupsRestaurar(id) {
         return;
     }
     try {
+        const passwordActual = prompt('Confirma tu identidad ingresando tu contraseña actual:');
+        if (!passwordActual) {
+            backupsMensaje('Restauración cancelada: falta reautenticación.', 'error');
+            return;
+        }
         const data = await fetch(`${backendUrl}/api/backups/${encodeURIComponent(id)}/restaurar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ confirmar: 'RESTAURAR' })
+            body: JSON.stringify({ confirmar: 'RESTAURAR', password_actual: passwordActual })
         }).then(manejarRespuestaJson);
         backupsMensaje(data.message || 'Backup restaurado. Reinicia el backend para finalizar.', 'success');
         await backupsCargar();

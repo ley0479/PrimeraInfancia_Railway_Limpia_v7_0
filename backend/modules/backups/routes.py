@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 
 from flask import g, jsonify, request, send_file
+from werkzeug.security import check_password_hash
+from modules.dbapi_compat import sqlite3
 
 from modules.seguridad.services import require_roles
 
@@ -79,8 +81,16 @@ def register_backups(app, database_path: str, backups_folder: str) -> None:
         confirmar = str(data.get('confirmar') or '').upper()
         if confirmar != 'RESTAURAR':
             return jsonify({'error': 'Para restaurar debes enviar confirmar=RESTAURAR. Esta acción solo la puede hacer SUPERADMIN.'}), 400
+        password=str(data.get('password_actual') or '')
+        user=current_user();conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+        try:row=conn.execute('SELECT password_hash FROM usuarios_app WHERE id=? AND fundacion_id=? AND COALESCE(activo,1)=1',(int(user.get('id') or 0),int(user.get('fundacion_id') or 1))).fetchone()
+        finally:conn.close()
+        if not row or not password or not check_password_hash(str(row['password_hash'] or ''),password):
+            service.audit('BACKUP_RESTAURACION_REAUTENTICACION_FALLIDA',backup_id,'La contraseña actual no fue validada.',user,request.remote_addr)
+            return jsonify({'error':'Debes reautenticarte con tu contraseña actual antes de restaurar.'}),403
         try:
-            resultado = service.restore_backup(backup_id, current_user(), request.remote_addr)
+            service.audit('BACKUP_RESTAURACION_REAUTENTICADA',backup_id,'Confirmación reforzada validada.',user,request.remote_addr)
+            resultado = service.restore_backup(backup_id, user, request.remote_addr)
             return jsonify(resultado)
         except Exception as exc:
             return jsonify({'error': f'No se pudo restaurar el backup: {exc}'}), 500
