@@ -26,6 +26,7 @@ from .context_service import load as load_session_context, save as save_session_
 from .repair_registry import public_registry
 from .action_audit import record_proposal as audit_action_proposal, complete as complete_action_audit, complete_server_proposal, list_authorized as list_action_audit
 from .notification_providers import provider_catalog
+from .dev_sandbox_results import MAX_PAYLOAD_BYTES, SandboxResultError, ingest as ingest_sandbox_result, signing_key as sandbox_signing_key, verify_signature as verify_sandbox_signature
 import csv, io, json, uuid, os, tempfile, re, hashlib, requests
 
 
@@ -897,6 +898,28 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
         ctx=get_request_user_context()
         if not public_liam_flags().get('repair_enabled'):return jsonify({'error':'Las reparaciones de Liam están desactivadas por configuración.','repairs':[],'arbitrary_commands':False}),403
         return jsonify({'repairs':public_registry(str(ctx.get('rol') or '')),'arbitrary_commands':False}),200
+
+    @bp.post('/dev/sandbox-results/<string:request_id>')
+    def receive_dev_sandbox_result(request_id):
+        if not public_liam_flags().get('dev_enabled'):
+            return jsonify({'error':'La capacidad ADMIN/DEV de Liam está desactivada.'}),403
+        ctx=get_request_user_context();role=str(ctx.get('rol') or '').upper()
+        if role!='SUPERADMIN':
+            return jsonify({'error':'Solo SUPERADMIN puede registrar evidencia de un sandbox externo.'}),403
+        raw=request.get_data(cache=True)
+        if len(raw)>MAX_PAYLOAD_BYTES:
+            return jsonify({'error':'El resultado del sandbox supera el límite permitido.'}),413
+        try:
+            verify_sandbox_signature(raw,request.headers.get('X-Liam-Sandbox-Signature'),sandbox_signing_key())
+            data=json.loads(raw.decode('utf-8'))
+            result=ingest_sandbox_result(database_path,request_id,int(ctx.get('fundacion_id') or 1),int(ctx.get('usuario_id') or 0),data)
+        except (UnicodeDecodeError,json.JSONDecodeError):
+            return jsonify({'error':'El resultado del sandbox no contiene JSON válido.'}),400
+        except SandboxResultError as exc:
+            audit_lia(ctx,'DEV_SANDBOX_RESULT_REJECTED',module='administracion',success=False,request_id=request_id,metadata={'reason':str(exc),'status_code':exc.status_code})
+            return jsonify({'error':str(exc)}),exc.status_code
+        audit_lia(ctx,'DEV_SANDBOX_RESULT_ACCEPTED',module='administracion',request_id=request_id,metadata={'artifact_id':result['artifact_id'],'status':result['status'],'tests':len(result['tests']),'changed_paths':result['changed_paths'],'deployment_started':False})
+        return jsonify(result),201
 
     @bp.get('/notification-providers')
     def notification_provider_status():

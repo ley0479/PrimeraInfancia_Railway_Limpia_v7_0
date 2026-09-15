@@ -22,7 +22,7 @@ finally:
 
 routes=(BACKEND/'modules'/'asistente_capacitacion'/'routes.py').read_text(encoding='utf-8')
 env=(ROOT/'.env.example').read_text(encoding='utf-8')
-assert "'dev_enabled':{'prepare_dev_change_request','list_dev_change_requests','get_dev_change_review'}" in routes
+assert "'dev_enabled':{'prepare_dev_change_request','list_dev_change_requests','get_dev_change_review','prepare_dev_sandbox_plan'}" in routes
 assert 'require_tool_feature(tool_name)' in routes
 for name in ('LIAM_VISUAL_PANEL_ENABLED','LIAM_SEARCH_ENABLED','LIAM_ACTIONS_ENABLED','LIAM_ADMIN_ENABLED','LIAM_DEV_ENABLED','LIAM_REPAIR_ENABLED'):assert name in env
 print('LIAM_CAPABILITY_FLAGS_V7_PASS')
