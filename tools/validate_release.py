@@ -62,6 +62,11 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def canonical_text_bytes(path: Path) -> bytes:
+    """Representa texto como lo recibe Linux desde Git, sin alterar binarios."""
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
 def text_files() -> list[Path]:
     allowed = {
         ".py", ".js", ".html", ".css", ".json", ".md", ".txt", ".sh",
@@ -404,9 +409,10 @@ def check_manifests_and_office_files() -> None:
             if not target.is_file():
                 failures.append(f"archivo ausente: {rel}")
                 continue
-            if sha256_file(target) != str(entry.get("sha256") or "").lower():
+            target_bytes = canonical_text_bytes(target) if target.suffix.lower() in {".json", ".txt", ".md"} else target.read_bytes()
+            if hashlib.sha256(target_bytes).hexdigest() != str(entry.get("sha256") or "").lower():
                 failures.append(f"hash distinto: {rel}")
-            if target.stat().st_size != int(entry.get("bytes") or -1):
+            if len(target_bytes) != int(entry.get("bytes") or -1):
                 failures.append(f"tamaño distinto: {rel}")
     except Exception as exc:  # noqa: BLE001
         failures.append(str(exc))
