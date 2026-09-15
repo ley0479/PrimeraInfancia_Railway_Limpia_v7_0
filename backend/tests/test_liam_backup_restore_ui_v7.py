@@ -7,5 +7,5 @@ assert "prompt('Confirma tu identidad" in block
 assert "/api/backups/${Number(a.backup_id)}/restaurar" in block
 assert "confirmar:'RESTAURAR',password_actual:passwordActual" in block
 assert '/api/asistente-capacitacion' not in block
-assert 'liam-controller.js?v=2.7.5-backup-restore-1' in index
+assert 'liam-controller.js?v=2.7.5-realtime-ice-1' in index
 print('LIAM_BACKUP_RESTORE_UI_V7_PASS')

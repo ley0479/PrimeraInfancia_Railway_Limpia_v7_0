@@ -22,6 +22,11 @@ assert "data-action=\"realtime\"" in controller
 assert "liam-realtime-webrtc" in controller
 assert "conversation.item.input_audio_transcription.delta" in runtime
 assert "sendToolResult" in runtime and "IDLE_MS=90000" in runtime and "MAX_MS=300000" in runtime
-assert "liam-controller.js?v=2.7.5-backup-restore-1" in index
+assert "waitForIceGathering" in runtime and "iceGatheringState==='complete'" in runtime
+assert "pc.localDescription?.sdp||offer.sdp" in runtime
+assert "state.active||state.connecting" in runtime
+assert "NotAllowedError" in runtime and "permiso para usar el micr" in runtime
+assert "liam-controller.js?v=2.7.5-realtime-ice-1" in index
+assert "2.7.5-realtime-ice-1" in controller
 assert "liam-realtime.css?v=2.7.5-action-policy-1" in index
 print('LIAM_REALTIME_WEBRTC_V7_PASS')
