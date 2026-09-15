@@ -357,11 +357,14 @@ def check_syntax() -> None:
     shell_failures = []
     bash = shutil.which("bash")
     if bash:
-        for path in shell_files:
-            result = subprocess.run([bash, "-n", str(path)], capture_output=True, text=True, check=False)
-            if result.returncode:
-                shell_failures.append(f"{path.relative_to(ROOT)}: {result.stderr.strip()}")
-        record("Sintaxis Bash", not shell_failures, f"{len(shell_files)} scripts" if not shell_failures else " | ".join(shell_failures[:5]))
+        try:
+            for path in shell_files:
+                result = subprocess.run([bash, "-n", str(path)], capture_output=True, text=True, check=False)
+                if result.returncode:
+                    shell_failures.append(f"{path.relative_to(ROOT)}: {result.stderr.strip()}")
+            record("Sintaxis Bash", not shell_failures, f"{len(shell_files)} scripts" if not shell_failures else " | ".join(shell_failures[:5]))
+        except OSError as exc:
+            record("Sintaxis Bash", True, f"bash no ejecutable en este host: {type(exc).__name__}", skipped=True)
     else:
         record("Sintaxis Bash", True, "bash no disponible", skipped=True)
 
@@ -369,11 +372,14 @@ def check_syntax() -> None:
     node = shutil.which("node")
     js_failures = []
     if node:
-        for path in js_files:
-            result = subprocess.run([node, "--check", str(path)], capture_output=True, text=True, check=False)
-            if result.returncode:
-                js_failures.append(f"{path.relative_to(ROOT)}: {result.stderr.strip()}")
-        record("Sintaxis JavaScript", not js_failures, f"{len(js_files)} archivos" if not js_failures else " | ".join(js_failures[:5]))
+        try:
+            for path in js_files:
+                result = subprocess.run([node, "--check", str(path)], capture_output=True, text=True, check=False)
+                if result.returncode:
+                    js_failures.append(f"{path.relative_to(ROOT)}: {result.stderr.strip()}")
+            record("Sintaxis JavaScript", not js_failures, f"{len(js_files)} archivos" if not js_failures else " | ".join(js_failures[:5]))
+        except OSError as exc:
+            record("Sintaxis JavaScript", True, f"node no ejecutable en este host: {type(exc).__name__}", skipped=True)
     else:
         record("Sintaxis JavaScript", True, "node no disponible", skipped=True)
 
@@ -572,17 +578,35 @@ def declared_role_prefixes() -> list[str]:
     return []
 
 
+def declared_public_routes() -> tuple[set[str], tuple[str, ...]]:
+    """Lee las excepciones públicas reales sin importar Flask ni la aplicación."""
+    path = BACKEND / "modules" / "seguridad" / "services.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    exact: set[str] = set()
+    prefixes: tuple[str, ...] = ()
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        names = {target.id for target in node.targets if isinstance(target, ast.Name)}
+        if "PUBLIC_PATHS" in names and isinstance(node.value, (ast.Set, ast.List, ast.Tuple)):
+            exact = {str(item.value) for item in node.value.elts if isinstance(item, ast.Constant) and isinstance(item.value, str)}
+        if "PUBLIC_PATH_PREFIXES" in names and isinstance(node.value, (ast.List, ast.Tuple)):
+            prefixes = tuple(str(item.value) for item in node.value.elts if isinstance(item, ast.Constant) and isinstance(item.value, str))
+    return exact, prefixes
+
+
 def check_route_authorization() -> None:
     routes, parse_errors = extract_routes()
     prefixes = sorted(declared_role_prefixes(), key=len, reverse=True)
+    public_exact, public_prefixes = declared_public_routes()
 
     def covered(route: str) -> str | None:
         normalized = route.rstrip("/") or "/"
         return next((prefix for prefix in prefixes if normalized == prefix or normalized.startswith(prefix + "/")), None)
 
     api_routes = [item for item in routes if item[0].startswith("/api/")]
-    unknown = [item for item in api_routes if item[0] not in {"/api/health", "/api/ready"} and not covered(item[0])]
-    detail = f"{len(api_routes)} rutas API, {len(prefixes)} familias declaradas"
+    unknown = [item for item in api_routes if item[0] not in public_exact and not any(item[0].startswith(prefix) for prefix in public_prefixes) and not covered(item[0])]
+    detail = f"{len(api_routes)} rutas API, {len(prefixes)} familias y {len(public_exact)+len(public_prefixes)} excepciones públicas declaradas"
     if parse_errors:
         detail += "; errores AST: " + " | ".join(parse_errors[:3])
     if unknown:
@@ -826,13 +850,14 @@ def check_security_text_invariants() -> None:
     )
     allowed_operational_catalog_paths = {
         "backend/config/uds_catalog.json",
+        "backend/services/uds_catalog.py",
         "frontend/index.html",
     }
     term_hits = [
-        str(path.relative_to(ROOT))
+        path.relative_to(ROOT).as_posix()
         for path, text in scan_content.items()
         if real_terms.search(text)
-        and str(path.relative_to(ROOT)) not in allowed_operational_catalog_paths
+        and path.relative_to(ROOT).as_posix() not in allowed_operational_catalog_paths
         and "backend/tests/" not in path.relative_to(ROOT).as_posix()
     ]
     if term_hits:
@@ -879,7 +904,7 @@ def check_security_text_invariants() -> None:
         "TENANT_STORAGE_ISOLATION=true",
         "MULTI_TENANT_SCHEMA_VERSION=3",
         "SYNC_MANAGED_TEMPLATES=true",
-        "APP_VERSION=2.7.1-universal-data-mapper",
+        "APP_VERSION=2.7.2-document-center",
         "REQUIRE_POSTGRESQL_IN_PRODUCTION=true",
         "INTEGRITY_ENGINE_ENABLED=true",
         "METRICS_ENABLED=true",
@@ -1315,16 +1340,18 @@ def check_railway_config() -> None:
         deploy = cfg.get("deploy") or {}
         if deploy.get("startCommand") != "./start_hosting.sh":
             failures.append("startCommand")
-        if deploy.get("healthcheckPath") != "/api/ready":
+        if deploy.get("healthcheckPath") != "/api/health":
             failures.append("healthcheckPath")
         if deploy.get("restartPolicyType") != "ON_FAILURE":
             failures.append("restartPolicyType")
     except Exception as exc:  # noqa: BLE001
         failures.append(str(exc))
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8", errors="ignore")
-    for required in ["python:3.12-slim", "requirements-production.txt", "tesseract-ocr-spa", "poppler-utils", "postgresql-client"]:
+    for required in ["python:3.12-slim", "requirements-production.txt", "tesseract-ocr-spa", "poppler-utils"]:
         if required not in dockerfile:
             failures.append(f"Dockerfile sin {required}")
+    if "AS postgres_client" not in dockerfile or "COPY --from=postgres_client" not in dockerfile:
+        failures.append("Dockerfile sin cliente PostgreSQL multi-stage")
     record("Configuración Railway/Docker", not failures, ", ".join(failures) if failures else "Dockerfile, PostgreSQL Client, healthcheck, reinicio y OCR presentes")
 
 

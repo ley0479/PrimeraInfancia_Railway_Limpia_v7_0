@@ -18,6 +18,7 @@ backend/documentos_institucionales/*
 backend/cuentas_cobro_plantillas/*
 backend/storage/*
 backend/templates_originales/*
+backend/data/tenants/*
 !backend/uploads/.gitkeep
 !backend/archivos_actualizados/.gitkeep
 !backend/backups/.gitkeep
@@ -26,6 +27,7 @@ backend/templates_originales/*
 !backend/cuentas_cobro_plantillas/.gitkeep
 !backend/storage/.gitkeep
 !backend/templates_originales/.gitkeep
+!backend/data/tenants/.gitkeep
 
 # Python y herramientas
 __pycache__/
