@@ -120,16 +120,17 @@ def _loads(value, fallback):
         return fallback
 
 
-def _approved_health_template(repo, tenant):
+def _approved_health_template(repo, tenant, kind='INFORME'):
     """Return only an approved tenant/global template; never infer one from a filled acta."""
+    code=f'{str(kind).strip().upper()}_SALUD_NUTRICION'
     try:
         return repo.fetch_one('''SELECT v.id plantilla_version_id,v.version,p.codigo,p.nombre,p.tipo_documento
           FROM doc_plantilla_versiones v JOIN doc_plantillas p ON p.id=v.plantilla_id
           JOIN doc_mapeos m ON m.plantilla_version_id=v.id AND m.estado='APROBADO' AND m.fundacion_id=?
           WHERE (v.fundacion_id=? OR (v.fundacion_id IS NULL AND p.scope='GLOBAL'))
             AND v.estado IN ('APROBADA','ACTIVA')
-            AND (UPPER(p.tipo_documento)='INFORME_SALUD_NUTRICION' OR UPPER(p.codigo)='INFORME_SALUD_NUTRICION')
-          ORDER BY CASE WHEN v.fundacion_id=? THEN 0 ELSE 1 END,v.id DESC,m.version DESC LIMIT 1''',(tenant,tenant,tenant))
+            AND (UPPER(p.tipo_documento)=? OR UPPER(p.codigo)=?)
+          ORDER BY CASE WHEN v.fundacion_id=? THEN 0 ELSE 1 END,v.id DESC,m.version DESC LIMIT 1''',(tenant,tenant,code,code,tenant))
     except Exception:
         return None
 
@@ -237,10 +238,10 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
     @bp.route('/tematicas/plantilla-informe',methods=['GET'])
     @require_roles(*READ_ROLES)
     def thematic_report_template():
-        tenant,_=_ctx(); template=_approved_health_template(repo,tenant)
-        if not template:
-            return jsonify({'estado':'PENDIENTE','institucional_disponible':False,'codigo_requerido':'INFORME_SALUD_NUTRICION','advertencia':'No hay una plantilla limpia y aprobada. Los borradores actuales usan el formato interno y no deben presentarse como formato institucional.'})
-        return jsonify({'estado':'APROBADA','institucional_disponible':True,'plantilla':template})
+        tenant,_=_ctx(); acta=_approved_health_template(repo,tenant,'ACTA'); report=_approved_health_template(repo,tenant,'INFORME')
+        return jsonify({'estado':'APROBADA' if acta and report else 'PENDIENTE','institucional_disponible':bool(report),'plantilla':report,
+          'formatos':{'ACTA':{'disponible':bool(acta),'plantilla':acta,'codigo_requerido':'ACTA_SALUD_NUTRICION'},'INFORME':{'disponible':bool(report),'plantilla':report,'codigo_requerido':'INFORME_SALUD_NUTRICION'}},
+          'advertencia':None if acta and report else 'Falta registrar, mapear o aprobar una o más plantillas limpias. Las salidas faltantes usarán formato interno.'})
 
     @bp.route('/tematicas/materiales',methods=['GET'])
     @require_roles(*READ_ROLES)

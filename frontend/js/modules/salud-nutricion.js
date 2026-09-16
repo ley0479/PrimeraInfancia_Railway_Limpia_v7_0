@@ -531,9 +531,11 @@ async function snTematicasCargar() {
         snEstado.tematicas = materials.materiales || [];
         const templateBox=document.getElementById('sn-theme-template-status');
         if(templateBox) {
-            const ready=Boolean(templateStatus.institucional_disponible);
+            const actaReady=Boolean(templateStatus.formatos?.ACTA?.disponible);
+            const reportReady=Boolean(templateStatus.formatos?.INFORME?.disponible);
+            const ready=actaReady && reportReady;
             templateBox.className=`mt-3 rounded-xl border p-3 text-sm ${ready ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'}`;
-            templateBox.textContent=ready ? `Plantilla aprobada: ${templateStatus.plantilla?.nombre || templateStatus.plantilla?.codigo} · versión ${templateStatus.plantilla?.version || ''}. El mapeo temático debe confirmarse antes de declararla como salida institucional.` : templateStatus.advertencia;
+            templateBox.textContent=`Acta institucional: ${actaReady ? 'aprobada' : 'pendiente'} · Informe institucional: ${reportReady ? 'aprobado' : 'pendiente'}. ${templateStatus.advertencia || ''}`;
         }
         const unitBox = document.getElementById('sn-theme-units');
         if (unitBox) unitBox.innerHTML = (units.unidades || []).map((u) => `<label class="flex gap-2"><input type="checkbox" value="${Number(u.id)}"><span>${escaparHtml(u.nombre || '')}</span></label>`).join('') || '<span class="text-amber-300">No hay unidades activas en Base Maestra.</span>';
@@ -546,6 +548,22 @@ async function snTematicasCargar() {
         if (!host) return;
         host.innerHTML = snEstado.tematicas.length ? snEstado.tematicas.map((m) => `<article class="sn-card"><div class="flex flex-wrap justify-between gap-2"><div><strong>${escaparHtml(m.titulo_documento || '')}</strong><p class="text-xs text-slate-400">${escaparHtml(m.estado || '')} · ${escaparHtml(m.metodo_extraccion || '')}</p></div><a class="text-cyan-300" target="_blank" href="${backendUrl}/api/idp/documentos/${Number(m.idp_documento_id)}/vista-previa">Ver original</a></div><div class="mt-3 grid gap-3">${(m.temas || []).map((t) => `<div class="rounded-xl border border-slate-700 p-3"><label class="text-xs text-slate-400">Título extraído</label><p>${escaparHtml(t.titulo_original || '')}</p><label class="mt-2 block text-xs text-slate-400">Denominación normalizada propuesta</label><input class="sn-ent-input w-full" value="${escaparHtml(t.titulo_normalizado || '')}" onchange="snTematicaEditar(${Number(t.id)},${Number(t.revision)},this.value)"><p class="mt-2 text-xs text-slate-500">Procedencia: ${escaparHtml(JSON.stringify(t.procedencia || {}))}</p></div>`).join('') || '<p class="text-amber-300">Sin contenido temático identificado.</p>'}</div><button class="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm" onclick="snTematicasPublicar(${Number(m.id)})">Revisar alcance y publicar</button></article>`).join('') : '<p class="text-slate-400">Aún no hay materiales temáticos.</p>';
     } catch (error) { snMensaje(error.message, 'error'); }
+}
+
+async function snTematicasSubirPlantilla() {
+    const kind=document.getElementById('sn-template-kind')?.value || 'ACTA';
+    const version=document.getElementById('sn-template-version')?.value?.trim() || '';
+    const file=document.getElementById('sn-template-file')?.files?.[0];
+    if(!file || !file.name.toLowerCase().endsWith('.docx')) return snMensaje('Selecciona una plantilla limpia en formato DOCX.','error');
+    const code=`${kind}_SALUD_NUTRICION`; const form=new FormData();
+    form.append('file',file); form.append('codigo',code); form.append('tipo_documento',code);
+    form.append('nombre',kind==='ACTA' ? 'Acta de Salud y Nutrición' : 'Informe de Salud y Nutrición');
+    form.append('componente','SALUD_NUTRICION'); if(version) form.append('version',version);
+    try {
+        const data=await snTematicasRequest('/api/documentos/plantillas',{method:'POST',body:form});
+        snMensaje(`${data.message || 'Plantilla registrada.'} Revisa y aprueba el mapeo antes de usarla.`,'success');
+        await snTematicasCargar();
+    } catch(error) { snMensaje(error.message,'error'); }
 }
 
 async function snTematicasPlanificar() {

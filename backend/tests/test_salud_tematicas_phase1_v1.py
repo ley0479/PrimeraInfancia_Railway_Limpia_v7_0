@@ -66,7 +66,7 @@ Resolución 2184 de 2019''',
             require("v.estado IN ('APROBADA','ACTIVA')" in sql,'Se aceptó una plantilla sin aprobación.')
             return {'plantilla_version_id':7,'codigo':'INFORME_SALUD_NUTRICION'}
     template_repo=TemplateRepo(); selected=_approved_health_template(template_repo,9)
-    require(selected['plantilla_version_id']==7 and template_repo.params==(9,9,9),'La selección no priorizó el tenant autenticado.')
+    require(selected['plantilla_version_id']==7 and template_repo.params==(9,9,'INFORME_SALUD_NUTRICION','INFORME_SALUD_NUTRICION',9),'La selección no priorizó el tenant autenticado.')
     db.close()
     print('PASS test_salud_tematicas_phase1_v1 (fixture textual; prueba visual real NO VERIFICADA)')
 
