@@ -141,6 +141,11 @@ def _institutional_product(product, kind='INFORME'):
     return bool(product and str(product.get('plantilla_codigo') or '').upper()==expected and product.get('plantilla_version') and str(product.get('nombre_archivo') or '').lower().endswith('.docx'))
 
 
+def _audit(repo, action, entity, entity_id, user=None, details=None):
+    if hasattr(repo,'log'):
+        repo.log(action,entity,entity_id,usuario=str((user or {}).get('username') or 'sistema'),nuevos=details or {})
+
+
 def _serialize_theme(row):
     item = dict(row)
     for key, fallback in (('subtemas_json', []), ('localizador_json', {}), ('procedencia_json', {})):
@@ -233,6 +238,7 @@ class TematicasService:
         for theme in themes:
             self.repo.execute('''INSERT INTO sn_temas(fundacion_id,material_id,titulo_original,titulo_normalizado,categoria_sugerida,subtemas_json,fragmento_origen,localizador_json,procedencia_json,estado,creado_por,actualizado_por,creado_en,actualizado_en)
               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(tenant,material_id,theme['titulo_original'],theme['titulo_normalizado'],theme['categoria_sugerida'],json.dumps(theme['subtemas'],ensure_ascii=False),theme['fragmento_origen'],json.dumps(theme['localizador']),json.dumps(theme['procedencia']), 'PENDIENTE_REVISION',user_id,user_id,now,now))
+        _audit(self.repo,'EXTRAER_TEMATICAS_SALUD','sn_materiales_tematicos',material_id,_user(),{'documento_id':document_id,'temas_detectados':len(themes),'advertencias':warnings})
         return self.material(material_id,tenant)
 
 
@@ -288,6 +294,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         if not service.material(material_id,tenant): return jsonify({'error':'Material no encontrado.'}),404
         if not title: return jsonify({'error':'El título original es obligatorio.'}),400
         now=_now(); theme_id=repo.execute('''INSERT INTO sn_temas(fundacion_id,material_id,titulo_original,titulo_normalizado,categoria_sugerida,subtemas_json,fragmento_origen,localizador_json,procedencia_json,estado,creado_por,actualizado_por,creado_en,actualizado_en) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(tenant,material_id,title,data.get('titulo_normalizado'),data.get('categoria_sugerida'),json.dumps(data.get('subtemas') or [],ensure_ascii=False),data.get('fragmento_origen'),json.dumps(data.get('localizador') or {}),json.dumps({'titulo_original':'EDITADO_USUARIO','titulo_normalizado':'EDITADO_USUARIO','subtemas':'EDITADO_USUARIO'}),'PENDIENTE_REVISION',user_id,user_id,now,now))
+        _audit(repo,'AGREGAR_TEMATICA_MANUAL','sn_temas',theme_id,_user(),{'material_id':material_id,'procedencia':'EDITADO_USUARIO'})
         return jsonify({'message':'Tema manual agregado con procedencia registrada.','tema_id':theme_id}),201
 
     @bp.route('/tematicas/temas/<int:theme_id>',methods=['PATCH'])
@@ -307,6 +314,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         revision=expected+1; now=_now()
         repo.execute('''UPDATE sn_temas SET titulo_original=?,titulo_normalizado=?,categoria_sugerida=?,subtemas_json=?,fragmento_origen=?,procedencia_json=?,revision=?,actualizado_por=?,actualizado_en=? WHERE id=? AND fundacion_id=? AND revision=?''',(updated['titulo_original'],updated.get('titulo_normalizado'),updated.get('categoria_sugerida'),updated.get('subtemas_json') or '[]',updated.get('fragmento_origen'),json.dumps(provenance),revision,user_id,now,theme_id,tenant,expected))
         repo.execute('INSERT INTO sn_tema_correcciones(fundacion_id,tema_id,revision_anterior,valor_anterior_json,valor_nuevo_json,motivo,usuario_id,creado_en) VALUES(?,?,?,?,?,?,?,?)',(tenant,theme_id,expected,json.dumps(dict(current),ensure_ascii=False,default=str),json.dumps(updated,ensure_ascii=False,default=str),data.get('motivo'),user_id,now))
+        _audit(repo,'CORREGIR_TEMATICA_SALUD','sn_temas',theme_id,_user(),{'revision_anterior':expected,'revision_nueva':revision,'campos':[key for key in data if key in allowed or key=='subtemas']})
         return jsonify({'message':'Corrección guardada sin borrar la lectura anterior.','tema':_serialize_theme(repo.fetch_one('SELECT * FROM sn_temas WHERE id=? AND fundacion_id=?',(theme_id,tenant)))})
 
     @bp.route('/tematicas/materiales/<int:material_id>/publicar',methods=['POST'])
@@ -333,6 +341,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
                 if not existing:
                     repo.execute('INSERT INTO sn_tema_asignaciones(fundacion_id,tema_id,tema_version,periodo,unidad_id,responsable_id,estado,creado_por,creado_en,actualizado_en) VALUES(?,?,?,?,?,?,?,?,?,?)',(tenant,theme['id'],theme['version'],period,unit_id,data.get('responsable_id'),'PUBLICADA',user_id,now,now)); created+=1
         repo.execute("UPDATE sn_materiales_tematicos SET periodo=?,estado='PUBLICADO',revisado_por=?,revisado_en=?,publicado_en=?,actualizado_en=? WHERE id=? AND fundacion_id=?",(period,user_id,now,now,now,material_id,tenant))
+        _audit(repo,'PUBLICAR_TEMATICAS_SALUD','sn_materiales_tematicos',material_id,user,{'periodo':period,'unidad_ids':unit_ids,'asignaciones_creadas':created})
         return jsonify({'message':'Temáticas publicadas. No se crearon actividades, fechas, asistentes ni resultados.','asignaciones_creadas':created,'material':service.material(material_id,tenant)})
 
     @bp.route('/tematicas/actividades/<int:activity_id>/vincular',methods=['POST'])
@@ -353,6 +362,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
             if not exists:
                 repo.execute('INSERT INTO sn_actividad_temas(fundacion_id,actividad_id,tema_id,tema_version,creado_por,creado_en) VALUES(?,?,?,?,?,?)',(tenant,activity_id,row['id'],row['version'],user_id,now)); created+=1
         total=repo.fetch_one('SELECT COUNT(*) total FROM sn_actividad_temas WHERE fundacion_id=? AND actividad_id=?',(tenant,activity_id))
+        _audit(repo,'VINCULAR_TEMATICAS_ACTIVIDAD','sn_actividades_integrales',activity_id,user,{'tema_ids':theme_ids,'vinculos_creados':created})
         return jsonify({'message':'Temáticas vinculadas. La asistencia existente no fue modificada.','vinculos_creados':created,'temas_vinculados':int((total or {}).get('total') or 0)})
 
     @bp.route('/tematicas/planificar',methods=['POST'])
@@ -391,6 +401,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
             except Exception:
                 calendar_warning='La actividad quedó creada, pero la sincronización con Calendario está pendiente de reintento.'
         message='Actividad planificada. No se registraron asistentes, ejecución ni resultados.'
+        _audit(repo,'PLANIFICAR_ACTIVIDAD_DESDE_TEMATICAS','sn_actividades_integrales',activity_id,user,{'tema_ids':theme_ids,'periodo':period,'unidad_id':unit_id,'fecha_programada':date,'estado_sincronizacion':'PENDIENTE_REINTENTO' if calendar_warning else ('SINCRONIZADO' if date else 'SIN_FECHA')})
         status=202 if calendar_warning else 201
         return jsonify({'message':message,'actividad':result,'temas':themes,'calendario':calendar_item,'estado_sincronizacion':'PENDIENTE_REINTENTO' if calendar_warning else ('SINCRONIZADO' if date else 'SIN_FECHA'),'advertencias':[calendar_warning] if calendar_warning else []}),status
 
@@ -418,6 +429,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         if not product:return jsonify({'error':'El generador no produjo un archivo verificable.'}),500
         latest=repo.fetch_one('SELECT COALESCE(MAX(version),0) version FROM sn_informes_tematicos WHERE fundacion_id=? AND actividad_id=?',(tenant,activity_id)); version=int((latest or {}).get('version') or 0)+1; now=_now(); state='BORRADOR_INCOMPLETO' if missing else 'BORRADOR'
         report_id=repo.execute('''INSERT INTO sn_informes_tematicos(fundacion_id,actividad_id,version,snapshot_hash,snapshot_json,faltantes_json,estado,producto_id,plantilla_codigo,plantilla_version,producto_sha256,disparador,creado_por,creado_en,actualizado_en) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(tenant,activity_id,version,digest,json.dumps(snapshot,ensure_ascii=False,default=str),json.dumps(missing,ensure_ascii=False),state,product['id'],product.get('plantilla_codigo'),product.get('plantilla_version'),product.get('sha256'),str(data.get('disparador') or 'MANUAL').upper(),user_id,now,now))
+        _audit(repo,'GENERAR_BORRADOR_TEMATICO','sn_informes_tematicos',report_id,user,{'actividad_id':activity_id,'version':version,'estado':state,'snapshot_hash':digest,'plantilla_codigo':product.get('plantilla_codigo'),'plantilla_version':product.get('plantilla_version')})
         institutional=_institutional_product(product,'INFORME')
         format_status={'institucional':institutional,'estado':'PLANTILLA_INSTITUCIONAL' if institutional else 'FORMATO_INTERNO','plantilla_aprobada':template,'advertencia':None if institutional else 'No hay una plantilla limpia y un mapeo aprobados con código INFORME_SALUD_NUTRICION.'}
         return jsonify({'message':'Borrador generado desde hechos registrados.' if not missing else 'BORRADOR INCOMPLETO generado sin inventar los campos faltantes.','informe':{'id':report_id,'version':version,'estado':state,'producto':product,'formato':format_status},'faltantes':missing}),201
@@ -454,6 +466,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         now=_now(); reviewer=user_id if target in {'EN_REVISION','DEVUELTO','APROBADO'} else None; approver=user_id if target=='APROBADO' else None
         repo.execute('UPDATE sn_informes_tematicos SET estado=?,observaciones_revision=?,revisado_por=?,revisado_en=?,aprobado_por=?,aprobado_en=?,actualizado_en=? WHERE id=? AND fundacion_id=?',(target,data.get('observaciones'),reviewer,now,approver,now if approver else None,now,report_id,tenant))
         repo.execute('UPDATE sn_productos_actividad SET estado=?,revisado_por=?,fecha_revision=?,aprobado_por=?,fecha_aprobacion=?,observaciones=? WHERE id=? AND fundacion_id=?',(target,reviewer,now,approver,now if approver else None,data.get('observaciones'),report.get('producto_id'),tenant))
+        _audit(repo,'CAMBIAR_ESTADO_INFORME_TEMATICO','sn_informes_tematicos',report_id,user,{'estado_anterior':report.get('estado'),'estado_nuevo':target,'producto_id':report.get('producto_id')})
         return jsonify({'message':'Estado actualizado mediante acción profesional explícita.','estado':target,'informe_id':report_id})
 
     return service

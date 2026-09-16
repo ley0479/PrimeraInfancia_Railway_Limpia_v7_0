@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from modules.salud_nutricion.tematicas import SCHEMA_SQL, SCHEMA_VERSION, _approved_health_template, _can_access_unit, _institutional_product, _report_snapshot, _theme_candidates
+from modules.salud_nutricion.tematicas import SCHEMA_SQL, SCHEMA_VERSION, _approved_health_template, _audit, _can_access_unit, _institutional_product, _report_snapshot, _theme_candidates
 
 
 def require(condition, message):
@@ -71,6 +71,11 @@ Resolución 2184 de 2019''',
     require(selected['plantilla_version_id']==7 and template_repo.params==(9,9,'INFORME_SALUD_NUTRICION','INFORME_SALUD_NUTRICION',9),'La selección no priorizó el tenant autenticado.')
     require(not _institutional_product({'plantilla_codigo':'SN-INFORME','plantilla_version':'INTERNA-1','nombre_archivo':'informe.pdf'}),'El PDF interno fue tratado como institucional.')
     require(_institutional_product({'plantilla_codigo':'INFORME_SALUD_NUTRICION','plantilla_version':'2026.1','nombre_archivo':'informe.docx'}),'No reconoció un informe generado con plantilla institucional versionada.')
+    class AuditRepo:
+        def __init__(self): self.event=None
+        def log(self,*args,**kwargs): self.event=(args,kwargs)
+    audit_repo=AuditRepo(); _audit(audit_repo,'PUBLICAR_TEMATICAS_SALUD','sn_materiales_tematicos',4,{'username':'revisor'}, {'periodo':'2026-09','asignaciones_creadas':3})
+    require(audit_repo.event[0][:3]==('PUBLICAR_TEMATICAS_SALUD','sn_materiales_tematicos',4) and audit_repo.event[1]['usuario']=='revisor','La auditoría temática no registró actor y recurso.')
     db.close()
     print('PASS test_salud_tematicas_phase1_v1 (fixture textual; prueba visual real NO VERIFICADA)')
 
