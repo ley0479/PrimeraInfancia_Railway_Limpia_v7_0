@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import unicodedata
 from datetime import datetime
@@ -59,6 +60,17 @@ CREATE TABLE IF NOT EXISTS sn_actividad_calendario (
  PRIMARY KEY(fundacion_id,actividad_id), UNIQUE(fundacion_id,calendario_entregable_id),
  FOREIGN KEY(actividad_id) REFERENCES sn_actividades_integrales(id)
 );
+CREATE TABLE IF NOT EXISTS sn_informes_tematicos (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, fundacion_id INTEGER NOT NULL, actividad_id INTEGER NOT NULL,
+ version INTEGER NOT NULL, snapshot_hash TEXT NOT NULL, snapshot_json TEXT NOT NULL,
+ faltantes_json TEXT NOT NULL DEFAULT '[]', estado TEXT NOT NULL DEFAULT 'BORRADOR_INCOMPLETO',
+ producto_id INTEGER, disparador TEXT NOT NULL DEFAULT 'MANUAL', observaciones_revision TEXT,
+ creado_por INTEGER, creado_en TEXT NOT NULL, revisado_por INTEGER, revisado_en TEXT,
+ aprobado_por INTEGER, aprobado_en TEXT, actualizado_en TEXT NOT NULL,
+ UNIQUE(fundacion_id,actividad_id,version), UNIQUE(fundacion_id,actividad_id,snapshot_hash),
+ FOREIGN KEY(actividad_id) REFERENCES sn_actividades_integrales(id), FOREIGN KEY(producto_id) REFERENCES sn_productos_actividad(id)
+);
+CREATE INDEX IF NOT EXISTS idx_sn_informe_tematico_estado ON sn_informes_tematicos(fundacion_id,estado,actividad_id);
 CREATE INDEX IF NOT EXISTS idx_sn_material_tenant_estado ON sn_materiales_tematicos(fundacion_id,estado,periodo);
 CREATE INDEX IF NOT EXISTS idx_sn_tema_material ON sn_temas(fundacion_id,material_id,estado);
 CREATE INDEX IF NOT EXISTS idx_sn_asignacion_periodo ON sn_tema_asignaciones(fundacion_id,periodo,unidad_id,estado);
@@ -138,6 +150,24 @@ def _theme_candidates(raw):
     if re.search(r'\b2184\b', text) and re.search(r'\b2019\b', text):
         references.append({'texto':'Resolución 2184 de 2019','tipo':'REFERENCIA_DOCUMENTAL_EXTRAIDA','vigencia_verificada':False})
     return themes, references
+
+
+def _report_snapshot(repo,tenant,activity_id):
+    activity=repo.fetch_one('SELECT * FROM sn_actividades_integrales WHERE id=? AND fundacion_id=?',(activity_id,tenant))
+    if not activity:return None
+    themes=repo.fetch_all('''SELECT t.id,t.version,t.titulo_original,t.titulo_normalizado,t.categoria_sugerida FROM sn_actividad_temas at JOIN sn_temas t ON t.id=at.tema_id AND t.fundacion_id=at.fundacion_id WHERE at.fundacion_id=? AND at.actividad_id=? ORDER BY t.id''',(tenant,activity_id))
+    attendance=repo.fetch_all('SELECT id,documento,nombre_completo,convocado,asistio,firma_estado,observaciones FROM sn_actividad_participantes WHERE fundacion_id=? AND actividad_id=? ORDER BY id',(tenant,activity_id))
+    evidences=repo.fetch_all('SELECT id,tipo,titulo,nombre_original,sha256,fecha_carga FROM sn_evidencias_integrales WHERE fundacion_id=? AND actividad_id=? AND activo=1 ORDER BY id',(tenant,activity_id))
+    snapshot={'schema_version':'1.0','actividad':dict(activity),'temas':themes,'asistencia':attendance,'evidencias':evidences,'conteos':{'convocados':sum(1 for x in attendance if x.get('convocado')),'asistentes':sum(1 for x in attendance if x.get('asistio')),'personas_registradas':len(attendance),'evidencias':len(evidences)},'criterio_conteo':'personas únicas por registro de participante dentro de la actividad'}
+    missing=[]
+    for field,label in (('fecha_ejecucion','fecha real de ejecución'),('metodologia','metodología realizada'),('resultados','resultados reportados por el responsable')):
+        if not str(activity.get(field) or '').strip():missing.append(label)
+    if not themes:missing.append('temáticas vinculadas')
+    if not attendance:missing.append('listado de participantes vinculado')
+    if int(activity.get('requiere_evidencias') or 0) and not evidences:missing.append('evidencias auténticas')
+    snapshot['completitud']={'completo':not missing,'faltantes':missing,'nota':'Los resultados son reportados por el responsable; no equivalen a resultados medidos salvo registro específico.'}
+    digest=hashlib.sha256(json.dumps(snapshot,ensure_ascii=False,sort_keys=True,default=str,separators=(',',':')).encode('utf-8')).hexdigest()
+    return snapshot,digest,missing
 
 
 class TematicasService:
@@ -329,5 +359,60 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         message='Actividad planificada. No se registraron asistentes, ejecución ni resultados.'
         status=202 if calendar_warning else 201
         return jsonify({'message':message,'actividad':result,'temas':themes,'calendario':calendar_item,'estado_sincronizacion':'PENDIENTE_REINTENTO' if calendar_warning else ('SINCRONIZADO' if date else 'SIN_FECHA'),'advertencias':[calendar_warning] if calendar_warning else []}),status
+
+    @bp.route('/tematicas/actividades/<int:activity_id>/completitud',methods=['GET'])
+    @require_roles(*READ_ROLES)
+    def thematic_completeness(activity_id):
+        tenant,_=_ctx(); user=_user(); built=_report_snapshot(repo,tenant,activity_id)
+        if not built:return jsonify({'error':'Actividad no encontrada.'}),404
+        snapshot,digest,missing=built
+        if not _can_access_unit(snapshot['actividad'].get('unidad_nombre'),user):return jsonify({'error':'No tienes permiso sobre esta unidad.'}),403
+        return jsonify({'actividad_id':activity_id,'completo':not missing,'faltantes':missing,'snapshot_hash':digest,'conteos':snapshot['conteos'],'temas':snapshot['temas']})
+
+    @bp.route('/tematicas/actividades/<int:activity_id>/informe',methods=['POST'])
+    @require_roles(*EDIT_ROLES)
+    def thematic_report(activity_id):
+        if integral_service is None:return jsonify({'error':'El generador documental no está disponible.'}),503
+        tenant,user_id=_ctx(); user=_user(); data=request.get_json(silent=True) or {}; built=_report_snapshot(repo,tenant,activity_id)
+        if not built:return jsonify({'error':'Actividad no encontrada.'}),404
+        snapshot,digest,missing=built
+        if not _can_access_unit(snapshot['actividad'].get('unidad_nombre'),user):return jsonify({'error':'No tienes permiso sobre esta unidad.'}),403
+        existing=repo.fetch_one('SELECT * FROM sn_informes_tematicos WHERE fundacion_id=? AND actividad_id=? AND snapshot_hash=?',(tenant,activity_id,digest))
+        if existing:return jsonify({'message':'Ya existe un borrador para esta misma versión de datos; no se duplicó.','informe':existing,'faltantes':_loads(existing.get('faltantes_json'),[]),'idempotente':True})
+        generated=integral_service.prepare_activity_documents(tenant,activity_id,user,['INFORME']); product=((generated or {}).get('documentos') or [None])[0]
+        if not product:return jsonify({'error':'El generador no produjo un archivo verificable.'}),500
+        latest=repo.fetch_one('SELECT COALESCE(MAX(version),0) version FROM sn_informes_tematicos WHERE fundacion_id=? AND actividad_id=?',(tenant,activity_id)); version=int((latest or {}).get('version') or 0)+1; now=_now(); state='BORRADOR_INCOMPLETO' if missing else 'BORRADOR'
+        report_id=repo.execute('''INSERT INTO sn_informes_tematicos(fundacion_id,actividad_id,version,snapshot_hash,snapshot_json,faltantes_json,estado,producto_id,disparador,creado_por,creado_en,actualizado_en) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',(tenant,activity_id,version,digest,json.dumps(snapshot,ensure_ascii=False,default=str),json.dumps(missing,ensure_ascii=False),state,product['id'],str(data.get('disparador') or 'MANUAL').upper(),user_id,now,now))
+        return jsonify({'message':'Borrador generado desde hechos registrados.' if not missing else 'BORRADOR INCOMPLETO generado sin inventar los campos faltantes.','informe':{'id':report_id,'version':version,'estado':state,'producto':product},'faltantes':missing}),201
+
+    @bp.route('/tematicas/informes',methods=['GET'])
+    @require_roles(*READ_ROLES)
+    def thematic_reports():
+        tenant,_=_ctx(); user=_user(); activity_id=request.args.get('actividad_id',type=int); where=['i.fundacion_id=?']; params=[tenant]
+        if activity_id:where.append('i.actividad_id=?');params.append(activity_id)
+        rows=repo.fetch_all(f'''SELECT i.id,i.actividad_id,i.version,i.snapshot_hash,i.faltantes_json,i.estado,i.producto_id,i.disparador,i.observaciones_revision,i.creado_en,i.revisado_en,i.aprobado_en,a.unidad_nombre,a.titulo FROM sn_informes_tematicos i JOIN sn_actividades_integrales a ON a.id=i.actividad_id AND a.fundacion_id=i.fundacion_id WHERE {' AND '.join(where)} ORDER BY i.id DESC LIMIT 500''',tuple(params))
+        result=[]
+        for row in rows:
+            if _can_access_unit(row.get('unidad_nombre'),user):
+                item=dict(row);item['faltantes']=_loads(item.pop('faltantes_json',None),[]);result.append(item)
+        return jsonify({'informes':result})
+
+    @bp.route('/tematicas/informes/<int:report_id>/estado',methods=['POST'])
+    @require_roles(*EDIT_ROLES)
+    def thematic_report_state(report_id):
+        tenant,user_id=_ctx(); user=_user(); data=request.get_json(silent=True) or {}; report=repo.fetch_one('SELECT * FROM sn_informes_tematicos WHERE id=? AND fundacion_id=?',(report_id,tenant))
+        if not report:return jsonify({'error':'Informe no encontrado.'}),404
+        activity=repo.fetch_one('SELECT unidad_nombre FROM sn_actividades_integrales WHERE id=? AND fundacion_id=?',(report['actividad_id'],tenant)) or {}
+        if not _can_access_unit(activity.get('unidad_nombre'),user):return jsonify({'error':'No tienes permiso sobre esta unidad.'}),403
+        target=str(data.get('estado') or '').upper(); allowed={'EN_REVISION','DEVUELTO','APROBADO'}
+        if target not in allowed:return jsonify({'error':'Estado de revisión no permitido.'}),400
+        missing=_loads(report.get('faltantes_json'),[])
+        if target=='APROBADO' and missing:return jsonify({'error':'No se puede aprobar un borrador incompleto.','faltantes':missing}),409
+        if target=='APROBADO' and user.get('rol') not in {'SUPERADMIN','GERENTE','COORDINADOR'}:return jsonify({'error':'La aprobación requiere un rol de coordinación autorizado.'}),403
+        if str(report.get('estado'))=='APROBADO':return jsonify({'error':'El informe aprobado está congelado; genera una nueva versión para cambios posteriores.'}),409
+        now=_now(); reviewer=user_id if target in {'EN_REVISION','DEVUELTO','APROBADO'} else None; approver=user_id if target=='APROBADO' else None
+        repo.execute('UPDATE sn_informes_tematicos SET estado=?,observaciones_revision=?,revisado_por=?,revisado_en=?,aprobado_por=?,aprobado_en=?,actualizado_en=? WHERE id=? AND fundacion_id=?',(target,data.get('observaciones'),reviewer,now,approver,now if approver else None,now,report_id,tenant))
+        repo.execute('UPDATE sn_productos_actividad SET estado=?,revisado_por=?,fecha_revision=?,aprobado_por=?,fecha_aprobacion=?,observaciones=? WHERE id=? AND fundacion_id=?',(target,reviewer,now,approver,now if approver else None,data.get('observaciones'),report.get('producto_id'),tenant))
+        return jsonify({'message':'Estado actualizado mediante acción profesional explícita.','estado':target,'informe_id':report_id})
 
     return service

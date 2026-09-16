@@ -480,7 +480,27 @@ function snIntegralRenderActividades() {
     if (!tbody) return;
     const rows = snEstado.integral.actividades || [];
     if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-slate-500">Sin jornadas registradas.</td></tr>'; return; }
-    tbody.innerHTML = rows.map((a) => `<tr><td>${escaparHtml(a.fecha_programada || '')}</td><td>${escaparHtml(a.unidad_nombre || '')}</td><td>${escaparHtml(a.linea_componente || '')}</td><td>${escaparHtml(a.titulo || '')}</td><td>${escaparHtml(a.estado || '')}</td><td>${Number(a.asistentes_total || 0)}/${Number(a.participantes_total || 0)}</td><td>${Number(a.evidencias_total || 0)}</td><td class="space-x-1"><button onclick="snIntegralPrepararDocumentos(${Number(a.id)})" class="sn-ent-btn">Acta/Listado</button><button onclick="snIntegralSubirEvidencia(${Number(a.id)})" class="sn-ent-btn sn-ent-btn-foto">Evidencia</button></td></tr>`).join('');
+    tbody.innerHTML = rows.map((a) => `<tr><td>${escaparHtml(a.fecha_programada || '')}</td><td>${escaparHtml(a.unidad_nombre || '')}</td><td>${escaparHtml(a.linea_componente || '')}</td><td>${escaparHtml(a.titulo || '')}</td><td>${escaparHtml(a.estado || '')}</td><td>${Number(a.asistentes_total || 0)}/${Number(a.participantes_total || 0)}</td><td>${Number(a.evidencias_total || 0)}</td><td class="space-x-1"><button onclick="snIntegralRegistrarEjecucion(${Number(a.id)})" class="sn-ent-btn sn-ent-btn-validar">Ejecución</button><button onclick="snTematicasGenerarInforme(${Number(a.id)})" class="sn-ent-btn">Informe</button><button onclick="snIntegralPrepararDocumentos(${Number(a.id)})" class="sn-ent-btn">Acta/Listado</button><button onclick="snIntegralSubirEvidencia(${Number(a.id)})" class="sn-ent-btn sn-ent-btn-foto">Evidencia</button></td></tr>`).join('');
+}
+
+async function snIntegralRegistrarEjecucion(activityId) {
+    const fecha=window.prompt('Fecha real de ejecución (AAAA-MM-DD). Déjala vacía si aún no se realizó:','');
+    if(fecha===null || !fecha.trim()) return;
+    const metodologia=window.prompt('Metodología realmente realizada:',''); if(metodologia===null)return;
+    const resultados=window.prompt('Resultados reportados por la persona responsable (no resultados supuestos):',''); if(resultados===null)return;
+    const compromisos=window.prompt('Compromisos registrados (opcional):','') || '';
+    try { const data=await snIntegralFetch(`/api/salud-nutricion/integral/actividades/${activityId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fecha_ejecucion:fecha.trim(),metodologia:metodologia.trim(),resultados:resultados.trim(),compromisos_generales:compromisos.trim(),estado:'REALIZADA'})}); snMensaje(data.message || 'Ejecución registrada para revisión.','success'); snIntegralCargarActividades(); }
+    catch(error){snMensaje(error.message,'error');}
+}
+
+async function snTematicasGenerarInforme(activityId) {
+    try {
+        const check=await snTematicasRequest(`/api/salud-nutricion/tematicas/actividades/${activityId}/completitud`);
+        if(check.faltantes?.length && !window.confirm(`El borrador quedará INCOMPLETO. Faltan: ${check.faltantes.join(', ')}. ¿Generarlo sin inventar datos?`)) return;
+        const data=await snTematicasRequest(`/api/salud-nutricion/tematicas/actividades/${activityId}/informe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({disparador:'MANUAL_UI'})});
+        snMensaje(`${data.message} ${(data.faltantes || []).length ? 'Pendientes: '+data.faltantes.join(', ') : ''}`,'success');
+        const product=data.informe?.producto; if(product?.id) window.descargarArchivoAutenticado(`${backendUrl}/api/salud-nutricion/integral/productos/${product.id}/descargar`).catch(()=>{});
+    } catch(error){snMensaje(error.message,'error');}
 }
 
 function snIntegralPrepararDocumentos(activityId) {

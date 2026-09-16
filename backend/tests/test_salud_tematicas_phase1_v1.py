@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from modules.salud_nutricion.tematicas import SCHEMA_SQL, SCHEMA_VERSION, _can_access_unit, _theme_candidates
+from modules.salud_nutricion.tematicas import SCHEMA_SQL, SCHEMA_VERSION, _can_access_unit, _report_snapshot, _theme_candidates
 
 
 def require(condition, message):
@@ -38,11 +38,25 @@ Resolución 2184 de 2019''',
     require(empty == [] and empty_refs == [], 'Un archivo sin temáticas produjo contenido inventado.')
 
     db=sqlite3.connect(':memory:')
-    db.executescript('CREATE TABLE idp_documentos(id INTEGER PRIMARY KEY); CREATE TABLE master_unidades(id INTEGER PRIMARY KEY); CREATE TABLE sn_actividades_integrales(id INTEGER PRIMARY KEY);')
+    db.executescript('''CREATE TABLE idp_documentos(id INTEGER PRIMARY KEY);
+      CREATE TABLE master_unidades(id INTEGER PRIMARY KEY);
+      CREATE TABLE sn_actividades_integrales(id INTEGER PRIMARY KEY,fundacion_id INTEGER,unidad_nombre TEXT,fecha_ejecucion TEXT,metodologia TEXT,resultados TEXT,requiere_evidencias INTEGER);
+      CREATE TABLE sn_actividad_participantes(id INTEGER PRIMARY KEY,fundacion_id INTEGER,actividad_id INTEGER,documento TEXT,nombre_completo TEXT,convocado INTEGER,asistio INTEGER,firma_estado TEXT,observaciones TEXT);
+      CREATE TABLE sn_evidencias_integrales(id INTEGER PRIMARY KEY,fundacion_id INTEGER,actividad_id INTEGER,tipo TEXT,titulo TEXT,nombre_original TEXT,sha256 TEXT,fecha_carga TEXT,activo INTEGER);
+      CREATE TABLE sn_productos_actividad(id INTEGER PRIMARY KEY);''')
     db.executescript(SCHEMA_SQL)
     db.executescript(SCHEMA_SQL)
     tables={row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    require({'sn_materiales_tematicos','sn_temas','sn_tema_correcciones','sn_tema_asignaciones','sn_actividad_temas','sn_actividad_calendario'} <= tables, 'Migración temática incompleta.')
+    require({'sn_materiales_tematicos','sn_temas','sn_tema_correcciones','sn_tema_asignaciones','sn_actividad_temas','sn_actividad_calendario','sn_informes_tematicos'} <= tables, 'Migración temática incompleta.')
+    db.row_factory=sqlite3.Row
+    db.execute("INSERT INTO sn_actividades_integrales VALUES(1,1,'UCA 1',NULL,NULL,NULL,1)")
+    class Repo:
+        def fetch_one(self,sql,params=()):
+            row=db.execute(sql,params).fetchone();return dict(row) if row else None
+        def fetch_all(self,sql,params=()):return [dict(row) for row in db.execute(sql,params).fetchall()]
+    snapshot,digest,missing=_report_snapshot(Repo(),1,1)
+    require(snapshot['conteos']['asistentes']==0 and len(digest)==64,'Instantánea determinística inválida.')
+    require('fecha real de ejecución' in missing and 'listado de participantes vinculado' in missing and 'evidencias auténticas' in missing,'El borrador incompleto ocultó faltantes.')
     db.close()
     print('PASS test_salud_tematicas_phase1_v1 (fixture textual; prueba visual real NO VERIFICADA)')
 

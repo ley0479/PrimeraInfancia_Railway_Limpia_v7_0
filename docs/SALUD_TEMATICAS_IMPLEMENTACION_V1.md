@@ -23,6 +23,9 @@ Fase 0 auditada y Fase 1 iniciada de forma aditiva. No se realizó despliegue pr
 - Publicar exige periodo `AAAA-MM`, al menos una unidad activa de Base Maestra y confirmación explícita.
 - La publicación es idempotente por tema, versión, periodo y unidad. No crea actividad, fecha, asistencia, evidencia, resultado ni aprobación de informe.
 - Una planeación confirmada reutiliza Salud Integral, admite varios temas por actividad y no agrega participantes. Sin día queda `SIN_PROGRAMAR`; con fecha crea un único enlace idempotente al Calendario.
+- El informe usa una instantánea con hash de actividad, temas, asistencia y evidencias. La misma versión no se duplica; los cambios generan otra versión.
+- Si faltan fecha real, metodología, resultados reportados, temas, listado o evidencias exigibles, se genera únicamente `BORRADOR_INCOMPLETO`.
+- Aprobar requiere completitud y acción explícita de coordinación. Un informe aprobado queda congelado.
 - El año de una referencia normativa no se transforma en fecha operativa y su vigencia no se certifica.
 - La revisión usa un número de revisión; un editor desactualizado recibe conflicto HTTP 409.
 
