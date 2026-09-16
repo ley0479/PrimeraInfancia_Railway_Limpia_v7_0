@@ -37,6 +37,24 @@ def _walk_table(table, values: dict[str,str]) -> int:
     return changes
 
 
+def _apply_cell_mapping(document, mappings: list[dict], values: dict[str,str]) -> int:
+    changes=0
+    for field in mappings or []:
+        if field.get("target_type") != "table_cell" or field.get("status") not in {"APROBADO","CONFIRMADO"}:
+            continue
+        key=str(field.get("field_key") or ""); value=str(values.get(key) or "")
+        if not value: continue
+        try: cell=document.tables[int(field["table"])].cell(int(field["row"]),int(field["column"]))
+        except (IndexError,KeyError,TypeError,ValueError):
+            raise ValueError(f"El mapeo aprobado de {key} no coincide con la plantilla.")
+        if field.get("mode") == "replace": cell.text=value
+        else:
+            paragraph=cell.paragraphs[-1] if cell.paragraphs else cell.add_paragraph()
+            paragraph.add_run(("\n" if paragraph.text else "")+value)
+        changes+=1
+    return changes
+
+
 def build_docx(template_path: Path, output_path: Path, context: dict, narrative: str = "") -> dict:
     from docx import Document
     if template_path.suffix.lower() != ".docx": raise ValueError("La generación Word requiere una plantilla DOCX aprobada.")
@@ -46,6 +64,10 @@ def build_docx(template_path: Path, output_path: Path, context: dict, narrative:
         "fundacion.nombre":context.get("fundacion_nombre", ""), "uds.nombre":context.get("uds", ""),
         "actividad.tema":context.get("tema", ""), "actividad.fecha":context.get("fecha", ""),
         "actividad.responsable":context.get("responsable", ""), "documento.narrativa":narrative,
+        "actividad.hora_inicio":context.get("hora_inicio", ""), "actividad.hora_fin":context.get("hora_fin", ""),
+        "actividad.lugar":context.get("lugar", ""), "actividad.objetivo":context.get("objetivo", ""),
+        "actividad.agenda":context.get("agenda", ""), "actividad.compromisos":context.get("compromisos", ""),
+        "actividad.compromiso_responsables":context.get("compromiso_responsables", ""),
     }
     changes=0
     for paragraph in document.paragraphs: changes+=int(_replace_in_paragraph(paragraph,values))
@@ -54,6 +76,7 @@ def build_docx(template_path: Path, output_path: Path, context: dict, narrative:
         for paragraph in section.header.paragraphs: changes+=int(_replace_in_paragraph(paragraph,values))
         for table in section.header.tables: changes+=_walk_table(table,values)
         for paragraph in section.footer.paragraphs: changes+=int(_replace_in_paragraph(paragraph,values))
+    changes+=_apply_cell_mapping(document,context.get("mapeo_campos") or [],values)
     if narrative and not any(token in context.get("mapped_fields",[]) for token in ("documento.narrativa","actividad.descripcion")) and changes==0:
         document.add_page_break(); document.add_heading("Continuación",level=1); document.add_paragraph(narrative)
     output_path.parent.mkdir(parents=True,exist_ok=True); document.save(str(output_path))

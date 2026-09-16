@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import zipfile
+import unicodedata
 
 
 def inspect_template(path: Path) -> dict:
@@ -37,7 +38,40 @@ def _inspect_docx(path: Path) -> dict:
         "secciones": sections, "imagenes": len(document.inline_shapes),
         "solo_imagen": bool(document.inline_shapes and not document.tables and not any(p.text.strip() for p in document.paragraphs)),
         "estructura_editable_detectada": editable,
+        "campos_detectados": _detect_docx_fields(document),
     }
+
+
+def _label(value: str) -> str:
+    text=unicodedata.normalize("NFKD",str(value or "").lower())
+    return " ".join("".join(c for c in text if not unicodedata.combining(c)).replace(":"," ").split())
+
+
+def _detect_docx_fields(document) -> list[dict]:
+    # Only recognized institutional labels are persisted. Arbitrary cell text
+    # (which may contain personal data in a filled document) is never returned.
+    labels=(
+        ("fecha","actividad.fecha"),("hora de inicio","actividad.hora_inicio"),("hora final","actividad.hora_fin"),
+        ("lugar","actividad.lugar"),("unidad de servicio-uca","uds.nombre"),
+        ("nombre del responsable","actividad.responsable"),("tema o actividad","actividad.tema"),
+        ("objetivo","actividad.objetivo"),("agenda","actividad.agenda"),("desarrollo","documento.narrativa"),
+        ("compromisos","actividad.compromisos"),("responsables","actividad.compromiso_responsables"),
+    )
+    found=[]; seen=set()
+    for table_index,table in enumerate(document.tables):
+        for row_index,row in enumerate(table.rows):
+            unique=[]
+            for column_index,cell in enumerate(row.cells):
+                marker=id(cell._tc)
+                if marker not in {x[0] for x in unique}: unique.append((marker,column_index,cell))
+            for _,column_index,cell in unique:
+                normalized=_label(cell.text)
+                for expected,key in labels:
+                    if normalized==expected or normalized.startswith(expected+" "):
+                        if key not in seen:
+                            found.append({"field_key":key,"target_type":"table_cell","table":table_index,"row":row_index,"column":column_index,"mode":"append_after_label","status":"REQUIERE_REVISION"}); seen.add(key)
+                        break
+    return found
 
 
 def _inspect_xlsx(path: Path) -> dict:
@@ -78,4 +112,4 @@ def propose_mapping(inspection: dict) -> dict:
         candidates = [{"target_type": "sheet", "target_location": f"hoja:{s['nombre']}", "status": "REQUIERE_REVISION"} for s in inspection.get("hojas", [])]
     else:
         candidates = [{"target_type": "page", "target_location": f"pagina:{p['numero']}", "status": "REQUIERE_REVISION"} for p in inspection.get("paginas", [])]
-    return {"estado": "PROPUESTO", "campos": [], "zonas_detectadas": candidates, "requiere_aprobacion": True}
+    return {"estado": "PROPUESTO", "campos": inspection.get("campos_detectados", []), "zonas_detectadas": candidates, "requiere_aprobacion": True}
