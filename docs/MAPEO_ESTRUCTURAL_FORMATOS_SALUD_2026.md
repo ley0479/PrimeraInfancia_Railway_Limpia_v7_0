@@ -18,7 +18,7 @@ La inspección fue de solo lectura y registró únicamente estructura (tablas, s
 
 ## Decisión de integración
 
-El Centro Documental existente es el registro canónico de plantillas. La plantilla limpia del informe debe cargarse con código y tipo `INFORME_SALUD_NUTRICION`, revisar su mapeo y aprobarse explícitamente. Un acta ya diligenciada no es una plantilla aprobable porque podría conservar datos personales y evidencias previas.
+El Centro Documental existente es el registro canónico de plantillas. Las plantillas limpias deben cargarse con código/tipo `ACTA_SALUD_NUTRICION` o `INFORME_SALUD_NUTRICION`, revisar su mapeo y aprobarse explícitamente. Un acta ya diligenciada no es una plantilla aprobable porque podría conservar datos personales y evidencias previas.
 
 Mientras no exista una plantilla limpia aprobada y un mapeo confirmado, el módulo puede producir únicamente un borrador interno trazable. La API informa de forma explícita `FORMATO_INTERNO`; no lo declara institucional.
 
@@ -27,6 +27,8 @@ Mientras no exista una plantilla limpia aprobada y un mapeo confirmado, el módu
 Se localizó `Desktop/2026/formato para suvir/FORMATO ACTA DE GRUPAL 2026.docx`. La inspección encontró una tabla principal 12×5, dos bloques fotográficos 2×2, cero imágenes diligenciadas y los siguientes doce campos reconocibles: fecha, hora inicial, hora final, lugar, unidad, responsable, tema, objetivo, agenda, desarrollo, compromisos y responsables de compromisos.
 
 El Motor Documental detecta ahora esos campos sin persistir texto libre y propone coordenadas de celda en estado `REQUIERE_REVISION`. Solamente un mapeo marcado `APROBADO` o `CONFIRMADO` puede escribir valores. La prueba con datos sintéticos verificó los doce campos por separado y una copia combinada conservando el original intacto. La comparación visual de paginación continúa pendiente.
+
+El generador de actividades consulta esas versiones aprobadas por fundación. Si encuentra `ACTA_SALUD_NUTRICION` o `INFORME_SALUD_NUTRICION`, genera una copia DOCX y registra en el producto el código y la versión usados. Si no existe la plantilla correspondiente, conserva el PDF interno y devuelve una advertencia; nunca lo etiqueta como institucional.
 
 ## Pendientes verificables
 

@@ -29,6 +29,7 @@ from werkzeug.utils import secure_filename
 from modules.seguridad.services import require_roles
 from modules.seguridad.tenant_context import tenant_storage_root
 from modules.operational_jobs import start_job
+from modules.centro_documental.document_builder_service import build_docx
 
 from .schema import INTEGRAL_SCHEMA_SQL
 from .services import now_iso
@@ -785,6 +786,7 @@ class SaludNutricionIntegralService:
         folder = self._tenant_dir(fundacion_id, "documentos")
         token = datetime.now().strftime("%Y%m%d_%H%M%S")
         output: list[dict[str, Any]] = []
+        warnings: list[str] = []
         for raw in types:
             kind = _norm(raw)
             if kind == "LISTADO_ASISTENCIA":
@@ -792,13 +794,57 @@ class SaludNutricionIntegralService:
                 self._write_attendance(path, detail)
                 mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             elif kind in {"ACTA", "INFORME"}:
+                official=self._approved_activity_template(fundacion_id,kind)
+                if official:
+                    path=folder/f"{kind.lower()}_salud_{activity_id}_{token}.docx"
+                    context=self._activity_template_context(detail,official["mapping"])
+                    build_docx(Path(official["ruta_privada"]),path,context,context["narrativa"])
+                    output.append(self._store_product(fundacion_id,path,kind,user,activity_id=activity_id,template_code=official["codigo"],template_version=official["version"]))
+                    continue
                 path = folder / f"{kind.lower()}_salud_{activity_id}_{token}.pdf"
                 self._write_activity_pdf(path, detail, kind)
                 mime = "application/pdf"
+                warnings.append(f"{kind}: no existe plantilla DOCX limpia, mapeada y aprobada; se generó formato interno.")
             else:
                 continue
             output.append(self._store_product(fundacion_id, path, kind, user, activity_id=activity_id, template_code=f"SN-{kind}", template_version="INTERNA-1"))
-        return {"documentos": output}
+        return {"documentos": output,"advertencias":warnings}
+
+    def _approved_activity_template(self, fundacion_id: int, kind: str) -> dict[str, Any] | None:
+        code=f"{kind}_SALUD_NUTRICION"
+        try:
+            row=self.repo.fetch_one('''SELECT v.id,v.version,v.ruta_privada,v.extension,p.codigo,m.mapa_json
+              FROM doc_plantilla_versiones v JOIN doc_plantillas p ON p.id=v.plantilla_id
+              JOIN doc_mapeos m ON m.plantilla_version_id=v.id AND m.fundacion_id=? AND m.estado='APROBADO'
+              WHERE v.fundacion_id=? AND v.estado IN ('APROBADA','ACTIVA') AND v.extension='.docx'
+                AND (UPPER(p.codigo)=? OR UPPER(p.tipo_documento)=?)
+              ORDER BY v.id DESC,m.version DESC LIMIT 1''',(fundacion_id,fundacion_id,code,code))
+        except Exception:
+            return None
+        if not row or not Path(row.get("ruta_privada") or "").is_file(): return None
+        try: mapping=json.loads(row.get("mapa_json") or "{}")
+        except (TypeError,ValueError): return None
+        fields=mapping.get("campos") or []
+        if not fields: return None
+        return {**row,"mapping":fields}
+
+    @staticmethod
+    def _activity_template_context(detail: dict[str, Any], mapping: list[dict]) -> dict[str, Any]:
+        activity=detail.get("actividad") or {}
+        narrative_parts=[]
+        for label,key in (("Metodología realizada","metodologia"),("Resultados reportados por el responsable","resultados"),("Conclusiones profesionales","conclusiones_profesionales")):
+            value=str(activity.get(key) or "").strip()
+            if value: narrative_parts.append(f"{label}: {value}")
+        return {
+            "fecha":activity.get("fecha_ejecucion") or activity.get("fecha_programada") or "",
+            "hora_inicio":activity.get("hora_inicio") or "","hora_fin":activity.get("hora_fin") or "",
+            "lugar":activity.get("lugar") or "","uds":activity.get("unidad_nombre") or "",
+            "responsable":activity.get("responsable_nombre") or "","tema":activity.get("titulo") or "",
+            "objetivo":activity.get("objetivo") or "","agenda":activity.get("titulo") or "",
+            "compromisos":activity.get("compromisos_generales") or "",
+            "narrativa":"\n\n".join(narrative_parts),"mapeo_campos":mapping,
+            "mapped_fields":[item.get("field_key") for item in mapping],
+        }
 
     def generate_capture(self, fundacion_id: int, user: dict[str, Any], unit: str | None = None, period: str | None = None, formats: Iterable[str] = ("XLSX", "PDF")) -> dict[str, Any]:
         if unit:
@@ -850,7 +896,7 @@ class SaludNutricionIntegralService:
             )
             product_id = int(cur.lastrowid)
             conn.commit()
-        return {"id": product_id, "tipo_producto": kind, "nombre_archivo": path.name, "mime_type": mime, "tamano_bytes": path.stat().st_size, "sha256": digest, "estado": "BORRADOR", "fecha_generacion": now}
+        return {"id": product_id, "tipo_producto": kind, "nombre_archivo": path.name, "mime_type": mime, "tamano_bytes": path.stat().st_size, "sha256": digest, "estado": "BORRADOR", "fecha_generacion": now,"plantilla_codigo":template_code,"plantilla_version":template_version}
 
     def product_path(self, fundacion_id: int, product_id: int) -> tuple[Path, str, str] | None:
         row = self.repo.fetch_one("SELECT * FROM sn_productos_actividad WHERE fundacion_id=? AND id=? AND activo=1", (fundacion_id, product_id))

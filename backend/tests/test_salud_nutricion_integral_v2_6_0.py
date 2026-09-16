@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import sqlite3, sys, tempfile, types
+import json, sqlite3, sys, tempfile, types
 from contextlib import closing
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; BACKEND=ROOT/'backend'; sys.path.insert(0,str(BACKEND))
@@ -17,6 +17,8 @@ security=types.ModuleType('modules.seguridad.services'); security.require_roles=
 tenant=types.ModuleType('modules.seguridad.tenant_context'); tenant.tenant_storage_root=lambda base,fid: Path(base)/'tenants'/str(fid); tenant.current_tenant_context=lambda: types.SimpleNamespace(tenant_id=None,allow_global=True,role='SYSTEM',username='test'); tenant.capture_tenant_context=tenant.current_tenant_context; tenant.tenant_context=lambda *a,**k: __import__('contextlib').nullcontext(); tenant.strict_tenant_mode=lambda: False; tenant.current_tenant_id=lambda default=None: default; tenant.tenant_path=lambda path,*parts: str(Path(path).joinpath(*parts)); tenant.resolve_tenant_path=tenant.tenant_path; sys.modules['modules.seguridad.tenant_context']=tenant
 from modules.salud_nutricion.integral import SaludNutricionIntegralService
 from modules.salud_nutricion.schema import SCHEMA_SQL
+from modules.centro_documental.template_inspector_service import inspect_template,propose_mapping
+from docx import Document
 class TestConnection(sqlite3.Connection):
     def __exit__(self, exc_type, exc, tb):
         try: return super().__exit__(exc_type, exc, tb)
@@ -71,8 +73,22 @@ with tempfile.TemporaryDirectory() as td:
     products=service.generate_capture(1,user,'UCA A','2026-08',('XLSX','PDF'))
     req(products['total_registros']==1 and len(products['productos'])==2,'CAPTURE no se generó')
     act=service.create_activity(1,{'unidad_nombre':'UCA A','linea_componente':'L2_EDUCACION_SALUD_ALIMENTARIA','tipo_actividad':'JORNADA','titulo':'Alimentación saludable','fecha_programada':'2026-08-10','participantes':[{'documento':'DOC-1','nombre_completo':'Ana Prueba'}]},user)
+    template=base/'acta_salud.docx'; template_doc=Document(); template_table=template_doc.add_table(rows=3,cols=2)
+    template_table.cell(0,0).text='Fecha:'; template_table.cell(1,0).text='UNIDAD DE SERVICIO-UCA:'; template_table.cell(2,0).text='DESARROLLO'; template_doc.save(template)
+    mapping=propose_mapping(inspect_template(template)); mapping['campos']=[{**x,'status':'APROBADO'} for x in mapping['campos']]
+    with closing(repo.connect()) as c:
+      with c:
+        c.executescript('''CREATE TABLE doc_plantillas(id INTEGER PRIMARY KEY,fundacion_id INTEGER,scope TEXT,codigo TEXT,tipo_documento TEXT);
+        CREATE TABLE doc_plantilla_versiones(id INTEGER PRIMARY KEY,plantilla_id INTEGER,fundacion_id INTEGER,version TEXT,ruta_privada TEXT,extension TEXT,estado TEXT);
+        CREATE TABLE doc_mapeos(id INTEGER PRIMARY KEY,plantilla_version_id INTEGER,fundacion_id INTEGER,version INTEGER,estado TEXT,mapa_json TEXT);''')
+        c.execute("INSERT INTO doc_plantillas VALUES(1,1,'FUNDACION','ACTA_SALUD_NUTRICION','ACTA_SALUD_NUTRICION')")
+        c.execute("INSERT INTO doc_plantilla_versiones VALUES(1,1,1,'2026.1',?,'.docx','APROBADA')",(str(template),))
+        c.execute("INSERT INTO doc_mapeos VALUES(1,1,1,1,'APROBADO',?)",(json.dumps(mapping,ensure_ascii=False),))
     docs=service.prepare_activity_documents(1,act['actividad']['id'],user,('ACTA','LISTADO_ASISTENCIA','INFORME'))
     req(len(docs['documentos'])==3,'productos actividad incompletos')
+    acta_product=repo.fetch_one("SELECT * FROM sn_productos_actividad WHERE fundacion_id=1 AND actividad_id=? AND tipo_producto='ACTA'",(act['actividad']['id'],))
+    req(acta_product['plantilla_codigo']=='ACTA_SALUD_NUTRICION' and acta_product['nombre_archivo'].endswith('.docx'),'no usó la plantilla institucional aprobada para el acta')
+    req(len(docs['advertencias'])==1 and docs['advertencias'][0].startswith('INFORME:'),'no distinguió el informe interno sin plantilla')
     period=service.save_monthly_period(1,{'anio_mes':'2026-08','temas':['Lactancia materna'],'variables':{'jornadas_desparasitacion':2}},user)
     req(period['estado']=='BORRADOR' and period['variables']['jornadas_desparasitacion']==2,'periodo mensual no se guardo')
     approved=service.approve_monthly_period(1,period['id'],user)

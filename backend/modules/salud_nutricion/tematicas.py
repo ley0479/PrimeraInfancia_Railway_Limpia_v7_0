@@ -125,10 +125,11 @@ def _approved_health_template(repo, tenant):
     try:
         return repo.fetch_one('''SELECT v.id plantilla_version_id,v.version,p.codigo,p.nombre,p.tipo_documento
           FROM doc_plantilla_versiones v JOIN doc_plantillas p ON p.id=v.plantilla_id
+          JOIN doc_mapeos m ON m.plantilla_version_id=v.id AND m.estado='APROBADO' AND m.fundacion_id=?
           WHERE (v.fundacion_id=? OR (v.fundacion_id IS NULL AND p.scope='GLOBAL'))
             AND v.estado IN ('APROBADA','ACTIVA')
             AND (UPPER(p.tipo_documento)='INFORME_SALUD_NUTRICION' OR UPPER(p.codigo)='INFORME_SALUD_NUTRICION')
-          ORDER BY CASE WHEN v.fundacion_id=? THEN 0 ELSE 1 END,v.id DESC LIMIT 1''',(tenant,tenant))
+          ORDER BY CASE WHEN v.fundacion_id=? THEN 0 ELSE 1 END,v.id DESC,m.version DESC LIMIT 1''',(tenant,tenant,tenant))
     except Exception:
         return None
 
@@ -405,7 +406,8 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         if not product:return jsonify({'error':'El generador no produjo un archivo verificable.'}),500
         latest=repo.fetch_one('SELECT COALESCE(MAX(version),0) version FROM sn_informes_tematicos WHERE fundacion_id=? AND actividad_id=?',(tenant,activity_id)); version=int((latest or {}).get('version') or 0)+1; now=_now(); state='BORRADOR_INCOMPLETO' if missing else 'BORRADOR'
         report_id=repo.execute('''INSERT INTO sn_informes_tematicos(fundacion_id,actividad_id,version,snapshot_hash,snapshot_json,faltantes_json,estado,producto_id,disparador,creado_por,creado_en,actualizado_en) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',(tenant,activity_id,version,digest,json.dumps(snapshot,ensure_ascii=False,default=str),json.dumps(missing,ensure_ascii=False),state,product['id'],str(data.get('disparador') or 'MANUAL').upper(),user_id,now,now))
-        format_status={'institucional':False,'estado':'FORMATO_INTERNO','plantilla_aprobada':template,'advertencia':'La plantilla institucional aprobada está registrada, pero su renderizado temático aún requiere un mapeo confirmado.' if template else 'No hay una plantilla limpia aprobada con código INFORME_SALUD_NUTRICION.'}
+        institutional=bool(product.get('plantilla_codigo')=='INFORME_SALUD_NUTRICION' and product.get('plantilla_version'))
+        format_status={'institucional':institutional,'estado':'PLANTILLA_INSTITUCIONAL' if institutional else 'FORMATO_INTERNO','plantilla_aprobada':template,'advertencia':None if institutional else 'No hay una plantilla limpia y un mapeo aprobados con código INFORME_SALUD_NUTRICION.'}
         return jsonify({'message':'Borrador generado desde hechos registrados.' if not missing else 'BORRADOR INCOMPLETO generado sin inventar los campos faltantes.','informe':{'id':report_id,'version':version,'estado':state,'producto':product,'formato':format_status},'faltantes':missing}),201
 
     @bp.route('/tematicas/informes',methods=['GET'])

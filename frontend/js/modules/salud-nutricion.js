@@ -507,7 +507,7 @@ async function snTematicasGenerarInforme(activityId) {
 function snIntegralPrepararDocumentos(activityId) {
     snIntegralFetch(`/api/salud-nutricion/integral/actividades/${encodeURIComponent(activityId)}/documentos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipos: ['ACTA', 'LISTADO_ASISTENCIA', 'INFORME'] }) })
         .then((data) => {
-            snMensaje(data.message || 'Documentos preparados.', 'success');
+            snMensaje(`${data.message || 'Documentos preparados.'} ${(data.resultado?.advertencias || []).join(' ')}`, 'success');
             (data.resultado?.documentos || []).forEach((p) => window.descargarArchivoAutenticado(`${backendUrl}/api/salud-nutricion/integral/productos/${p.id}/descargar`).catch(() => {}));
             snIntegralCargarActividades();
         }).catch((error) => snMensaje(error.message, 'error'));
