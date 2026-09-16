@@ -15,6 +15,7 @@ from werkzeug.utils import secure_filename
 from .repository import SaludNutricionRepository
 from .integral import register_integral_routes
 from .entregables import EntregablesSaludNutricionService
+from .tematicas import register_tematicas_routes
 from .reportes import (
     generar_excel_comparacion,
     generar_pdf_comparacion,
@@ -61,12 +62,14 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
     entregables_service.init_schema()
     data_dir = os.environ.get('DATA_DIR') or os.path.dirname(os.path.abspath(upload_folder))
     integral_service = register_integral_routes(bp, repo, data_dir)
+    tematicas_service = register_tematicas_routes(bp, repo)
 
     @bp.before_request
     def _ensure_schema():
         repo.init_schema()
         entregables_service.init_schema()
         integral_service.init_schema()
+        tematicas_service.init_schema()
 
     @bp.route('/dashboard', methods=['GET'])
     def dashboard():

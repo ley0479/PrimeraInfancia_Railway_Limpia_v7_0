@@ -27,7 +27,7 @@ function snInit() {
 }
 
 function snMostrarVista(vista) {
-    ['dashboard', 'integral', 'jornadas', 'mensuales', 'actas', 'rutas', 'importar', 'cruce', 'historial', 'alertas', 'calendario', 'entregables'].forEach((id) => {
+    ['dashboard', 'integral', 'tematicas', 'jornadas', 'mensuales', 'actas', 'rutas', 'importar', 'cruce', 'historial', 'alertas', 'calendario', 'entregables'].forEach((id) => {
         const el = document.getElementById(`sn-view-${id}`);
         if (el) el.classList.toggle('hidden', id !== vista);
     });
@@ -38,6 +38,7 @@ function snMostrarVista(vista) {
     if (vista === 'alertas') snCargarAlertas();
     if (vista === 'calendario') snCargarCalendario();
     if (vista === 'integral') snIntegralCargar();
+    if (vista === 'tematicas') snTematicasCargar();
     if (vista === 'jornadas') snIntegralCargarActividades();
     if (vista === 'mensuales') snCargarPeriodosMensuales();
     if (vista === 'actas') snCargarActasInstitucionales();
@@ -489,6 +490,52 @@ function snIntegralPrepararDocumentos(activityId) {
             (data.resultado?.documentos || []).forEach((p) => window.descargarArchivoAutenticado(`${backendUrl}/api/salud-nutricion/integral/productos/${p.id}/descargar`).catch(() => {}));
             snIntegralCargarActividades();
         }).catch((error) => snMensaje(error.message, 'error'));
+}
+
+async function snTematicasRequest(path, options = {}) {
+    const response = await fetch(`${backendUrl}${path}`, { credentials: 'include', ...options });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'No fue posible completar la operación.');
+    return data;
+}
+
+async function snTematicasCargar() {
+    try {
+        const [materials, units] = await Promise.all([
+            snTematicasRequest('/api/salud-nutricion/tematicas/materiales'),
+            snTematicasRequest('/api/salud-nutricion/tematicas/unidades')
+        ]);
+        snEstado.tematicas = materials.materiales || [];
+        const unitBox = document.getElementById('sn-theme-units');
+        if (unitBox) unitBox.innerHTML = (units.unidades || []).map((u) => `<label class="flex gap-2"><input type="checkbox" value="${Number(u.id)}"><span>${escaparHtml(u.nombre || '')}</span></label>`).join('') || '<span class="text-amber-300">No hay unidades activas en Base Maestra.</span>';
+        const host = document.getElementById('sn-theme-materials');
+        if (!host) return;
+        host.innerHTML = snEstado.tematicas.length ? snEstado.tematicas.map((m) => `<article class="sn-card"><div class="flex flex-wrap justify-between gap-2"><div><strong>${escaparHtml(m.titulo_documento || '')}</strong><p class="text-xs text-slate-400">${escaparHtml(m.estado || '')} · ${escaparHtml(m.metodo_extraccion || '')}</p></div><a class="text-cyan-300" target="_blank" href="${backendUrl}/api/idp/documentos/${Number(m.idp_documento_id)}/vista-previa">Ver original</a></div><div class="mt-3 grid gap-3">${(m.temas || []).map((t) => `<div class="rounded-xl border border-slate-700 p-3"><label class="text-xs text-slate-400">Título extraído</label><p>${escaparHtml(t.titulo_original || '')}</p><label class="mt-2 block text-xs text-slate-400">Denominación normalizada propuesta</label><input class="sn-ent-input w-full" value="${escaparHtml(t.titulo_normalizado || '')}" onchange="snTematicaEditar(${Number(t.id)},${Number(t.revision)},this.value)"><p class="mt-2 text-xs text-slate-500">Procedencia: ${escaparHtml(JSON.stringify(t.procedencia || {}))}</p></div>`).join('') || '<p class="text-amber-300">Sin contenido temático identificado.</p>'}</div><button class="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm" onclick="snTematicasPublicar(${Number(m.id)})">Revisar alcance y publicar</button></article>`).join('') : '<p class="text-slate-400">Aún no hay materiales temáticos.</p>';
+    } catch (error) { snMensaje(error.message, 'error'); }
+}
+
+async function snTematicasExtraer() {
+    const documentoId = Number(document.getElementById('sn-theme-document-id')?.value || 0);
+    const periodo = document.getElementById('sn-theme-period')?.value || null;
+    if (!documentoId) return snMensaje('Indica el ID del material cargado en Motor Documental.', 'error');
+    try {
+        const data = await snTematicasRequest('/api/salud-nutricion/tematicas/extraer', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({documento_id:documentoId,periodo}) });
+        snMensaje(data.message, 'success'); await snTematicasCargar();
+    } catch (error) { snMensaje(error.message, 'error'); }
+}
+
+async function snTematicaEditar(id, revision, value) {
+    try { await snTematicasRequest(`/api/salud-nutricion/tematicas/temas/${id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,titulo_normalizado:value,motivo:'Revisión profesional'})}); snMensaje('Corrección guardada con trazabilidad.','success'); await snTematicasCargar(); }
+    catch (error) { snMensaje(error.message,'error'); await snTematicasCargar(); }
+}
+
+async function snTematicasPublicar(materialId) {
+    const periodo = document.getElementById('sn-theme-period')?.value || '';
+    const unidad_ids = [...document.querySelectorAll('#sn-theme-units input:checked')].map((x) => Number(x.value));
+    if (!periodo || !unidad_ids.length) return snMensaje('Confirma el periodo y al menos una unidad.', 'error');
+    if (!window.confirm(`Publicar las temáticas en ${unidad_ids.length} unidad(es) para ${periodo}. Esto no registra ejecución ni asistentes. ¿Continuar?`)) return;
+    try { const data=await snTematicasRequest(`/api/salud-nutricion/tematicas/materiales/${materialId}/publicar`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({periodo,unidad_ids,confirmar:true})}); snMensaje(data.message,'success'); await snTematicasCargar(); }
+    catch(error){ snMensaje(error.message,'error'); }
 }
 
 function snLineas(id) {

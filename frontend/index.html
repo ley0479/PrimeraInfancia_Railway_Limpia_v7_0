@@ -2337,6 +2337,7 @@
                             <div class="flex flex-wrap gap-2">
                                 <button data-help-id="salud-nutricion.tab.dashboard" onclick="snMostrarVista('dashboard')" class="sn-tab active" data-sn-tab="dashboard">Dashboard</button>
                                 <button data-help-id="salud-nutricion.tab.integral" onclick="snMostrarVista('integral')" class="sn-tab" data-sn-tab="integral">Expediente Integral</button>
+                                <button onclick="snMostrarVista('tematicas')" class="sn-tab" data-sn-tab="tematicas">Temáticas, actividades e informes</button>
                                 <button onclick="snMostrarVista('jornadas')" class="sn-tab" data-sn-tab="jornadas">Jornadas</button>
                                 <button onclick="snMostrarVista('mensuales')" class="sn-tab" data-sn-tab="mensuales">Informes mensuales</button>
                                 <button onclick="snMostrarVista('actas')" class="sn-tab" data-sn-tab="actas">Actas</button>
@@ -2441,6 +2442,20 @@
                             <div class="mt-4 flex flex-wrap gap-2"><button onclick="snIntegralCrearActividad()" class="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Crear y convocar UCA</button><button onclick="snIntegralCargarActividades()" class="rounded-xl bg-cyan-600 hover:bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Actualizar jornadas</button></div>
                         </div>
                         <div class="sn-card overflow-x-auto"><table class="w-full text-left text-xs text-slate-400 sn-table"><thead><tr><th>Fecha</th><th>UCA</th><th>Línea</th><th>Actividad</th><th>Estado</th><th>Asistencia</th><th>Evidencias</th><th>Acciones</th></tr></thead><tbody id="sn-integral-actividades"><tr><td colspan="8" class="text-center text-slate-500">Sin jornadas registradas.</td></tr></tbody></table></div>
+                    </div>
+
+                    <div id="sn-view-tematicas" class="hidden space-y-6">
+                        <div class="sn-card">
+                            <h3 class="font-semibold text-lg">Material recibido y temáticas del periodo</h3>
+                            <p class="mt-2 text-sm text-slate-400">Carga primero el JPG, PNG o PDF en Motor Documental. Aquí se conserva el original, se revisa la extracción y se publica únicamente al periodo y unidades confirmados.</p>
+                            <div class="mt-4 grid gap-3 md:grid-cols-3">
+                                <label class="text-sm">ID del documento fuente<input id="sn-theme-document-id" type="number" min="1" class="sn-ent-input mt-1 w-full" placeholder="ID de Motor Documental"></label>
+                                <label class="text-sm">Periodo<input id="sn-theme-period" type="month" class="sn-ent-input mt-1 w-full"></label>
+                                <div class="flex items-end"><button onclick="snTematicasExtraer()" class="w-full rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white">Extraer para revisión</button></div>
+                            </div>
+                            <fieldset class="mt-4"><legend class="text-sm font-semibold">Unidades autorizadas (Base Maestra)</legend><div id="sn-theme-units" class="mt-2 grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-3"></div></fieldset>
+                        </div>
+                        <div class="grid gap-4 xl:grid-cols-2" id="sn-theme-materials"><p class="text-slate-400">Cargando materiales…</p></div>
                     </div>
 
                     <div id="sn-view-mensuales" class="hidden space-y-6">
