@@ -565,7 +565,7 @@
         throw new Error("La navegación segura no está disponible.");
       window.mostrarSeccion(action.module);
       if (action.module === "calendario-inteligente") {
-        const ready = await waitForElement("#ci-periodo");
+        const ready = await waitForElement('#ci-periodo');
         if (!ready)
           throw new Error("El calendario no confirmó que terminó de cargar.");
         if (action.period && typeof window.ciSetPeriodo === "function")
@@ -1577,7 +1577,7 @@
         add("liam", result.result.message);
         remember("assistant", result.result.message);
       }
-      if (d.name === "get_pending_activities_summary") {
+      if (d.name==='get_pending_activities_summary') {
         const query = result.result?.query || {};
         await runClientAction(
           {
