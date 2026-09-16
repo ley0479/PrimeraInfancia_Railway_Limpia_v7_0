@@ -30,6 +30,7 @@ ALLOWED_EVIDENCE_EXT = {'.png', '.jpg', '.jpeg', '.webp', '.pdf', '.doc', '.docx
 ENTREGABLES_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS sn_entregables_catalogo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER,
     codigo TEXT NOT NULL UNIQUE,
     nombre TEXT NOT NULL,
     descripcion TEXT,
@@ -79,6 +80,7 @@ CREATE TABLE IF NOT EXISTS sn_entregables_mes (
 CREATE TABLE IF NOT EXISTS sn_entregables_evidencias (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entregable_id INTEGER NOT NULL,
+    fundacion_id INTEGER DEFAULT 1,
     nombre_original TEXT,
     nombre_guardado TEXT,
     ruta_archivo TEXT NOT NULL,
@@ -96,6 +98,7 @@ CREATE TABLE IF NOT EXISTS sn_entregables_evidencias (
 CREATE TABLE IF NOT EXISTS sn_entregables_archivos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entregable_id INTEGER,
+    fundacion_id INTEGER DEFAULT 1,
     tipo TEXT NOT NULL,
     nombre_archivo TEXT NOT NULL,
     ruta_archivo TEXT NOT NULL,
@@ -109,6 +112,7 @@ CREATE TABLE IF NOT EXISTS sn_entregables_archivos (
 CREATE TABLE IF NOT EXISTS sn_entregables_validaciones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entregable_id INTEGER NOT NULL,
+    fundacion_id INTEGER DEFAULT 1,
     valido INTEGER DEFAULT 0,
     pendientes_json TEXT,
     resultado_json TEXT,
@@ -120,9 +124,36 @@ CREATE TABLE IF NOT EXISTS sn_entregables_validaciones (
 CREATE TABLE IF NOT EXISTS sn_entregables_observaciones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entregable_id INTEGER NOT NULL,
+    fundacion_id INTEGER DEFAULT 1,
     observacion TEXT NOT NULL,
     estado TEXT DEFAULT 'abierta',
     fecha_creacion TEXT,
+    usuario_id INTEGER,
+    FOREIGN KEY (entregable_id) REFERENCES sn_entregables_mes(id)
+);
+
+CREATE TABLE IF NOT EXISTS sn_entregables_actividades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entregable_id INTEGER NOT NULL,
+    fundacion_id INTEGER DEFAULT 1,
+    fecha_actividad TEXT NOT NULL,
+    hora_inicio TEXT,
+    hora_final TEXT,
+    lugar TEXT,
+    dirigido_a TEXT,
+    objetivo TEXT,
+    agenda_json TEXT,
+    desarrollo TEXT,
+    resultados TEXT,
+    compromisos TEXT,
+    dificultades TEXT,
+    acciones_mejora TEXT,
+    participantes_total INTEGER DEFAULT 0,
+    responsable TEXT,
+    confirmado INTEGER DEFAULT 0,
+    fecha_confirmacion TEXT,
+    fecha_creacion TEXT,
+    fecha_actualizacion TEXT,
     usuario_id INTEGER,
     FOREIGN KEY (entregable_id) REFERENCES sn_entregables_mes(id)
 );
@@ -131,14 +162,15 @@ CREATE INDEX IF NOT EXISTS idx_sn_entregables_mes_periodo ON sn_entregables_mes(
 CREATE INDEX IF NOT EXISTS idx_sn_entregables_mes_estado ON sn_entregables_mes(estado);
 CREATE INDEX IF NOT EXISTS idx_sn_entregables_evidencias_entregable ON sn_entregables_evidencias(entregable_id);
 CREATE INDEX IF NOT EXISTS idx_sn_entregables_archivos_entregable ON sn_entregables_archivos(entregable_id);
+CREATE INDEX IF NOT EXISTS idx_sn_entregables_actividades_entregable ON sn_entregables_actividades(entregable_id);
 """
 
 CATALOGO_BASE = [
     dict(codigo='E01_REGISTRO_NOVEDADES', nombre='Registro de novedades, articulaciones en salud y garantía de derechos',
          actividad='Acta de revisión de carpeta; identificación de garantías de derechos y canalizaciones.',
          evidencias='Acta de revisión, formato de novedades, oficio/correo de articulación y evidencias fotográficas.', acta=1, listado=0, fotos=1, oficio=1, excel=1, word=1),
-    dict(codigo='E02_AAVN', nombre='Preparación y consumo de AAVN',
-         actividad='Orientación a familias sobre preparación y consumo de AAVN.',
+    dict(codigo='E02_LAVADO_MANOS', nombre='Lavado de manos',
+         actividad='Promover con usuarios y familias la práctica correcta del lavado de manos.',
          evidencias='Acta, listado de asistencia y evidencias fotográficas.', acta=1, listado=1, fotos=1, oficio=0, excel=0, word=1),
     dict(codigo='E03_LACTANCIA', nombre='Lactancia materna / extracción de lactancia',
          actividad='Promover práctica de lactancia con gestantes, madres lactantes y familias.',
@@ -155,8 +187,8 @@ CATALOGO_BASE = [
     dict(codigo='E07_MONITOREO_DNT', nombre='Formato de monitoreo de signos de alarma DNT',
          actividad='Monitoreo semanal para DNT, riesgo de DNT y signos físicos.',
          evidencias='Formato Excel magnético y anexo físico en informe.', acta=0, listado=0, fotos=0, oficio=0, excel=1, word=0),
-    dict(codigo='E08_SOCIALIZACION_RPP', nombre='Socialización de minuta RPP',
-         actividad='Socialización de minuta de raciones alimentarias.',
+    dict(codigo='E08_CONCERTACION_MINUTA', nombre='Concertación de minuta RPP',
+         actividad='Concertar la minuta con las familias beneficiarias de la modalidad.',
          evidencias='Acta, listado de asistencia y evidencias fotográficas.', acta=1, listado=1, fotos=1, oficio=0, excel=0, word=1),
     dict(codigo='E09_CONTROL_CALIDAD', nombre='Control de calidad de raciones y alimentos',
          actividad='Verificación de raciones alimentarias, almacenamiento y entrega de RPP/Bienestarina.',
@@ -228,16 +260,42 @@ class EntregablesSaludNutricionService:
 
     def init_schema(self) -> None:
         self.repo.execute_script(ENTREGABLES_SCHEMA_SQL)
+        for table in (
+            'sn_entregables_catalogo', 'sn_entregables_mes', 'sn_entregables_evidencias',
+            'sn_entregables_archivos', 'sn_entregables_validaciones',
+            'sn_entregables_observaciones', 'sn_entregables_actividades',
+        ):
+            if self.repo.table_exists(table):
+                default = 'INTEGER' if table == 'sn_entregables_catalogo' else 'INTEGER DEFAULT 1'
+                self.repo.ensure_column(table, 'fundacion_id', default)
         self.seed_catalogo()
 
     def seed_catalogo(self) -> None:
-        existing = self.repo.fetch_one('SELECT COUNT(*) AS total FROM sn_entregables_catalogo') or {'total': 0}
-        if int(existing.get('total') or 0) >= 15:
-            return
         now = now_iso()
+        # Migración reversible de los dos nombres provisionales usados antes de
+        # recibir la matriz institucional de agosto de 2026. Se ejecuta antes
+        # del alta para conservar IDs y evitar duplicados en bases existentes.
+        aliases = {
+            'E02_AAVN': CATALOGO_BASE[1],
+            'E08_SOCIALIZACION_RPP': CATALOGO_BASE[7],
+        }
+        for old_code, item in aliases.items():
+            old = self.repo.fetch_one('SELECT id FROM sn_entregables_catalogo WHERE codigo = ?', (old_code,))
+            canonical = self.repo.fetch_one('SELECT id FROM sn_entregables_catalogo WHERE codigo = ?', (item['codigo'],))
+            if old and not canonical:
+                self.repo.execute(
+                    'UPDATE sn_entregables_catalogo SET codigo = ? WHERE id = ?',
+                    (item['codigo'], old['id']),
+                )
+                self.repo.execute(
+                    'UPDATE sn_entregables_mes SET codigo = ? WHERE catalogo_id = ?',
+                    (item['codigo'], old['id']),
+                )
+
         for idx, item in enumerate(CATALOGO_BASE, start=1):
             found = self.repo.fetch_one('SELECT id FROM sn_entregables_catalogo WHERE codigo = ?', (item['codigo'],))
             if found:
+                self._sync_catalog_item(int(found['id']), item, now)
                 continue
             self.repo.execute(
                 """
@@ -257,6 +315,25 @@ class EntregablesSaludNutricionService:
                     item['codigo'], 'ACTIVO', 'Catálogo base ALPHA51', now, now,
                 ),
             )
+
+    def _sync_catalog_item(self, catalog_id: int, item: dict[str, Any], now: str) -> None:
+        self.repo.execute(
+            """
+            UPDATE sn_entregables_catalogo
+               SET nombre = ?, descripcion = ?, actividad = ?, evidencias_requeridas = ?,
+                   requiere_acta = ?, requiere_listado = ?, requiere_fotos = ?, minimo_fotos = ?,
+                   requiere_oficio = ?, requiere_formato_excel = ?, requiere_word = ?,
+                   requiere_firma = ?, plantilla_asociada = ?, fecha_actualizacion = ?
+             WHERE id = ?
+            """,
+            (
+                item['nombre'], item.get('descripcion') or item['nombre'], item['actividad'], item['evidencias'],
+                item.get('acta', 0), item.get('listado', 0), item.get('fotos', 0),
+                4 if item.get('fotos', 0) else 0, item.get('oficio', 0), item.get('excel', 0),
+                item.get('word', 0), 1 if item.get('acta') or item.get('listado') else 0,
+                item['codigo'], now, catalog_id,
+            ),
+        )
 
     def catalogo(self) -> list[dict[str, Any]]:
         return self.repo.fetch_all('SELECT * FROM sn_entregables_catalogo ORDER BY id ASC')
@@ -326,6 +403,10 @@ class EntregablesSaludNutricionService:
                    (SELECT COUNT(*) FROM sn_entregables_archivos a
                      WHERE a.entregable_id = m.id
                        AND COALESCE(a.fundacion_id, 1) = {fundacion_id}) AS archivos_generados
+                   ,(SELECT COUNT(*) FROM sn_entregables_actividades x
+                     WHERE x.entregable_id = m.id
+                       AND COALESCE(x.fundacion_id, 1) = {fundacion_id}
+                       AND x.confirmado = 1) AS actividades_confirmadas
             FROM sn_entregables_mes m
             JOIN sn_entregables_catalogo c
               ON c.id = m.catalogo_id
@@ -360,7 +441,65 @@ class EntregablesSaludNutricionService:
         row['evidencias'] = self.repo.fetch_all('SELECT * FROM sn_entregables_evidencias WHERE entregable_id = ? ORDER BY id', (entregable_id,))
         row['archivos'] = self.repo.fetch_all('SELECT * FROM sn_entregables_archivos WHERE entregable_id = ? ORDER BY id DESC', (entregable_id,))
         row['validaciones'] = self.repo.fetch_all('SELECT * FROM sn_entregables_validaciones WHERE entregable_id = ? ORDER BY id DESC LIMIT 10', (entregable_id,))
+        row['actividades'] = self.listar_actividades(entregable_id)
         return row
+
+    def listar_actividades(self, entregable_id: int) -> list[dict[str, Any]]:
+        fundacion_id = int(current_tenant_id(1) or 1)
+        return self.repo.fetch_all(
+            """
+            SELECT * FROM sn_entregables_actividades
+             WHERE entregable_id = ? AND COALESCE(fundacion_id, 1) = ?
+             ORDER BY fecha_actividad ASC, id ASC
+            """,
+            (entregable_id, fundacion_id),
+        )
+
+    def guardar_actividad(self, entregable_id: int, payload: dict[str, Any], usuario_id: int | None = None) -> dict[str, Any]:
+        ent = self.detalle(entregable_id)
+        if not ent:
+            raise ValueError('Entregable no encontrado.')
+        fecha = str(payload.get('fecha_actividad') or '').strip()
+        objetivo = str(payload.get('objetivo') or '').strip()
+        desarrollo = str(payload.get('desarrollo') or '').strip()
+        responsable = str(payload.get('responsable') or ent.get('responsable') or '').strip()
+        confirmado = 1 if str(payload.get('confirmado') or '').lower() in {'1', 'true', 'si', 'sí', 'on'} else 0
+        if not fecha:
+            raise ValueError('La fecha de la actividad es obligatoria.')
+        if confirmado and (not objetivo or not desarrollo or not responsable):
+            raise ValueError('Para confirmar la actividad se requieren objetivo, desarrollo y responsable.')
+        agenda = payload.get('agenda') or []
+        if isinstance(agenda, str):
+            agenda = [line.strip() for line in agenda.splitlines() if line.strip()]
+        now = now_iso()
+        activity_id = self.repo.execute(
+            """
+            INSERT INTO sn_entregables_actividades
+            (entregable_id, fundacion_id, fecha_actividad, hora_inicio, hora_final, lugar, dirigido_a,
+             objetivo, agenda_json, desarrollo, resultados, compromisos, dificultades, acciones_mejora,
+             participantes_total, responsable, confirmado, fecha_confirmacion, fecha_creacion,
+             fecha_actualizacion, usuario_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entregable_id, int(current_tenant_id(1) or 1), fecha,
+                str(payload.get('hora_inicio') or '').strip(), str(payload.get('hora_final') or '').strip(),
+                str(payload.get('lugar') or ent.get('uds') or '').strip(), str(payload.get('dirigido_a') or '').strip(),
+                objetivo, json.dumps(agenda, ensure_ascii=False), desarrollo,
+                str(payload.get('resultados') or '').strip(), str(payload.get('compromisos') or '').strip(),
+                str(payload.get('dificultades') or '').strip(), str(payload.get('acciones_mejora') or '').strip(),
+                max(0, int(payload.get('participantes_total') or 0)), responsable, confirmado,
+                now if confirmado else None, now, now, usuario_id,
+            ),
+        )
+        if not activity_id:
+            latest = self.repo.fetch_one(
+                'SELECT id FROM sn_entregables_actividades WHERE entregable_id = ? ORDER BY id DESC LIMIT 1',
+                (entregable_id,),
+            ) or {}
+            activity_id = int(latest.get('id') or 0)
+        self._touch(entregable_id, 'en proceso')
+        return {'id': activity_id, 'confirmado': bool(confirmado), 'fecha_actividad': fecha}
 
     def _resumen(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         total = len(rows)
@@ -379,6 +518,7 @@ class EntregablesSaludNutricionService:
             'observados': observados,
             'fotos_faltantes': fotos_faltantes,
             'porcentaje': round((completos / total) * 100, 1) if total else 0,
+            'actividades_confirmadas': sum(int(r.get('actividades_confirmadas') or 0) for r in rows),
         }
 
     def obtener_usuarios_base(self, uds: str | None = None, limit: int = 2000) -> list[dict[str, Any]]:
@@ -429,11 +569,11 @@ class EntregablesSaludNutricionService:
         evidencia_id = self.repo.execute(
             """
             INSERT INTO sn_entregables_evidencias
-            (entregable_id, nombre_original, nombre_guardado, ruta_archivo, tipo, actividad, fecha_actividad,
+            (entregable_id, fundacion_id, nombre_original, nombre_guardado, ruta_archivo, tipo, actividad, fecha_actividad,
              uds, responsable, observaciones, fecha_carga, usuario_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (entregable_id, nombre_original, nombre_guardado, str(ruta), 'evidencia', actividad, fecha, uds,
+            (entregable_id, int(current_tenant_id(1) or 1), nombre_original, nombre_guardado, str(ruta), 'evidencia', actividad, fecha, uds,
              meta.get('responsable') or ent.get('responsable'), meta.get('observaciones') or '', now_iso(), meta.get('usuario_id')),
         )
         if not evidencia_id:
@@ -449,7 +589,11 @@ class EntregablesSaludNutricionService:
         pendientes = []
         archivos = ent.get('archivos') or []
         evidencias = ent.get('evidencias') or []
+        actividades = ent.get('actividades') or []
+        confirmadas = [a for a in actividades if int(a.get('confirmado') or 0) == 1]
         tipos = {a.get('tipo') for a in archivos}
+        if (int(ent.get('requiere_acta') or 0) or int(ent.get('requiere_listado') or 0)) and not confirmadas:
+            pendientes.append('Falta registrar y confirmar la actividad realizada.')
         if int(ent.get('requiere_acta') or 0) and 'acta' not in tipos:
             pendientes.append('Falta acta generada.')
         if int(ent.get('requiere_listado') or 0) and 'listado' not in tipos:
@@ -464,10 +608,13 @@ class EntregablesSaludNutricionService:
                 pendientes.append(f'Faltan evidencias fotográficas: {len(evidencias)}/{minimo}.')
         valido = not pendientes
         estado = 'completo' if valido else 'pendiente'
-        resultado = {'valido': valido, 'pendientes': pendientes, 'evidencias': len(evidencias), 'archivos': len(archivos)}
+        resultado = {
+            'valido': valido, 'pendientes': pendientes, 'evidencias': len(evidencias),
+            'archivos': len(archivos), 'actividades_confirmadas': len(confirmadas),
+        }
         self.repo.execute(
-            'INSERT INTO sn_entregables_validaciones (entregable_id, valido, pendientes_json, resultado_json, fecha_validacion, usuario_id) VALUES (?, ?, ?, ?, ?, ?)',
-            (entregable_id, 1 if valido else 0, json.dumps(pendientes, ensure_ascii=False), json.dumps(resultado, ensure_ascii=False), now_iso(), usuario_id),
+            'INSERT INTO sn_entregables_validaciones (entregable_id, fundacion_id, valido, pendientes_json, resultado_json, fecha_validacion, usuario_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (entregable_id, int(current_tenant_id(1) or 1), 1 if valido else 0, json.dumps(pendientes, ensure_ascii=False), json.dumps(resultado, ensure_ascii=False), now_iso(), usuario_id),
         )
         self._touch(entregable_id, estado, 100 if valido else None)
         return resultado
@@ -477,14 +624,44 @@ class EntregablesSaludNutricionService:
         if not ent:
             raise ValueError('Entregable no encontrado.')
         usuarios = self.obtener_usuarios_base(ent.get('uds'), limit=80)
+        actividades = [a for a in (ent.get('actividades') or []) if int(a.get('confirmado') or 0) == 1]
+        if not actividades:
+            raise ValueError('Registre y confirme al menos una actividad antes de generar el acta.')
         path = self._document_path(ent, 'ACTA', '.docx')
         doc = Document()
-        doc.add_heading('ACTA DE ENTREGABLE SALUD Y NUTRICIÓN', 0)
+        doc.add_heading('ACTA DE REUNIONES', 0)
         self._add_doc_context(doc, ent)
         doc.add_heading(ent.get('nombre') or '', level=1)
         doc.add_paragraph(f"Actividad: {ent.get('actividad') or ''}")
-        doc.add_paragraph(f"Objetivo: dar cumplimiento al entregable del componente Salud y Nutrición para {_month_name(int(ent.get('mes') or 1))} de {ent.get('anio')}.")
-        doc.add_paragraph('Desarrollo: se documenta la actividad, participantes, evidencias y compromisos asociados.')
+        for index, actividad in enumerate(actividades, start=1):
+            if len(actividades) > 1:
+                doc.add_heading(f'Actividad confirmada {index}', level=2)
+            horario = ' - '.join(filter(None, [str(actividad.get('hora_inicio') or ''), str(actividad.get('hora_final') or '')]))
+            doc.add_paragraph(f"Fecha: {actividad.get('fecha_actividad') or ''}")
+            if horario:
+                doc.add_paragraph(f"Horario: {horario}")
+            doc.add_paragraph(f"Lugar/UCA: {actividad.get('lugar') or ent.get('uds') or ''}")
+            doc.add_paragraph(f"Responsable: {actividad.get('responsable') or ent.get('responsable') or ''}")
+            if actividad.get('dirigido_a'):
+                doc.add_paragraph(f"Dirigido a: {actividad.get('dirigido_a')}")
+            doc.add_heading('Objetivo e intencionalidad', level=2)
+            doc.add_paragraph(str(actividad.get('objetivo') or ''))
+            agenda = self._json_list(actividad.get('agenda_json'))
+            if agenda:
+                doc.add_heading('Agenda', level=2)
+                for item in agenda:
+                    doc.add_paragraph(str(item), style='List Number')
+            doc.add_heading('Desarrollo de la actividad', level=2)
+            doc.add_paragraph(str(actividad.get('desarrollo') or ''))
+            if actividad.get('resultados'):
+                doc.add_heading('Resultados', level=2)
+                doc.add_paragraph(str(actividad.get('resultados')))
+            if actividad.get('dificultades'):
+                doc.add_heading('Dificultades identificadas', level=2)
+                doc.add_paragraph(str(actividad.get('dificultades')))
+            if actividad.get('acciones_mejora'):
+                doc.add_heading('Acciones de mejora', level=2)
+                doc.add_paragraph(str(actividad.get('acciones_mejora')))
         if usuarios:
             doc.add_heading('Participantes / usuarios relacionados', level=2)
             table = doc.add_table(rows=1, cols=4)
@@ -497,10 +674,15 @@ class EntregablesSaludNutricionService:
                 row[2].text = str(u.get('unidad') or ent.get('uds') or '')
                 row[3].text = str(u.get('diagnostico_nutricional') or u.get('estado') or '')
         doc.add_heading('Compromisos', level=2)
-        doc.add_paragraph('1. Revisar pendientes y cargar evidencias requeridas.\n2. Validar cierre del entregable en plataforma.')
+        compromisos = [str(a.get('compromisos') or '').strip() for a in actividades if str(a.get('compromisos') or '').strip()]
+        for item in compromisos:
+            doc.add_paragraph(item, style='List Bullet')
+        if not compromisos:
+            doc.add_paragraph('Sin compromisos adicionales registrados.')
+        self._add_evidence_annex(doc, ent.get('evidencias') or [])
         doc.add_paragraph('\nFirma responsable: ________________________________')
         doc.save(path)
-        return self._register_file(entregable_id, 'acta', path, usuario_id, {'usuarios': len(usuarios)})
+        return self._register_file(entregable_id, 'acta', path, usuario_id, {'usuarios': len(usuarios), 'actividades': len(actividades)})
 
     def generar_listado(self, entregable_id: int, usuario_id: int | None = None) -> dict[str, Any]:
         ent = self.detalle(entregable_id)
@@ -606,10 +788,27 @@ class EntregablesSaludNutricionService:
         anio = int(filtros.get('anio') or datetime.now().year)
         path = self.output_folder / f"INFORME_ENTREGABLES_SALUD_NUTRICION_{_month_name(mes)}_{anio}.docx"
         doc = Document()
-        doc.add_heading('INFORME CONSOLIDADO DE ENTREGABLES', 0)
-        doc.add_paragraph('Componente Salud y Nutrición')
+        detalles = [self.detalle(int(r['id'])) or r for r in rows]
+        actividades = [
+            actividad
+            for detalle in detalles
+            for actividad in (detalle.get('actividades') or [])
+            if int(actividad.get('confirmado') or 0) == 1
+        ]
+        participantes = sum(int(a.get('participantes_total') or 0) for a in actividades)
+        ucas = sorted({str(r.get('uds') or '').strip() for r in rows if str(r.get('uds') or '').strip()})
+        doc.add_heading('INFORME MENSUAL', 0)
+        doc.add_heading('Componente Salud y Nutrición', level=1)
         doc.add_paragraph(f"Periodo: {_month_name(mes)} {anio}")
-        doc.add_paragraph(f"Cumplimiento: {resumen.get('porcentaje')}% · Completos: {resumen.get('completos')} · Pendientes: {resumen.get('pendientes')} · Fotos faltantes: {resumen.get('fotos_faltantes')}")
+        doc.add_paragraph('Estado del documento: borrador generado por la plataforma para revisión y aprobación profesional.')
+        doc.add_heading('1. Resumen ejecutivo', level=1)
+        doc.add_paragraph(
+            f"Durante el periodo se registraron {len(actividades)} actividades confirmadas en "
+            f"{len(ucas)} UCA, con {participantes} participaciones reportadas. El tablero presenta "
+            f"{resumen.get('completos')} entregables completos y {resumen.get('pendientes')} pendientes, "
+            f"para un cumplimiento documental del {resumen.get('porcentaje')}%."
+        )
+        doc.add_heading('2. Indicadores de cumplimiento', level=1)
         table = doc.add_table(rows=1, cols=5)
         hdr = table.rows[0].cells
         hdr[0].text = 'No.'; hdr[1].text = 'Entregable'; hdr[2].text = 'UDS/UCA'; hdr[3].text = 'Estado'; hdr[4].text = 'Observaciones'
@@ -617,12 +816,55 @@ class EntregablesSaludNutricionService:
             row = table.add_row().cells
             row[0].text = str(idx); row[1].text = str(r.get('nombre') or ''); row[2].text = str(r.get('uds') or ''); row[3].text = str(r.get('estado') or ''); row[4].text = str(r.get('observaciones') or '')
         doc.add_page_break()
-        doc.add_heading('Pendientes y observaciones', level=1)
-        for r in rows:
-            if str(r.get('estado') or '').lower() != 'completo':
-                doc.add_paragraph(f"{r.get('codigo')} - {r.get('nombre')} ({r.get('uds')}): {r.get('estado')}")
+        doc.add_heading('3. Desarrollo de actividades confirmadas', level=1)
+        chapter = 1
+        for detalle in detalles:
+            confirmadas = [a for a in (detalle.get('actividades') or []) if int(a.get('confirmado') or 0) == 1]
+            if not confirmadas:
+                continue
+            doc.add_heading(f"3.{chapter} {detalle.get('nombre') or detalle.get('codigo')}", level=2)
+            doc.add_paragraph(f"UCA: {detalle.get('uds') or 'TODAS'}")
+            for actividad in confirmadas:
+                doc.add_heading(str(actividad.get('fecha_actividad') or ''), level=3)
+                doc.add_paragraph(f"Responsable: {actividad.get('responsable') or detalle.get('responsable') or ''}")
+                doc.add_paragraph(f"Objetivo: {actividad.get('objetivo') or ''}")
+                doc.add_paragraph(str(actividad.get('desarrollo') or ''))
+                if actividad.get('resultados'):
+                    doc.add_paragraph(f"Resultados: {actividad.get('resultados')}")
+                if actividad.get('dificultades'):
+                    doc.add_paragraph(f"Dificultades: {actividad.get('dificultades')}")
+                if actividad.get('acciones_mejora'):
+                    doc.add_paragraph(f"Acciones de mejora: {actividad.get('acciones_mejora')}")
+                if actividad.get('compromisos'):
+                    doc.add_paragraph(f"Compromisos: {actividad.get('compromisos')}")
+            self._add_evidence_annex(doc, detalle.get('evidencias') or [], heading='Evidencias del entregable')
+            chapter += 1
+        if not actividades:
+            doc.add_paragraph('No existen actividades confirmadas para el periodo. No se presentan actividades programadas como ejecutadas.')
+
+        doc.add_heading('4. Pendientes y plan de mejora', level=1)
+        pending_count = 0
+        for detalle in detalles:
+            if str(detalle.get('estado') or '').lower() == 'completo':
+                continue
+            pending_count += 1
+            doc.add_paragraph(
+                f"{detalle.get('codigo')} - {detalle.get('nombre')} ({detalle.get('uds')}): "
+                f"estado {detalle.get('estado') or 'pendiente'}. Evidencia requerida: "
+                f"{detalle.get('evidencias_requeridas') or ''}",
+                style='List Bullet',
+            )
+        if not pending_count:
+            doc.add_paragraph('No se registran pendientes documentales en el periodo.')
+        doc.add_heading('5. Revisión profesional', level=1)
+        doc.add_paragraph('Observaciones finales: ______________________________________________________________')
+        doc.add_paragraph('\nNombre y firma de la profesional: _________________________________________________')
+        doc.add_paragraph('Fecha de aprobación: ____________________')
         doc.save(path)
-        return self._register_file(None, 'informe', path, usuario_id, {'total_entregables': len(rows)})
+        return self._register_file(None, 'informe', path, usuario_id, {
+            'total_entregables': len(rows), 'actividades_confirmadas': len(actividades),
+            'participantes_reportados': participantes, 'estado': 'BORRADOR_PARA_REVISION',
+        })
 
     def generar_zip(self, filtros: dict[str, Any], usuario_id: int | None = None) -> dict[str, Any]:
         data = self.listar(filtros)
@@ -653,10 +895,10 @@ class EntregablesSaludNutricionService:
         archivo_id = self.repo.execute(
             """
             INSERT INTO sn_entregables_archivos
-            (entregable_id, tipo, nombre_archivo, ruta_archivo, estado, metadata_json, fecha_generacion, usuario_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (entregable_id, fundacion_id, tipo, nombre_archivo, ruta_archivo, estado, metadata_json, fecha_generacion, usuario_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (entregable_id, tipo, path.name, str(path), 'generado', json.dumps(metadata, ensure_ascii=False), now_iso(), usuario_id),
+            (entregable_id, int(current_tenant_id(1) or 1), tipo, path.name, str(path), 'generado', json.dumps(metadata, ensure_ascii=False), now_iso(), usuario_id),
         )
         if not archivo_id:
             if entregable_id:
@@ -673,6 +915,35 @@ class EntregablesSaludNutricionService:
         folder.mkdir(parents=True, exist_ok=True)
         name = f"{prefix}_{_slug(ent.get('codigo'))}_{_slug(ent.get('uds'))}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
         return folder / name
+
+    @staticmethod
+    def _json_list(value: Any) -> list[Any]:
+        if isinstance(value, list):
+            return value
+        try:
+            parsed = json.loads(value or '[]')
+            return parsed if isinstance(parsed, list) else []
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return []
+
+    def _add_evidence_annex(self, doc: Document, evidencias: list[dict[str, Any]], heading: str = 'Registro fotográfico') -> None:
+        imagenes = []
+        for evidencia in evidencias:
+            ruta = Path(str(evidencia.get('ruta_archivo') or ''))
+            if ruta.suffix.lower() in {'.png', '.jpg', '.jpeg', '.webp'} and ruta.exists():
+                imagenes.append((ruta, evidencia))
+        if not imagenes:
+            return
+        doc.add_heading(heading, level=2)
+        for ruta, evidencia in imagenes:
+            try:
+                doc.add_picture(str(ruta), width=Inches(5.8))
+                doc.add_paragraph(
+                    f"{evidencia.get('actividad') or 'Actividad'} · "
+                    f"{evidencia.get('fecha_actividad') or ''} · {evidencia.get('uds') or ''}"
+                )
+            except Exception:
+                doc.add_paragraph(f"Evidencia adjunta: {evidencia.get('nombre_guardado') or ruta.name}")
 
     def _touch(self, entregable_id: int, estado: str | None = None, porcentaje: int | None = None) -> None:
         if estado is not None and porcentaje is not None:

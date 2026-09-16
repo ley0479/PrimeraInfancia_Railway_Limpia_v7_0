@@ -160,12 +160,16 @@ class SaludNutricionIntegralService:
         current = self.repo.fetch_one("SELECT * FROM sn_periodos_mensuales WHERE fundacion_id=? AND anio_mes=?", (fundacion_id, period))
         if current and _norm(current.get("estado")) in LOCKED_STATES:
             raise ValueError("El periodo est\u00e1 aprobado y es inmutable.")
-        topics = data.get("temas") or []
+        automatic = self._deliverables_monthly_snapshot(fundacion_id, period)
+        topics = data.get("temas") or automatic["temas"]
         variables = data.get("variables") or {}
         if not isinstance(topics, list) or not isinstance(variables, dict):
             raise ValueError("Temas debe ser una lista y variables un objeto.")
         topics = [str(value).strip()[:300] for value in topics if str(value).strip()][:50]
         variables = {str(key).strip()[:80]: value for key, value in list(variables.items())[:200] if str(key).strip()}
+        variables.update(automatic["variables"])
+        if automatic["temas"]:
+            topics = list(dict.fromkeys([*automatic["temas"], *topics]))[:50]
         now = now_iso()
         if current:
             self.repo.execute_update(
@@ -182,6 +186,48 @@ class SaludNutricionIntegralService:
                 period_id = int(cur.lastrowid); conn.commit()
         self.repo.log("GUARDAR_PERIODO_SALUD", "sn_periodos_mensuales", period_id, usuario=user.get("username", "sistema"), nuevos={"anio_mes": period})
         return next(row for row in self.list_monthly_periods(fundacion_id) if int(row["id"]) == period_id)
+
+    def _deliverables_monthly_snapshot(self, fundacion_id: int, period: str) -> dict[str, Any]:
+        """Resume hechos confirmados sin convertir actividades planeadas en ejecutadas."""
+        if not self.repo.table_exists("sn_entregables_mes"):
+            return {"temas": [], "variables": {}}
+        year, month = (int(value) for value in period.split("-"))
+        rows = self.repo.fetch_all(
+            """
+            SELECT m.id, m.codigo, m.uds, m.estado, c.nombre,
+                   COALESCE((SELECT COUNT(*) FROM sn_entregables_actividades a
+                              WHERE a.entregable_id=m.id AND a.fundacion_id=m.fundacion_id
+                                AND a.confirmado=1), 0) actividades_confirmadas,
+                   COALESCE((SELECT SUM(a.participantes_total) FROM sn_entregables_actividades a
+                              WHERE a.entregable_id=m.id AND a.fundacion_id=m.fundacion_id
+                                AND a.confirmado=1), 0) participantes_reportados,
+                   COALESCE((SELECT COUNT(*) FROM sn_entregables_evidencias e
+                              WHERE e.entregable_id=m.id AND e.fundacion_id=m.fundacion_id), 0) evidencias
+              FROM sn_entregables_mes m
+              JOIN sn_entregables_catalogo c ON c.id=m.catalogo_id
+             WHERE m.fundacion_id=? AND m.anio=? AND m.mes=?
+             ORDER BY c.id, m.uds
+            """,
+            (fundacion_id, year, month),
+        )
+        confirmed = [row for row in rows if int(row.get("actividades_confirmadas") or 0) > 0]
+        states: dict[str, int] = {}
+        for row in rows:
+            state = str(row.get("estado") or "pendiente").lower()
+            states[state] = states.get(state, 0) + 1
+        return {
+            "temas": list(dict.fromkeys(str(row.get("nombre") or row.get("codigo")) for row in confirmed)),
+            "variables": {
+                "entregables_total": len(rows),
+                "entregables_completos": states.get("completo", 0),
+                "entregables_pendientes": len(rows) - states.get("completo", 0),
+                "actividades_confirmadas": sum(int(row.get("actividades_confirmadas") or 0) for row in rows),
+                "participaciones_reportadas": sum(int(row.get("participantes_reportados") or 0) for row in rows),
+                "evidencias_cargadas": sum(int(row.get("evidencias") or 0) for row in rows),
+                "ucas_con_actividad": len({str(row.get("uds") or "") for row in confirmed}),
+                "fuente_automatica": "Entregables Salud y Nutrición",
+            },
+        }
 
     def approve_monthly_period(self, fundacion_id: int, period_id: int, user: dict[str, Any]) -> dict[str, Any]:
         row = self.repo.fetch_one("SELECT * FROM sn_periodos_mensuales WHERE fundacion_id=? AND id=?", (fundacion_id, period_id))

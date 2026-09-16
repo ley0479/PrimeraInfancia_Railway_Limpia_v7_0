@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request, send_from_directory, send_file
+from modules.seguridad.services import require_roles
 from modules.seguridad.tenant_context import tenant_path
 from werkzeug.utils import secure_filename
 
@@ -28,6 +29,9 @@ from .services import (
     now_iso,
     read_tabular_file,
 )
+
+ENTREGABLES_READ_ROLES = ('SUPERADMIN', 'GERENTE', 'COORDINADOR', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA')
+ENTREGABLES_EDIT_ROLES = ('SUPERADMIN', 'GERENTE', 'COORDINADOR', 'NUTRICIONISTA')
 
 
 def allowed_data_file(filename: str) -> bool:
@@ -53,7 +57,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
     module_reports = tenant_path(output_folder, 'salud_nutricion')
     os.makedirs(module_upload, exist_ok=True)
     os.makedirs(module_reports, exist_ok=True)
-    entregables_service = EntregablesSaludNutricionService(repo, output_folder, upload_folder)
+    entregables_service = EntregablesSaludNutricionService(repo, module_reports, module_upload)
     entregables_service.init_schema()
     data_dir = os.environ.get('DATA_DIR') or os.path.dirname(os.path.abspath(upload_folder))
     integral_service = register_integral_routes(bp, repo, data_dir)
@@ -374,10 +378,12 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
     # ALPHA51 — Entregables Salud y Nutrición
     # ============================================================== 
     @bp.route('/entregables/catalogo', methods=['GET'])
+    @require_roles(*ENTREGABLES_READ_ROLES)
     def entregables_catalogo():
         return jsonify({'catalogo': entregables_service.catalogo()}), 200
 
     @bp.route('/entregables/crear-mes', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
     def entregables_crear_mes():
         data = request.get_json(silent=True) or request.form.to_dict() or {}
         try:
@@ -387,6 +393,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             return jsonify({'error': f'No se pudieron crear entregables del mes: {exc}'}), 400
 
     @bp.route('/entregables', methods=['GET'])
+    @require_roles(*ENTREGABLES_READ_ROLES)
     def entregables_listar():
         filtros = {
             'mes': request.args.get('mes') or None,
@@ -397,13 +404,26 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
         return jsonify(entregables_service.listar(filtros)), 200
 
     @bp.route('/entregables/<int:entregable_id>', methods=['GET'])
+    @require_roles(*ENTREGABLES_READ_ROLES)
     def entregables_detalle(entregable_id: int):
         detalle = entregables_service.detalle(entregable_id)
         if not detalle:
             return jsonify({'error': 'Entregable no encontrado.'}), 404
         return jsonify({'entregable': detalle}), 200
 
+    @bp.route('/entregables/<int:entregable_id>/actividades', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
+    def entregables_guardar_actividad(entregable_id: int):
+        data = request.get_json(silent=True) or request.form.to_dict() or {}
+        try:
+            actividad = entregables_service.guardar_actividad(entregable_id, data)
+            estado = 'confirmada' if actividad.get('confirmado') else 'guardada como borrador'
+            return jsonify({'message': f'Actividad {estado}.', 'actividad': actividad}), 201
+        except Exception as exc:
+            return jsonify({'error': f'No se pudo guardar la actividad: {exc}'}), 400
+
     @bp.route('/entregables/<int:entregable_id>/acta', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
     def entregables_generar_acta(entregable_id: int):
         try:
             archivo = entregables_service.generar_acta(entregable_id)
@@ -412,6 +432,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             return jsonify({'error': f'No se pudo generar acta: {exc}'}), 400
 
     @bp.route('/entregables/<int:entregable_id>/listado', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
     def entregables_generar_listado(entregable_id: int):
         try:
             archivo = entregables_service.generar_listado(entregable_id)
@@ -420,6 +441,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             return jsonify({'error': f'No se pudo generar listado: {exc}'}), 400
 
     @bp.route('/entregables/<int:entregable_id>/oficio', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
     def entregables_generar_oficio(entregable_id: int):
         try:
             archivo = entregables_service.generar_oficio(entregable_id)
@@ -428,6 +450,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             return jsonify({'error': f'No se pudo generar oficio: {exc}'}), 400
 
     @bp.route('/entregables/<int:entregable_id>/formato', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
     def entregables_generar_formato(entregable_id: int):
         try:
             archivo = entregables_service.generar_formato(entregable_id)
@@ -436,6 +459,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             return jsonify({'error': f'No se pudo generar formato: {exc}'}), 400
 
     @bp.route('/entregables/<int:entregable_id>/evidencias', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
     def entregables_subir_evidencias(entregable_id: int):
         files = request.files.getlist('files') or ([] if 'file' not in request.files else [request.files['file']])
         if not files:
@@ -451,6 +475,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             return jsonify({'error': f'No se pudieron cargar evidencias: {exc}'}), 400
 
     @bp.route('/entregables/<int:entregable_id>/validar', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
     def entregables_validar(entregable_id: int):
         try:
             result = entregables_service.validar(entregable_id)
@@ -461,6 +486,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             return jsonify({'error': f'No se pudo validar entregable: {exc}'}), 400
 
     @bp.route('/entregables/matriz', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
     def entregables_matriz():
         data = request.get_json(silent=True) or request.form.to_dict() or {}
         try:
@@ -470,6 +496,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             return jsonify({'error': f'No se pudo generar matriz: {exc}'}), 400
 
     @bp.route('/entregables/informe', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
     def entregables_informe():
         data = request.get_json(silent=True) or request.form.to_dict() or {}
         try:
@@ -479,6 +506,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             return jsonify({'error': f'No se pudo generar informe: {exc}'}), 400
 
     @bp.route('/entregables/zip', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
     def entregables_zip():
         data = request.get_json(silent=True) or request.form.to_dict() or {}
         try:
@@ -488,6 +516,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             return jsonify({'error': f'No se pudo generar ZIP: {exc}'}), 400
 
     @bp.route('/entregables/archivo/<int:archivo_id>', methods=['GET'])
+    @require_roles(*ENTREGABLES_READ_ROLES)
     def entregables_descargar_archivo(archivo_id: int):
         archivo = entregables_service.archivo(archivo_id)
         if not archivo or not archivo.get('ruta_archivo') or not os.path.exists(archivo['ruta_archivo']):

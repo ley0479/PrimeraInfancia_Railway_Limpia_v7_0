@@ -61,6 +61,7 @@ function snEntBadge(estado) {
 function snEntAcciones(row) {
     const id = Number(row.id);
     const acciones = [];
+    acciones.push(`<button onclick="snEntAbrirActividad(${id})" class="sn-ent-btn sn-ent-btn-validar">Registrar actividad</button>`);
     if (Number(row.requiere_acta || 0)) acciones.push(`<button onclick="snEntGenerar(${id}, 'acta')" class="sn-ent-btn">Acta</button>`);
     if (Number(row.requiere_listado || 0)) acciones.push(`<button onclick="snEntGenerar(${id}, 'listado')" class="sn-ent-btn">Listado</button>`);
     if (Number(row.requiere_oficio || 0)) acciones.push(`<button onclick="snEntGenerar(${id}, 'oficio')" class="sn-ent-btn">Oficio</button>`);
@@ -70,12 +71,80 @@ function snEntAcciones(row) {
     return `<div class="flex flex-wrap gap-1.5">${acciones.join('')}</div>`;
 }
 
+function snEntAbrirActividad(id) {
+    const row = snEntEstado.entregables.find((item) => Number(item.id) === Number(id));
+    if (!row) return;
+    const form = document.getElementById('sn-ent-activity-form');
+    document.getElementById('sn-ent-activity-id').value = String(id);
+    document.getElementById('sn-ent-activity-title').innerText = `${row.nombre || row.codigo} · ${row.uds || 'TODAS'}`;
+    document.getElementById('sn-ent-act-fecha').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('sn-ent-act-lugar').value = row.uds || '';
+    document.getElementById('sn-ent-act-responsable').value = row.responsable || '';
+    document.getElementById('sn-ent-act-objetivo').value = row.actividad || '';
+    ['inicio', 'final', 'dirigido', 'desarrollo', 'resultados', 'compromisos', 'dificultades', 'mejoras'].forEach((suffix) => {
+        const input = document.getElementById(`sn-ent-act-${suffix}`);
+        if (input) input.value = '';
+    });
+    document.getElementById('sn-ent-act-agenda').value = 'Saludo y bienvenida\nSocialización del tema\nDesarrollo de la actividad\nCompromisos\nCierre';
+    document.getElementById('sn-ent-act-participantes').value = '0';
+    document.getElementById('sn-ent-act-confirmado').checked = false;
+    form?.classList.remove('hidden');
+    form?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function snEntCerrarActividad() {
+    document.getElementById('sn-ent-activity-form')?.classList.add('hidden');
+}
+
+function snEntGuardarActividad(confirmar = false) {
+    const id = Number(document.getElementById('sn-ent-activity-id')?.value || 0);
+    if (!id) return snEntMsg('Selecciona un entregable.', 'error');
+    const value = (suffix) => document.getElementById(`sn-ent-act-${suffix}`)?.value?.trim() || '';
+    const payload = {
+        fecha_actividad: value('fecha'),
+        hora_inicio: value('inicio'),
+        hora_final: value('final'),
+        lugar: value('lugar'),
+        dirigido_a: value('dirigido'),
+        responsable: value('responsable'),
+        objetivo: value('objetivo'),
+        agenda: value('agenda'),
+        desarrollo: value('desarrollo'),
+        resultados: value('resultados'),
+        compromisos: value('compromisos'),
+        dificultades: value('dificultades'),
+        acciones_mejora: value('mejoras'),
+        participantes_total: Number(value('participantes') || 0),
+        confirmado: Boolean(confirmar)
+    };
+    if (confirmar && !document.getElementById('sn-ent-act-confirmado')?.checked) {
+        return snEntMsg('Marca la confirmación de actividad realizada.', 'error');
+    }
+    mostrarCargando(confirmar ? 'Confirmando actividad...' : 'Guardando borrador...');
+    fetch(`${backendUrl}/api/salud-nutricion/entregables/${id}/actividades`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+        .then(manejarRespuestaJson)
+        .then((data) => {
+            ocultarCargando();
+            snEntMsg(data.message || 'Actividad guardada.', 'success');
+            snEntCerrarActividad();
+            snEntCargar();
+        })
+        .catch((error) => {
+            ocultarCargando();
+            snEntMsg(error.message || 'No se pudo guardar la actividad.', 'error');
+        });
+}
+
 function snEntRender(rows = [], resumen = {}) {
     const body = document.getElementById('sn-ent-list');
     snEntActualizarStats(resumen);
     if (!body) return;
     if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="7" class="text-center text-slate-500">No hay entregables creados para los filtros seleccionados.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="text-center text-slate-500">No hay entregables creados para los filtros seleccionados.</td></tr>';
         return;
     }
     body.innerHTML = rows.map((row, idx) => {
@@ -88,6 +157,7 @@ function snEntRender(rows = [], resumen = {}) {
                 <td><div class="font-semibold text-slate-100">${escaparHtml(row.nombre || '')}</div><div class="mt-1 text-[11px] text-slate-500">${escaparHtml(row.codigo || '')}</div></td>
                 <td>${escaparHtml(row.uds || 'TODAS')}</td>
                 <td>${snEntBadge(row.estado)}</td>
+                <td>${Number(row.actividades_confirmadas || 0)}</td>
                 <td class="${minimo && fotos < minimo ? 'text-amber-300' : 'text-emerald-300'}">${fotoTxt}</td>
                 <td>${Number(row.archivos_generados || 0)}</td>
                 <td>${snEntAcciones(row)}</td>
@@ -226,3 +296,6 @@ window.snEntValidar = snEntValidar;
 window.snEntGenerarMatriz = snEntGenerarMatriz;
 window.snEntGenerarInforme = snEntGenerarInforme;
 window.snEntGenerarZip = snEntGenerarZip;
+window.snEntAbrirActividad = snEntAbrirActividad;
+window.snEntCerrarActividad = snEntCerrarActividad;
+window.snEntGuardarActividad = snEntGuardarActividad;
