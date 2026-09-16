@@ -465,6 +465,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         current_state=str(report.get('estado') or '').upper()
         transitions={'BORRADOR':{'EN_REVISION'},'BORRADOR_INCOMPLETO':{'EN_REVISION'},'EN_REVISION':{'DEVUELTO','APROBADO'},'DEVUELTO':{'EN_REVISION'}}
         if target not in transitions.get(current_state,set()):return jsonify({'error':f'No se permite pasar de {current_state} a {target}.','codigo':'INVALID_STATE_TRANSITION'}),409
+        if target=='DEVUELTO' and not str(data.get('observaciones') or '').strip():return jsonify({'error':'La devolución requiere una observación para la persona responsable.'}),400
         missing=_loads(report.get('faltantes_json'),[])
         if target=='APROBADO' and missing:return jsonify({'error':'No se puede aprobar un borrador incompleto.','faltantes':missing}),409
         if target=='APROBADO' and user.get('rol') not in {'SUPERADMIN','GERENTE','COORDINADOR'}:return jsonify({'error':'La aprobación requiere un rol de coordinación autorizado.'}),403

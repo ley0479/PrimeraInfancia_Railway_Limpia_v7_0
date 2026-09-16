@@ -2473,6 +2473,10 @@
                             <fieldset class="mt-4"><legend class="text-sm font-semibold">Temáticas publicadas</legend><div id="sn-theme-published" class="mt-2 grid gap-2 text-sm md:grid-cols-2"></div></fieldset>
                             <button onclick="snTematicasPlanificar()" class="mt-4 rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Crear propuesta de actividad</button>
                         </div>
+                        <div class="sn-card overflow-x-auto">
+                            <div class="flex items-center justify-between gap-3"><div><h3 class="font-semibold">Revisión de informes temáticos</h3><p class="mt-1 text-xs text-slate-500">La aprobación exige datos completos, plantilla institucional y revisión vigente.</p></div><button onclick="snTematicasCargar()" class="rounded-xl border border-slate-600 px-3 py-2 text-sm">Actualizar</button></div>
+                            <table class="mt-4 w-full text-left text-xs text-slate-400 sn-table"><thead><tr><th>Actividad</th><th>Unidad</th><th>Versión</th><th>Estado</th><th>Formato</th><th>Pendientes</th><th>Acciones</th></tr></thead><tbody id="sn-theme-reports"><tr><td colspan="7" class="text-center text-slate-500">Cargando informes…</td></tr></tbody></table>
+                        </div>
                     </div>
 
                     <div id="sn-view-mensuales" class="hidden space-y-6">
@@ -3952,7 +3956,7 @@
     <script src="./js/modules/asistente-capacitacion.js?v=2.7.3-mic-diagnostics"></script>
     <script src="./js/modules/gestion-pedagogica.js?v=2.1.3"></script>
     <script src="./js/modules/gestion-coordinador.js?v=2.1.6"></script>
-    <script src="./js/modules/salud-nutricion.js?v=2.7.6-tematicas-plantilla-4"></script>
+    <script src="./js/modules/salud-nutricion.js?v=2.7.6-tematicas-revision-1"></script>
     <script src="./js/modules/entregables-salud-nutricion.js?v=2.7.6-informe-mensual-auto-1"></script>
     <script src="./js/modules/facturacion.js?v=2.7.0-credit-visibility-2"></script>
     <script src="./js/modules/administrativo-financiero.js?v=2.7.0"></script>

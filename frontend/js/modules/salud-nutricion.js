@@ -523,11 +523,12 @@ async function snTematicasRequest(path, options = {}) {
 
 async function snTematicasCargar() {
     try {
-        const [materials, units, assignments, templateStatus] = await Promise.all([
+        const [materials, units, assignments, templateStatus, reports] = await Promise.all([
             snTematicasRequest('/api/salud-nutricion/tematicas/materiales'),
             snTematicasRequest('/api/salud-nutricion/tematicas/unidades'),
             snTematicasRequest('/api/salud-nutricion/tematicas/asignaciones'),
-            snTematicasRequest('/api/salud-nutricion/tematicas/plantilla-informe')
+            snTematicasRequest('/api/salud-nutricion/tematicas/plantilla-informe'),
+            snTematicasRequest('/api/salud-nutricion/tematicas/informes')
         ]);
         snEstado.tematicas = materials.materiales || [];
         const templateBox=document.getElementById('sn-theme-template-status');
@@ -548,7 +549,40 @@ async function snTematicasCargar() {
         const host = document.getElementById('sn-theme-materials');
         if (!host) return;
         host.innerHTML = snEstado.tematicas.length ? snEstado.tematicas.map((m) => `<article class="sn-card"><div class="flex flex-wrap justify-between gap-2"><div><strong>${escaparHtml(m.titulo_documento || '')}</strong><p class="text-xs text-slate-400">${escaparHtml(m.estado || '')} · ${escaparHtml(m.metodo_extraccion || '')}</p></div><a class="text-cyan-300" target="_blank" href="${backendUrl}/api/idp/documentos/${Number(m.idp_documento_id)}/vista-previa">Ver original</a></div><div class="mt-3 grid gap-3">${(m.temas || []).map((t) => `<div class="rounded-xl border border-slate-700 p-3"><label class="text-xs text-slate-400">Título extraído</label><p>${escaparHtml(t.titulo_original || '')}</p><label class="mt-2 block text-xs text-slate-400">Denominación normalizada propuesta</label><input class="sn-ent-input w-full" value="${escaparHtml(t.titulo_normalizado || '')}" onchange="snTematicaEditar(${Number(t.id)},${Number(t.revision)},this.value)"><p class="mt-2 text-xs text-slate-500">Procedencia: ${escaparHtml(JSON.stringify(t.procedencia || {}))}</p></div>`).join('') || '<p class="text-amber-300">Sin contenido temático identificado.</p>'}</div><button class="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm" onclick="snTematicasPublicar(${Number(m.id)})">Revisar alcance y publicar</button></article>`).join('') : '<p class="text-slate-400">Aún no hay materiales temáticos.</p>';
+        snTematicasRenderInformes(reports.informes || []);
     } catch (error) { snMensaje(error.message, 'error'); }
+}
+
+function snTematicasRenderInformes(rows) {
+    const body=document.getElementById('sn-theme-reports'); if(!body)return;
+    if(!rows.length) { body.innerHTML='<tr><td colspan="7" class="text-center text-slate-500">Aún no hay borradores temáticos.</td></tr>'; return; }
+    body.innerHTML=rows.map((r)=>{
+        const state=String(r.estado || ''); const revision=Number(r.revision || 1); const missing=r.faltantes || [];
+        const institutional=String(r.plantilla_codigo || '')==='INFORME_SALUD_NUTRICION';
+        const actions=[`<button onclick="snTematicasDescargarInforme(${Number(r.producto_id)})" class="sn-ent-btn">Descargar</button>`];
+        if(['BORRADOR','BORRADOR_INCOMPLETO','DEVUELTO'].includes(state)) actions.push(`<button onclick="snTematicasCambiarInforme(${Number(r.id)},${revision},'EN_REVISION')" class="sn-ent-btn sn-ent-btn-validar">Enviar a revisión</button>`);
+        if(state==='EN_REVISION') {
+            actions.push(`<button onclick="snTematicasCambiarInforme(${Number(r.id)},${revision},'DEVUELTO')" class="sn-ent-btn">Devolver</button>`);
+            if(institutional && !missing.length) actions.push(`<button onclick="snTematicasCambiarInforme(${Number(r.id)},${revision},'APROBADO')" class="sn-ent-btn sn-ent-btn-validar">Aprobar</button>`);
+            else actions.push('<span class="text-amber-300">Aprobación bloqueada</span>');
+        }
+        return `<tr><td>${escaparHtml(r.titulo || `Actividad ${r.actividad_id}`)}</td><td>${escaparHtml(r.unidad_nombre || '')}</td><td>v${Number(r.version || 1)} · rev.${revision}</td><td>${escaparHtml(state)}</td><td>${institutional ? `Institucional ${escaparHtml(r.plantilla_version || '')}` : '<span class="text-amber-300">Interno</span>'}</td><td>${missing.length ? escaparHtml(missing.join(', ')) : 'Completo'}</td><td class="space-x-1">${actions.join('')}</td></tr>`;
+    }).join('');
+}
+
+function snTematicasDescargarInforme(productId) {
+    if(!productId) return snMensaje('El informe no tiene un archivo disponible.','error');
+    window.descargarArchivoAutenticado(`${backendUrl}/api/salud-nutricion/integral/productos/${productId}/descargar`).catch((error)=>snMensaje(error.message,'error'));
+}
+
+async function snTematicasCambiarInforme(reportId,revision,estado) {
+    let observaciones='';
+    if(estado==='DEVUELTO') { observaciones=window.prompt('Indica claramente qué debe corregirse:','') || ''; if(!observaciones.trim()) return snMensaje('La devolución requiere una observación.','error'); }
+    if(!window.confirm(`Cambiar el informe a ${estado}. Se validará la revisión ${revision}. ¿Continuar?`)) return;
+    try {
+        const data=await snTematicasRequest(`/api/salud-nutricion/tematicas/informes/${reportId}/estado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({estado,revision,observaciones})});
+        snMensaje(data.message || 'Estado actualizado.','success'); await snTematicasCargar();
+    } catch(error) { snMensaje(error.message,'error'); await snTematicasCargar(); }
 }
 
 async function snTematicasSubirPlantilla() {
