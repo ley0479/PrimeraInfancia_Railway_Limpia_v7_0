@@ -498,7 +498,8 @@ async function snTematicasGenerarInforme(activityId) {
         const check=await snTematicasRequest(`/api/salud-nutricion/tematicas/actividades/${activityId}/completitud`);
         if(check.faltantes?.length && !window.confirm(`El borrador quedará INCOMPLETO. Faltan: ${check.faltantes.join(', ')}. ¿Generarlo sin inventar datos?`)) return;
         const data=await snTematicasRequest(`/api/salud-nutricion/tematicas/actividades/${activityId}/informe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({disparador:'MANUAL_UI'})});
-        snMensaje(`${data.message} ${(data.faltantes || []).length ? 'Pendientes: '+data.faltantes.join(', ') : ''}`,'success');
+        const formatWarning=data.informe?.formato?.advertencia || '';
+        snMensaje(`${data.message} ${(data.faltantes || []).length ? 'Pendientes: '+data.faltantes.join(', ') : ''} ${formatWarning}`,'success');
         const product=data.informe?.producto; if(product?.id) window.descargarArchivoAutenticado(`${backendUrl}/api/salud-nutricion/integral/productos/${product.id}/descargar`).catch(()=>{});
     } catch(error){snMensaje(error.message,'error');}
 }
@@ -521,12 +522,19 @@ async function snTematicasRequest(path, options = {}) {
 
 async function snTematicasCargar() {
     try {
-        const [materials, units, assignments] = await Promise.all([
+        const [materials, units, assignments, templateStatus] = await Promise.all([
             snTematicasRequest('/api/salud-nutricion/tematicas/materiales'),
             snTematicasRequest('/api/salud-nutricion/tematicas/unidades'),
-            snTematicasRequest('/api/salud-nutricion/tematicas/asignaciones')
+            snTematicasRequest('/api/salud-nutricion/tematicas/asignaciones'),
+            snTematicasRequest('/api/salud-nutricion/tematicas/plantilla-informe')
         ]);
         snEstado.tematicas = materials.materiales || [];
+        const templateBox=document.getElementById('sn-theme-template-status');
+        if(templateBox) {
+            const ready=Boolean(templateStatus.institucional_disponible);
+            templateBox.className=`mt-3 rounded-xl border p-3 text-sm ${ready ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'}`;
+            templateBox.textContent=ready ? `Plantilla aprobada: ${templateStatus.plantilla?.nombre || templateStatus.plantilla?.codigo} · versión ${templateStatus.plantilla?.version || ''}. El mapeo temático debe confirmarse antes de declararla como salida institucional.` : templateStatus.advertencia;
+        }
         const unitBox = document.getElementById('sn-theme-units');
         if (unitBox) unitBox.innerHTML = (units.unidades || []).map((u) => `<label class="flex gap-2"><input type="checkbox" value="${Number(u.id)}"><span>${escaparHtml(u.nombre || '')}</span></label>`).join('') || '<span class="text-amber-300">No hay unidades activas en Base Maestra.</span>';
         const planUnit=document.getElementById('sn-theme-plan-unit');

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from modules.salud_nutricion.tematicas import SCHEMA_SQL, SCHEMA_VERSION, _can_access_unit, _report_snapshot, _theme_candidates
+from modules.salud_nutricion.tematicas import SCHEMA_SQL, SCHEMA_VERSION, _approved_health_template, _can_access_unit, _report_snapshot, _theme_candidates
 
 
 def require(condition, message):
@@ -57,6 +57,16 @@ Resolución 2184 de 2019''',
     snapshot,digest,missing=_report_snapshot(Repo(),1,1)
     require(snapshot['conteos']['asistentes']==0 and len(digest)==64,'Instantánea determinística inválida.')
     require('fecha real de ejecución' in missing and 'listado de participantes vinculado' in missing and 'evidencias auténticas' in missing,'El borrador incompleto ocultó faltantes.')
+    require(_approved_health_template(Repo(),1) is None,'Una plantilla inexistente no puede declararse institucional.')
+    class TemplateRepo:
+        def __init__(self): self.params=None
+        def fetch_one(self,sql,params=()):
+            self.params=params
+            require("v.fundacion_id=?" in sql and "p.scope='GLOBAL'" in sql,'La plantilla no quedó aislada por tenant/global.')
+            require("v.estado IN ('APROBADA','ACTIVA')" in sql,'Se aceptó una plantilla sin aprobación.')
+            return {'plantilla_version_id':7,'codigo':'INFORME_SALUD_NUTRICION'}
+    template_repo=TemplateRepo(); selected=_approved_health_template(template_repo,9)
+    require(selected['plantilla_version_id']==7 and template_repo.params==(9,9),'La selección no priorizó el tenant autenticado.')
     db.close()
     print('PASS test_salud_tematicas_phase1_v1 (fixture textual; prueba visual real NO VERIFICADA)')
 

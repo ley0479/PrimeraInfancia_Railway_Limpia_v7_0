@@ -120,6 +120,19 @@ def _loads(value, fallback):
         return fallback
 
 
+def _approved_health_template(repo, tenant):
+    """Return only an approved tenant/global template; never infer one from a filled acta."""
+    try:
+        return repo.fetch_one('''SELECT v.id plantilla_version_id,v.version,p.codigo,p.nombre,p.tipo_documento
+          FROM doc_plantilla_versiones v JOIN doc_plantillas p ON p.id=v.plantilla_id
+          WHERE (v.fundacion_id=? OR (v.fundacion_id IS NULL AND p.scope='GLOBAL'))
+            AND v.estado IN ('APROBADA','ACTIVA')
+            AND (UPPER(p.tipo_documento)='INFORME_SALUD_NUTRICION' OR UPPER(p.codigo)='INFORME_SALUD_NUTRICION')
+          ORDER BY CASE WHEN v.fundacion_id=? THEN 0 ELSE 1 END,v.id DESC LIMIT 1''',(tenant,tenant))
+    except Exception:
+        return None
+
+
 def _serialize_theme(row):
     item = dict(row)
     for key, fallback in (('subtemas_json', []), ('localizador_json', {}), ('procedencia_json', {})):
@@ -219,6 +232,14 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         tenant,_=_ctx(); user=_user(); rows=repo.fetch_all('SELECT id,nombre,codigo_unidad,coordinador FROM master_unidades WHERE fundacion_id=? AND activo=1 ORDER BY nombre',(tenant,))
         rows=[row for row in rows if _can_access_unit(row.get('nombre'),user)]
         return jsonify({'unidades':rows,'fuente':'BASE_MAESTRA'})
+
+    @bp.route('/tematicas/plantilla-informe',methods=['GET'])
+    @require_roles(*READ_ROLES)
+    def thematic_report_template():
+        tenant,_=_ctx(); template=_approved_health_template(repo,tenant)
+        if not template:
+            return jsonify({'estado':'PENDIENTE','institucional_disponible':False,'codigo_requerido':'INFORME_SALUD_NUTRICION','advertencia':'No hay una plantilla limpia y aprobada. Los borradores actuales usan el formato interno y no deben presentarse como formato institucional.'})
+        return jsonify({'estado':'APROBADA','institucional_disponible':True,'plantilla':template})
 
     @bp.route('/tematicas/materiales',methods=['GET'])
     @require_roles(*READ_ROLES)
@@ -379,11 +400,13 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         if not _can_access_unit(snapshot['actividad'].get('unidad_nombre'),user):return jsonify({'error':'No tienes permiso sobre esta unidad.'}),403
         existing=repo.fetch_one('SELECT * FROM sn_informes_tematicos WHERE fundacion_id=? AND actividad_id=? AND snapshot_hash=?',(tenant,activity_id,digest))
         if existing:return jsonify({'message':'Ya existe un borrador para esta misma versión de datos; no se duplicó.','informe':existing,'faltantes':_loads(existing.get('faltantes_json'),[]),'idempotente':True})
+        template=_approved_health_template(repo,tenant)
         generated=integral_service.prepare_activity_documents(tenant,activity_id,user,['INFORME']); product=((generated or {}).get('documentos') or [None])[0]
         if not product:return jsonify({'error':'El generador no produjo un archivo verificable.'}),500
         latest=repo.fetch_one('SELECT COALESCE(MAX(version),0) version FROM sn_informes_tematicos WHERE fundacion_id=? AND actividad_id=?',(tenant,activity_id)); version=int((latest or {}).get('version') or 0)+1; now=_now(); state='BORRADOR_INCOMPLETO' if missing else 'BORRADOR'
         report_id=repo.execute('''INSERT INTO sn_informes_tematicos(fundacion_id,actividad_id,version,snapshot_hash,snapshot_json,faltantes_json,estado,producto_id,disparador,creado_por,creado_en,actualizado_en) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',(tenant,activity_id,version,digest,json.dumps(snapshot,ensure_ascii=False,default=str),json.dumps(missing,ensure_ascii=False),state,product['id'],str(data.get('disparador') or 'MANUAL').upper(),user_id,now,now))
-        return jsonify({'message':'Borrador generado desde hechos registrados.' if not missing else 'BORRADOR INCOMPLETO generado sin inventar los campos faltantes.','informe':{'id':report_id,'version':version,'estado':state,'producto':product},'faltantes':missing}),201
+        format_status={'institucional':False,'estado':'FORMATO_INTERNO','plantilla_aprobada':template,'advertencia':'La plantilla institucional aprobada está registrada, pero su renderizado temático aún requiere un mapeo confirmado.' if template else 'No hay una plantilla limpia aprobada con código INFORME_SALUD_NUTRICION.'}
+        return jsonify({'message':'Borrador generado desde hechos registrados.' if not missing else 'BORRADOR INCOMPLETO generado sin inventar los campos faltantes.','informe':{'id':report_id,'version':version,'estado':state,'producto':product,'formato':format_status},'faltantes':missing}),201
 
     @bp.route('/tematicas/informes',methods=['GET'])
     @require_roles(*READ_ROLES)
