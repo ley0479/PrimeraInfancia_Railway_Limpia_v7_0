@@ -26,6 +26,7 @@ Fase 0 auditada y Fase 1 iniciada de forma aditiva. No se realizó despliegue pr
 - El informe usa una instantánea con hash de actividad, temas, asistencia y evidencias. La misma versión no se duplica; los cambios generan otra versión.
 - Si faltan fecha real, metodología, resultados reportados, temas, listado o evidencias exigibles, se genera únicamente `BORRADOR_INCOMPLETO`.
 - Aprobar requiere completitud y acción explícita de coordinación. Un informe aprobado queda congelado.
+- Liam puede consultar temáticas publicadas, faltantes de una actividad y estados/versiones de informes mediante herramientas cerradas de solo lectura. No puede aprobar ni inventar resultados.
 - El año de una referencia normativa no se transforma en fecha operativa y su vigencia no se certifica.
 - La revisión usa un número de revisión; un editor desactualizado recibe conflicto HTTP 409.
 
@@ -42,7 +43,7 @@ Fase 0 auditada y Fase 1 iniciada de forma aditiva. No se realizó despliegue pr
 - El afiche real del usuario no está disponible en el entorno: el escenario visual A permanece **NO VERIFICADO**. El test incluido usa un fixture textual y lo declara expresamente.
 - `pytest` no está instalado en el Python local. El test nuevo es ejecutable directamente con Python; la regresión completa debe correrse en el entorno de CI/dependencias.
 - La consulta y publicación filtran también las unidades asignadas al usuario; coordinación conserva su alcance institucional configurado.
-- Aún no se implementaron planeación, calendario, ejecución, informes ni acciones de Liam dentro de este flujo.
+- La publicación/asignación masiva mediante Liam sigue pendiente de un ejecutor con confirmación de servidor; no se habilitó como atajo mutable.
 
 ### Rollback
 

@@ -22,6 +22,7 @@ ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_dev_change_review'})
 ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_known_solution'})
 ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_technical_diagnostic'})
 ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'prepare_dev_sandbox_plan'})
+ALLOWED_TOOLS = ALLOWED_TOOLS | frozenset({'get_health_themes','get_health_activity_gaps','get_health_report_status'})
 
 MODULE_DATASETS = {
     'ambientes-protectores': [('activos','aep_activos',None),('mantenimientos','aep_mantenimientos',None)],
@@ -862,6 +863,65 @@ def _monthly_relation(database_path: str, tenant_id: int, args: dict) -> dict:
     metrics=[{'label':'Unidades de atención','value':len(output)},{'label':'Total usuarios','value':numeric_totals[6] if numeric_totals else 0},{'label':'Total huevos','value':numeric_totals[9] if numeric_totals else 0},{'label':'Cubetas de 30','value':numeric_totals[10] if numeric_totals else 0},{'label':'Panales completos','value':numeric_totals[11] if numeric_totals else 0},{'label':'Total verduras','value':numeric_totals[14] if numeric_totals else 0},{'label':'Ollas comunitarias','value':numeric_totals[15] if numeric_totals else 0},{'label':'Bienestarina','value':numeric_totals[16] if numeric_totals else 0}]
     return {'scope':{'foundation_id':tenant_id,'source':'authenticated_session','cross_foundation':False},'period':period,'title':f'RELACIÓN DEL MES {period}','rule':'30 huevos por usuario; de 6 a 11 meses recibe 15. Una cubeta contiene 30 huevos y un panal contiene 7 cubetas.','metrics':metrics,'columns':columns,'relation_rows':output,'total_row':total_row,'read_only':True}
 
+def _health_unit_allowed(unit: str,user: dict) -> bool:
+    if str(user.get('rol') or '').upper() in {'SUPERADMIN','GERENTE','COORDINADOR'}:return True
+    raw=user.get('unidades')
+    if isinstance(raw,str):
+        try:raw=json.loads(raw)
+        except Exception:raw=[x.strip() for x in raw.split(',') if x.strip()]
+    allowed={' '.join(str(x).strip().upper().split()) for x in (raw if isinstance(raw,list) else [])}
+    return ' '.join(str(unit or '').strip().upper().split()) in allowed
+
+def _health_themes(database_path: str,tenant_id: int,args: dict,user: dict) -> dict:
+    period=str(args.get('period') or '').strip();unit=str(args.get('unit') or '').strip();where=['a.fundacion_id=?'];params=[tenant_id]
+    if period:where.append('a.periodo=?');params.append(period)
+    if unit:where.append('LOWER(TRIM(u.nombre))=LOWER(TRIM(?))');params.append(unit)
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:rows=[dict(x) for x in conn.execute(f'''SELECT a.id asignacion_id,a.periodo,a.estado,u.id unidad_id,u.nombre unidad,t.id tema_id,t.version tema_version,t.titulo_original,t.titulo_normalizado,t.categoria_sugerida,m.titulo_documento fuente FROM sn_tema_asignaciones a JOIN sn_temas t ON t.id=a.tema_id AND t.fundacion_id=a.fundacion_id JOIN sn_materiales_tematicos m ON m.id=t.material_id AND m.fundacion_id=t.fundacion_id JOIN master_unidades u ON u.id=a.unidad_id AND u.fundacion_id=a.fundacion_id WHERE {' AND '.join(where)} ORDER BY a.periodo DESC,u.nombre,t.id LIMIT 500''',tuple(params)).fetchall()]
+    except Exception:rows=[]
+    finally:conn.close()
+    rows=[x for x in rows if _health_unit_allowed(x.get('unidad'),user)]
+    return {'scope':{'foundation_id':tenant_id,'cross_foundation':False,'source':'authenticated_session'},'period':period or None,'unit':unit or None,'themes':rows,'total':len(rows),'read_only':True,'source':'Temáticas publicadas de Salud y Nutrición'}
+
+def _health_activity_gaps(database_path: str,tenant_id: int,args: dict,user: dict) -> dict:
+    try:activity_id=int(args.get('activity_id') or 0)
+    except Exception:activity_id=0
+    if activity_id<=0:raise ValueError('Indica el identificador de la actividad.')
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        row=conn.execute('SELECT * FROM sn_actividades_integrales WHERE id=? AND fundacion_id=?',(activity_id,tenant_id)).fetchone()
+        if not row:raise LookupError('Actividad no encontrada dentro de la fundación activa.')
+        item=dict(row)
+        if not _health_unit_allowed(item.get('unidad_nombre'),user):raise PermissionError('No tienes permiso sobre esta unidad.')
+        themes=int(conn.execute('SELECT COUNT(*) FROM sn_actividad_temas WHERE fundacion_id=? AND actividad_id=?',(tenant_id,activity_id)).fetchone()[0] or 0)
+        people=int(conn.execute('SELECT COUNT(*) FROM sn_actividad_participantes WHERE fundacion_id=? AND actividad_id=?',(tenant_id,activity_id)).fetchone()[0] or 0)
+        attendees=int(conn.execute('SELECT COUNT(*) FROM sn_actividad_participantes WHERE fundacion_id=? AND actividad_id=? AND asistio=1',(tenant_id,activity_id)).fetchone()[0] or 0)
+        evidence=int(conn.execute('SELECT COUNT(*) FROM sn_evidencias_integrales WHERE fundacion_id=? AND actividad_id=? AND activo=1',(tenant_id,activity_id)).fetchone()[0] or 0)
+    finally:conn.close()
+    missing=[]
+    for field,label in (('fecha_ejecucion','fecha real de ejecución'),('metodologia','metodología realizada'),('resultados','resultados reportados por el responsable')):
+        if not str(item.get(field) or '').strip():missing.append(label)
+    if not themes:missing.append('temáticas vinculadas')
+    if not people:missing.append('listado de participantes vinculado')
+    if int(item.get('requiere_evidencias') or 0) and not evidence:missing.append('evidencias auténticas')
+    return {'scope':{'foundation_id':tenant_id,'cross_foundation':False,'source':'authenticated_session'},'activity_id':activity_id,'title':item.get('titulo'),'unit':item.get('unidad_nombre'),'complete':not missing,'missing':missing,'counts':{'themes':themes,'registered_people':people,'attendees':attendees,'evidence':evidence},'disclaimer':'Asistentes proviene del listado vinculado; no del total de beneficiarios activos.','read_only':True}
+
+def _health_report_status(database_path: str,tenant_id: int,args: dict,user: dict) -> dict:
+    try:activity_id=int(args.get('activity_id') or 0)
+    except Exception:activity_id=0
+    if activity_id<=0:raise ValueError('Indica el identificador de la actividad.')
+    conn=sqlite3.connect(database_path);conn.row_factory=sqlite3.Row
+    try:
+        activity=conn.execute('SELECT unidad_nombre FROM sn_actividades_integrales WHERE id=? AND fundacion_id=?',(activity_id,tenant_id)).fetchone()
+        if not activity:raise LookupError('Actividad no encontrada dentro de la fundación activa.')
+        if not _health_unit_allowed(activity['unidad_nombre'],user):raise PermissionError('No tienes permiso sobre esta unidad.')
+        rows=[dict(x) for x in conn.execute('SELECT id,version,estado,producto_id,faltantes_json,disparador,creado_en,revisado_en,aprobado_en FROM sn_informes_tematicos WHERE fundacion_id=? AND actividad_id=? ORDER BY version DESC',(tenant_id,activity_id)).fetchall()]
+    finally:conn.close()
+    for row in rows:
+        try:row['missing']=json.loads(row.pop('faltantes_json') or '[]')
+        except Exception:row['missing']=[]
+    return {'scope':{'foundation_id':tenant_id,'cross_foundation':False,'source':'authenticated_session'},'activity_id':activity_id,'reports':rows,'total':len(rows),'read_only':True}
+
 def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, user: dict) -> dict:
     if tool_name not in ALLOWED_TOOLS: raise PermissionError('Herramienta no autorizada para LÍA.')
     require_action(tool_name, str(user.get('rol') or ''))
@@ -891,6 +951,9 @@ def execute(tool_name: str, *, args: dict, database_path: str, tenant_id: int, u
         if allowed and module not in allowed:raise PermissionError('Tu rol no tiene permiso para consultar ese módulo.')
         return _module_summary(database_path,tenant_id,args)
     if tool_name=='get_monthly_health_indicators': return _health_indicators(database_path,tenant_id,args)
+    if tool_name=='get_health_themes': return _health_themes(database_path,tenant_id,args,user)
+    if tool_name=='get_health_activity_gaps': return _health_activity_gaps(database_path,tenant_id,args,user)
+    if tool_name=='get_health_report_status': return _health_report_status(database_path,tenant_id,args,user)
     if tool_name=='get_role_dashboard': return _role_dashboard(database_path,tenant_id,args,user)
     if tool_name=='prepare_meeting_brief': return _meeting_brief(database_path,tenant_id,args,user)
     if tool_name=='prepare_meeting_followup': return _meeting_followup(tenant_id,args,user)

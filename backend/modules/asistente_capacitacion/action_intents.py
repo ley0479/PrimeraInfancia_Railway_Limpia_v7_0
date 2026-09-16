@@ -71,6 +71,13 @@ def propose_action(question: str, *, screen_context: dict | None = None) -> dict
     """Devuelve una propuesta estructurada; nunca ejecuta la accion."""
     q = _plain(question)
     context = screen_context if isinstance(screen_context, dict) else {}
+    health_activity=re.search(r'\bactividad\s*#?\s*(\d+)\b',q)
+    if health_activity and any(text in q for text in ('que falta','faltantes','terminar el informe')):
+        return {'id':'get_health_activity_gaps','label':'Consultar faltantes del informe','summary':'Consultaré los hechos y soportes faltantes sin completar datos por inferencia.','arguments':{'activity_id':int(health_activity.group(1))},'missing':[],'confirmation_required':False,'server_tool':'get_health_activity_gaps'}
+    if health_activity and any(text in q for text in ('estado del informe','versiones del informe','informes de la actividad')):
+        return {'id':'get_health_report_status','label':'Consultar informes de la actividad','summary':'Consultaré versiones y estados reales del informe.','arguments':{'activity_id':int(health_activity.group(1))},'missing':[],'confirmation_required':False,'server_tool':'get_health_report_status'}
+    if any(text in q for text in ('tematicas del periodo','temas de salud del periodo','muestrame las tematicas')):
+        return {'id':'get_health_themes','label':'Consultar temáticas de Salud y Nutrición','summary':'Consultaré las temáticas publicadas en tus unidades autorizadas.','arguments':{'period':context.get('selected_period')},'missing':[],'confirmation_required':False,'server_tool':'get_health_themes'}
     technical_incident=re.search(r'\bINC-\d{8}-\d{6}-[A-Z0-9]{6}\b',str(question or '').upper())
     if technical_incident and any(text in q for text in ('diagnostico tecnico','detalle tecnico','ver la traza','mostrar la traza')):
         return {'id':'get_technical_diagnostic','label':'Consultar diagnóstico técnico','summary':'Consultaré el diagnóstico sanitizado dentro de la fundación activa.','arguments':{'incident_id':technical_incident.group(0)},'missing':[],'confirmation_required':False,'server_tool':'get_technical_diagnostic'}

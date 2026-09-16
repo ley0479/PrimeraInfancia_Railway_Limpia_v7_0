@@ -5,7 +5,7 @@ BACKEND=Path(__file__).resolve().parents[1];sys.path.insert(0,str(BACKEND))
 from modules.dbapi_compat import sqlite3
 from modules.asistente_capacitacion.tool_registry import ALLOWED_TOOLS,execute
 
-assert ALLOWED_TOOLS==frozenset({'get_pending_activities_summary','get_role_dashboard','prepare_meeting_brief','prepare_meeting_followup','prepare_dev_change_request','list_dev_change_requests','get_dev_change_review','prepare_dev_sandbox_plan','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_known_solution','get_technical_diagnostic','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
+assert ALLOWED_TOOLS==frozenset({'get_pending_activities_summary','get_role_dashboard','prepare_meeting_brief','prepare_meeting_followup','prepare_dev_change_request','list_dev_change_requests','get_dev_change_review','prepare_dev_sandbox_plan','get_foundation_data_summary','get_monthly_relation_summary','list_foundation_profiles','search_foundation_beneficiaries','universal_search','get_platform_module_summary','get_monthly_health_indicators','get_health_themes','get_health_activity_gaps','get_health_report_status','compare_periods','build_custom_report_preview','supervise_deliverables','get_system_health','get_backup_status','get_module_usage','get_foundation_portfolio','analyze_master_data_quality','get_early_warnings','get_incident_center','get_known_solution','get_technical_diagnostic','get_notification_center','prepare_communication_draft','run_command_favorite','get_liam_center','get_document_processing_status','get_format_generation_status','get_structured_error','propose_platform_action'})
 try: execute('run_sql',args={},database_path='none',tenant_id=1,user={})
 except PermissionError: pass
 else: raise AssertionError('Una herramienta fuera de lista fue aceptada.')
@@ -26,4 +26,18 @@ with tempfile.TemporaryDirectory() as tmp:
     try: execute('get_format_generation_status',args={'test_id':20},database_path=db,tenant_id=1,user={'id':1,'rol':'DOCENTE'})
     except LookupError: pass
     else: raise AssertionError('Se cruzó una generación de otro tenant.')
+with tempfile.TemporaryDirectory() as tmp:
+    db=str(Path(tmp)/'health.db');conn=sqlite3.connect(db)
+    conn.executescript('''CREATE TABLE sn_actividades_integrales(id INTEGER PRIMARY KEY,fundacion_id INTEGER,unidad_nombre TEXT,titulo TEXT,fecha_ejecucion TEXT,metodologia TEXT,resultados TEXT,requiere_evidencias INTEGER);
+    CREATE TABLE sn_actividad_temas(fundacion_id INTEGER,actividad_id INTEGER,tema_id INTEGER);
+    CREATE TABLE sn_actividad_participantes(fundacion_id INTEGER,actividad_id INTEGER,asistio INTEGER);
+    CREATE TABLE sn_evidencias_integrales(fundacion_id INTEGER,actividad_id INTEGER,activo INTEGER);
+    CREATE TABLE sn_informes_tematicos(id INTEGER,version INTEGER,estado TEXT,producto_id INTEGER,faltantes_json TEXT,disparador TEXT,creado_en TEXT,revisado_en TEXT,aprobado_en TEXT,fundacion_id INTEGER,actividad_id INTEGER);''')
+    conn.execute("INSERT INTO sn_actividades_integrales VALUES(1,1,'UCA 1','Encuentro',NULL,NULL,NULL,1)")
+    conn.execute("INSERT INTO sn_actividades_integrales VALUES(2,2,'UCA X','Ajena','2026-09-01','Método','Resultado',0)");conn.commit();conn.close()
+    gaps=execute('get_health_activity_gaps',args={'activity_id':1},database_path=db,tenant_id=1,user={'id':1,'rol':'NUTRICIONISTA','unidades':['UCA 1']})
+    assert gaps['complete'] is False and gaps['counts']['attendees']==0 and 'evidencias auténticas' in gaps['missing']
+    try:execute('get_health_activity_gaps',args={'activity_id':2},database_path=db,tenant_id=1,user={'id':1,'rol':'NUTRICIONISTA','unidades':['UCA 1']})
+    except LookupError:pass
+    else:raise AssertionError('Liam consultó una actividad de otro tenant.')
 print('LIA_TOOL_REGISTRY_V7_PASS')
