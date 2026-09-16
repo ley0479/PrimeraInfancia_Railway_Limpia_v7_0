@@ -132,6 +132,9 @@ class SaludNutricionIntegralService:
 
     def init_schema(self) -> None:
         self.repo.execute_script(INTEGRAL_SCHEMA_SQL)
+        enable_rls = getattr(self.repo, '_enable_institutional_rls', None)
+        if callable(enable_rls):
+            enable_rls()
 
     @staticmethod
     def _period(value: Any) -> str:

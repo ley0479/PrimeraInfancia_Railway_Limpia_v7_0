@@ -28,6 +28,8 @@ assert "snGenerarInformeMensual" in frontend
 assert "esperarJobOperativo(data.job_id" in frontend
 assert "ENABLE ROW LEVEL SECURITY" in repository and "FORCE ROW LEVEL SECURITY" in repository
 assert "CREATE POLICY" in repository and "app.current_fundacion_id" in repository
+assert "if self.table_exists(table)" in repository and "if not tables:" in repository
+assert "enable_rls = getattr(self.repo, '_enable_institutional_rls', None)" in service
 assert "set_config('app.current_fundacion_id'" in compat and "app.allow_global" in compat
 assert 'snMostrarVista(\'mensuales\')' in index and 'snMostrarVista(\'actas\')' in index
 assert "salud-nutricion.js?v=2.7.0-informes-actas-1" in index

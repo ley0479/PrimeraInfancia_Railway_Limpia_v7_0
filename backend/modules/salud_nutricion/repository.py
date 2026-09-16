@@ -105,16 +105,20 @@ class SaludNutricionRepository(CoreCompatRepository):
         """Activa RLS solo para las tablas nuevas cuyo acceso ya propaga tenant transaccional."""
         if not database.is_postgresql or database.engine is None:
             return
-        tables = ('sn_periodos_mensuales', 'sn_informes_mensuales', 'sn_actas_institucionales', 'sn_acta_tareas')
+        tables = tuple(
+            table for table in
+            ('sn_periodos_mensuales', 'sn_informes_mensuales', 'sn_actas_institucionales', 'sn_acta_tareas')
+            if self.table_exists(table)
+        )
+        if not tables:
+            return
         predicate = "(fundacion_id = NULLIF(current_setting('app.current_fundacion_id', true), '')::integer OR current_setting('app.allow_global', true) = 'true')"
         with database.transaction() as connection:
-            existing = {row[0] for row in connection.execute(text("SELECT policyname FROM pg_policies WHERE schemaname=current_schema() AND tablename=:table"), {'table': tables[0]}).fetchall()}
             for table in tables:
+                existing = {row[0] for row in connection.execute(text("SELECT policyname FROM pg_policies WHERE schemaname=current_schema() AND tablename=:table"), {'table': table}).fetchall()}
                 connection.execute(text(f'ALTER TABLE {table} ENABLE ROW LEVEL SECURITY'))
                 connection.execute(text(f'ALTER TABLE {table} FORCE ROW LEVEL SECURITY'))
                 policy = f'{table}_tenant_policy'
-                if table != tables[0]:
-                    existing = {row[0] for row in connection.execute(text("SELECT policyname FROM pg_policies WHERE schemaname=current_schema() AND tablename=:table"), {'table': table}).fetchall()}
                 if policy not in existing:
                     connection.execute(text(f'CREATE POLICY {policy} ON {table} FOR ALL USING {predicate} WITH CHECK {predicate}'))
 
