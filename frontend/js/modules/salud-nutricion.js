@@ -7,7 +7,8 @@ let snEstado = {
     dashboard: null,
     alertas: [],
     calendario: [],
-    integral: { expedientes: [], actividades: [], rutas: [], periodos: [], actas: [] }
+    integral: { expedientes: [], actividades: [], rutas: [], periodos: [], actas: [] },
+    plantillaPendiente: null
 };
 
 function snMensaje(texto, tipo = 'success') {
@@ -561,7 +562,22 @@ async function snTematicasSubirPlantilla() {
     form.append('componente','SALUD_NUTRICION'); if(version) form.append('version',version);
     try {
         const data=await snTematicasRequest('/api/documentos/plantillas',{method:'POST',body:form});
-        snMensaje(`${data.message || 'Plantilla registrada.'} Revisa y aprueba el mapeo antes de usarla.`,'success');
+        const pending={versionId:Number(data.plantilla_version?.id || 0),kind,fields:data.mapeo?.mapeo?.campos || []}; snEstado.plantillaPendiente=pending;
+        const review=document.getElementById('sn-template-review');
+        if(review) { review.classList.remove('hidden'); review.innerHTML=`<strong>Mapeo propuesto para ${escaparHtml(kind)}</strong><p class="mt-1">${pending.fields.length ? pending.fields.map((x)=>escaparHtml(x.field_key || '')).join(' · ') : 'No se detectaron campos automáticos; revisa el documento en Centro Documental.'}</p>${pending.versionId && pending.fields.length ? '<button onclick="snTematicasAprobarPlantilla()" class="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Confirmar y aprobar este mapeo</button>' : ''}`; }
+        snMensaje(`${data.message || 'Plantilla registrada.'} Revisa los campos antes de aprobar.`,'success');
+        await snTematicasCargar();
+    } catch(error) { snMensaje(error.message,'error'); }
+}
+
+async function snTematicasAprobarPlantilla() {
+    const pending=snEstado.plantillaPendiente;
+    if(!pending?.versionId || !pending.fields?.length) return snMensaje('No hay un mapeo detectable listo para aprobar.','error');
+    if(!window.confirm(`Aprobar ${pending.fields.length} campos de la plantilla ${pending.kind}. Esta versión se usará para nuevos documentos. ¿Continuar?`)) return;
+    try {
+        const data=await snTematicasRequest(`/api/documentos/plantillas/${pending.versionId}/aprobar`,{method:'POST'});
+        snMensaje(`${data.message || 'Mapeo aprobado.'} Campos aprobados: ${data.mapeo?.campos_aprobados || pending.fields.length}.`,'success');
+        snEstado.plantillaPendiente=null; const review=document.getElementById('sn-template-review'); if(review) review.classList.add('hidden');
         await snTematicasCargar();
     } catch(error) { snMensaje(error.message,'error'); }
 }

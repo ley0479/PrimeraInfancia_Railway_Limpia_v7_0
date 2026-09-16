@@ -110,10 +110,15 @@ class CentroDocumentalRepository:
         with self.connect() as connection:
             mapping=connection.execute("SELECT * FROM doc_mapeos WHERE plantilla_version_id=? AND fundacion_id=? ORDER BY version DESC LIMIT 1",(version_id,tenant)).fetchone()
             if not mapping: raise ValueError("No existe un mapa propuesto para aprobar.")
-            connection.execute("UPDATE doc_mapeos SET estado='APROBADO',usuario_aprobador_id=?,aprobado_en=? WHERE id=?",(user_id,now_iso(),mapping["id"]))
+            try: payload=json.loads(mapping["mapa_json"] or "{}")
+            except (TypeError,ValueError): raise ValueError("El mapa propuesto no contiene JSON válido.")
+            for field in payload.get("campos") or []:
+                if field.get("field_key") and field.get("target_type"): field["status"]="APROBADO"
+            payload["estado"]="APROBADO"; payload["requiere_aprobacion"]=False
+            connection.execute("UPDATE doc_mapeos SET estado='APROBADO',mapa_json=?,usuario_aprobador_id=?,aprobado_en=? WHERE id=?",(json.dumps(payload,ensure_ascii=False),user_id,now_iso(),mapping["id"]))
             connection.execute("UPDATE doc_plantilla_versiones SET estado='APROBADA',usuario_aprobador_id=?,mapa_version=?,actualizado_en=? WHERE id=? AND fundacion_id=?",(user_id,mapping["version"],now_iso(),version_id,tenant)); connection.commit()
         self.audit(tenant,"MAPEO",mapping["id"],"APROBADO",user_id)
-        return {"id":mapping["id"],"estado":"APROBADO","version":mapping["version"]}
+        return {"id":mapping["id"],"estado":"APROBADO","version":mapping["version"],"campos_aprobados":len(payload.get("campos") or [])}
 
     def list_catalogs(self, tenant: int, component: str = "") -> list[dict]:
         with self.connect() as connection:

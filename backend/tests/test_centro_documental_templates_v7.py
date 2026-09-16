@@ -26,7 +26,7 @@ def digest(path: Path) -> str:
 def run() -> None:
     with tempfile.TemporaryDirectory() as folder:
         root=Path(folder); database=root/"documents.sqlite"; migrate(str(database)); repo=CentroDocumentalRepository(str(database))
-        docx=root/"acta.docx"; document=Document(); document.sections[0].header.paragraphs[0].text="MEMBRETE OFICIAL"; table=document.add_table(rows=2,cols=2); table.cell(0,0).text="Tema"; table.cell(0,1).text="{{ actividad.tema }}"; document.save(docx)
+        docx=root/"acta.docx"; document=Document(); document.sections[0].header.paragraphs[0].text="MEMBRETE OFICIAL"; table=document.add_table(rows=2,cols=2); table.cell(0,0).text="Fecha:"; table.cell(0,1).text="{{ actividad.fecha }}"; document.save(docx)
         before=digest(docx); doc_inspection=inspect_template(docx); after=digest(docx)
         assert before == after and doc_inspection["tipo"] == "DOCX" and doc_inspection["tablas"][0]["columnas"] == 2
         assert propose_mapping(doc_inspection)["requiere_aprobacion"] is True
@@ -51,6 +51,10 @@ def run() -> None:
             {"version":"1","nombre_original":docx.name,"nombre_seguro":docx.name,"ruta_privada":str(docx),"mime_type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","extension":".docx","hash_sha256":before,"inspeccion":doc_inspection},1)
         mapping=repo.save_mapping(version["id"],1,propose_mapping(doc_inspection),1); assert mapping["estado"] == "PROPUESTO"
         approved=repo.approve_mapping(version["id"],1,1); assert approved["estado"] == "APROBADO"
+        with repo.connect() as connection:
+            approved_payload=__import__('json').loads(connection.execute("SELECT mapa_json FROM doc_mapeos WHERE id=?",(approved["id"],)).fetchone()["mapa_json"])
+        assert approved_payload["requiere_aprobacion"] is False
+        assert approved_payload["campos"][0]["status"] == "APROBADO" and approved["campos_aprobados"] == 1
         assert repo.get_version(version["id"],2) is None
         assert len(repo.list_templates(1)) == 1 and len(repo.list_templates(2)) == 0
         try:
