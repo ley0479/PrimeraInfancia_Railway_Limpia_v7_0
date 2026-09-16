@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS sn_informes_tematicos (
  version INTEGER NOT NULL, snapshot_hash TEXT NOT NULL, snapshot_json TEXT NOT NULL,
  faltantes_json TEXT NOT NULL DEFAULT '[]', estado TEXT NOT NULL DEFAULT 'BORRADOR_INCOMPLETO',
  producto_id INTEGER, plantilla_codigo TEXT, plantilla_version TEXT, producto_sha256 TEXT,
- disparador TEXT NOT NULL DEFAULT 'MANUAL', observaciones_revision TEXT,
+ disparador TEXT NOT NULL DEFAULT 'MANUAL', observaciones_revision TEXT, revision INTEGER NOT NULL DEFAULT 1,
  creado_por INTEGER, creado_en TEXT NOT NULL, revisado_por INTEGER, revisado_en TEXT,
  aprobado_por INTEGER, aprobado_en TEXT, actualizado_en TEXT NOT NULL,
  UNIQUE(fundacion_id,actividad_id,version), UNIQUE(fundacion_id,actividad_id,snapshot_hash),
@@ -208,6 +208,7 @@ class TematicasService:
             self.repo.ensure_column('sn_informes_tematicos','plantilla_codigo','TEXT')
             self.repo.ensure_column('sn_informes_tematicos','plantilla_version','TEXT')
             self.repo.ensure_column('sn_informes_tematicos','producto_sha256','TEXT')
+            self.repo.ensure_column('sn_informes_tematicos','revision','INTEGER NOT NULL DEFAULT 1')
 
     def material(self, material_id, tenant):
         row = self.repo.fetch_one('SELECT * FROM sn_materiales_tematicos WHERE id=? AND fundacion_id=?',(material_id,tenant))
@@ -443,7 +444,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
     def thematic_reports():
         tenant,_=_ctx(); user=_user(); activity_id=request.args.get('actividad_id',type=int); where=['i.fundacion_id=?']; params=[tenant]
         if activity_id:where.append('i.actividad_id=?');params.append(activity_id)
-        rows=repo.fetch_all(f'''SELECT i.id,i.actividad_id,i.version,i.snapshot_hash,i.faltantes_json,i.estado,i.producto_id,i.plantilla_codigo,i.plantilla_version,i.producto_sha256,i.disparador,i.observaciones_revision,i.creado_en,i.revisado_en,i.aprobado_en,a.unidad_nombre,a.titulo FROM sn_informes_tematicos i JOIN sn_actividades_integrales a ON a.id=i.actividad_id AND a.fundacion_id=i.fundacion_id WHERE {' AND '.join(where)} ORDER BY i.id DESC LIMIT 500''',tuple(params))
+        rows=repo.fetch_all(f'''SELECT i.id,i.actividad_id,i.version,i.revision,i.snapshot_hash,i.faltantes_json,i.estado,i.producto_id,i.plantilla_codigo,i.plantilla_version,i.producto_sha256,i.disparador,i.observaciones_revision,i.creado_en,i.revisado_en,i.aprobado_en,a.unidad_nombre,a.titulo FROM sn_informes_tematicos i JOIN sn_actividades_integrales a ON a.id=i.actividad_id AND a.fundacion_id=i.fundacion_id WHERE {' AND '.join(where)} ORDER BY i.id DESC LIMIT 500''',tuple(params))
         result=[]
         for row in rows:
             if _can_access_unit(row.get('unidad_nombre'),user):
@@ -459,6 +460,11 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         if not _can_access_unit(activity.get('unidad_nombre'),user):return jsonify({'error':'No tienes permiso sobre esta unidad.'}),403
         target=str(data.get('estado') or '').upper(); allowed={'EN_REVISION','DEVUELTO','APROBADO'}
         if target not in allowed:return jsonify({'error':'Estado de revisión no permitido.'}),400
+        expected=int(data.get('revision') or 0); current_revision=int(report.get('revision') or 1)
+        if expected != current_revision:return jsonify({'error':'El informe fue modificado por otro revisor. Recarga antes de continuar.','codigo':'VERSION_CONFLICT','revision_actual':current_revision}),409
+        current_state=str(report.get('estado') or '').upper()
+        transitions={'BORRADOR':{'EN_REVISION'},'BORRADOR_INCOMPLETO':{'EN_REVISION'},'EN_REVISION':{'DEVUELTO','APROBADO'},'DEVUELTO':{'EN_REVISION'}}
+        if target not in transitions.get(current_state,set()):return jsonify({'error':f'No se permite pasar de {current_state} a {target}.','codigo':'INVALID_STATE_TRANSITION'}),409
         missing=_loads(report.get('faltantes_json'),[])
         if target=='APROBADO' and missing:return jsonify({'error':'No se puede aprobar un borrador incompleto.','faltantes':missing}),409
         if target=='APROBADO' and user.get('rol') not in {'SUPERADMIN','GERENTE','COORDINADOR'}:return jsonify({'error':'La aprobación requiere un rol de coordinación autorizado.'}),403
@@ -468,9 +474,10 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
                 return jsonify({'error':'El borrador usa formato interno. Registra y aprueba la plantilla INFORME_SALUD_NUTRICION, genera una nueva versión y revísala antes de aprobar.','codigo':'PLANTILLA_INSTITUCIONAL_REQUIRED'}),409
         if str(report.get('estado'))=='APROBADO':return jsonify({'error':'El informe aprobado está congelado; genera una nueva versión para cambios posteriores.'}),409
         now=_now(); reviewer=user_id if target in {'EN_REVISION','DEVUELTO','APROBADO'} else None; approver=user_id if target=='APROBADO' else None
-        repo.execute('UPDATE sn_informes_tematicos SET estado=?,observaciones_revision=?,revisado_por=?,revisado_en=?,aprobado_por=?,aprobado_en=?,actualizado_en=? WHERE id=? AND fundacion_id=?',(target,data.get('observaciones'),reviewer,now,approver,now if approver else None,now,report_id,tenant))
+        affected=repo.execute_update('UPDATE sn_informes_tematicos SET estado=?,observaciones_revision=?,revisado_por=?,revisado_en=?,aprobado_por=?,aprobado_en=?,revision=revision+1,actualizado_en=? WHERE id=? AND fundacion_id=? AND revision=?',(target,data.get('observaciones'),reviewer,now,approver,now if approver else None,now,report_id,tenant,expected))
+        if affected != 1:return jsonify({'error':'El informe cambió durante la revisión. Recarga antes de continuar.','codigo':'VERSION_CONFLICT'}),409
         repo.execute('UPDATE sn_productos_actividad SET estado=?,revisado_por=?,fecha_revision=?,aprobado_por=?,fecha_aprobacion=?,observaciones=? WHERE id=? AND fundacion_id=?',(target,reviewer,now,approver,now if approver else None,data.get('observaciones'),report.get('producto_id'),tenant))
         _audit(repo,'CAMBIAR_ESTADO_INFORME_TEMATICO','sn_informes_tematicos',report_id,user,{'estado_anterior':report.get('estado'),'estado_nuevo':target,'producto_id':report.get('producto_id')})
-        return jsonify({'message':'Estado actualizado mediante acción profesional explícita.','estado':target,'informe_id':report_id})
+        return jsonify({'message':'Estado actualizado mediante acción profesional explícita.','estado':target,'informe_id':report_id,'revision':expected+1})
 
     return service

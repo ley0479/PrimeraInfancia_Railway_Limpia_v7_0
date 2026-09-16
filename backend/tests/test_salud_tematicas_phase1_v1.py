@@ -49,9 +49,13 @@ Resolución 2184 de 2019''',
     tables={row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     require({'sn_materiales_tematicos','sn_temas','sn_tema_correcciones','sn_tema_asignaciones','sn_actividad_temas','sn_actividad_calendario','sn_informes_tematicos'} <= tables, 'Migración temática incompleta.')
     report_columns={row[1] for row in db.execute('PRAGMA table_info(sn_informes_tematicos)')}
-    require({'plantilla_codigo','plantilla_version','producto_sha256'} <= report_columns,'El informe no congela plantilla e integridad del producto.')
+    require({'plantilla_codigo','plantilla_version','producto_sha256','revision'} <= report_columns,'El informe no congela plantilla, integridad y revisión concurrente.')
     db.row_factory=sqlite3.Row
     db.execute("INSERT INTO sn_actividades_integrales VALUES(1,1,'UCA 1',NULL,NULL,NULL,1)")
+    db.execute("INSERT INTO sn_informes_tematicos(fundacion_id,actividad_id,version,snapshot_hash,snapshot_json,estado,creado_en,actualizado_en) VALUES(1,1,1,'hash-concurrencia','{}','BORRADOR','2026-09-16','2026-09-16')")
+    first=db.execute("UPDATE sn_informes_tematicos SET estado='EN_REVISION',revision=revision+1 WHERE id=1 AND revision=1").rowcount
+    stale=db.execute("UPDATE sn_informes_tematicos SET estado='DEVUELTO',revision=revision+1 WHERE id=1 AND revision=1").rowcount
+    require(first==1 and stale==0,'Dos revisores pudieron sobrescribir la misma revisión del informe.')
     class Repo:
         def fetch_one(self,sql,params=()):
             row=db.execute(sql,params).fetchone();return dict(row) if row else None
