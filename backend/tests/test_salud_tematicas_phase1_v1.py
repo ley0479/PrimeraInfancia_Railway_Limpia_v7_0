@@ -48,6 +48,8 @@ Resolución 2184 de 2019''',
     db.executescript(SCHEMA_SQL)
     tables={row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     require({'sn_materiales_tematicos','sn_temas','sn_tema_correcciones','sn_tema_asignaciones','sn_actividad_temas','sn_actividad_calendario','sn_informes_tematicos'} <= tables, 'Migración temática incompleta.')
+    report_columns={row[1] for row in db.execute('PRAGMA table_info(sn_informes_tematicos)')}
+    require({'plantilla_codigo','plantilla_version','producto_sha256'} <= report_columns,'El informe no congela plantilla e integridad del producto.')
     db.row_factory=sqlite3.Row
     db.execute("INSERT INTO sn_actividades_integrales VALUES(1,1,'UCA 1',NULL,NULL,NULL,1)")
     class Repo:

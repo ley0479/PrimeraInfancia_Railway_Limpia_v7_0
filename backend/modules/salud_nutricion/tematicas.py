@@ -64,7 +64,8 @@ CREATE TABLE IF NOT EXISTS sn_informes_tematicos (
  id INTEGER PRIMARY KEY AUTOINCREMENT, fundacion_id INTEGER NOT NULL, actividad_id INTEGER NOT NULL,
  version INTEGER NOT NULL, snapshot_hash TEXT NOT NULL, snapshot_json TEXT NOT NULL,
  faltantes_json TEXT NOT NULL DEFAULT '[]', estado TEXT NOT NULL DEFAULT 'BORRADOR_INCOMPLETO',
- producto_id INTEGER, disparador TEXT NOT NULL DEFAULT 'MANUAL', observaciones_revision TEXT,
+ producto_id INTEGER, plantilla_codigo TEXT, plantilla_version TEXT, producto_sha256 TEXT,
+ disparador TEXT NOT NULL DEFAULT 'MANUAL', observaciones_revision TEXT,
  creado_por INTEGER, creado_en TEXT NOT NULL, revisado_por INTEGER, revisado_en TEXT,
  aprobado_por INTEGER, aprobado_en TEXT, actualizado_en TEXT NOT NULL,
  UNIQUE(fundacion_id,actividad_id,version), UNIQUE(fundacion_id,actividad_id,snapshot_hash),
@@ -192,7 +193,12 @@ def _report_snapshot(repo,tenant,activity_id):
 
 class TematicasService:
     def __init__(self, repo): self.repo = repo
-    def init_schema(self): self.repo.execute_script(SCHEMA_SQL)
+    def init_schema(self):
+        self.repo.execute_script(SCHEMA_SQL)
+        if hasattr(self.repo,'ensure_column'):
+            self.repo.ensure_column('sn_informes_tematicos','plantilla_codigo','TEXT')
+            self.repo.ensure_column('sn_informes_tematicos','plantilla_version','TEXT')
+            self.repo.ensure_column('sn_informes_tematicos','producto_sha256','TEXT')
 
     def material(self, material_id, tenant):
         row = self.repo.fetch_one('SELECT * FROM sn_materiales_tematicos WHERE id=? AND fundacion_id=?',(material_id,tenant))
@@ -411,7 +417,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
         generated=integral_service.prepare_activity_documents(tenant,activity_id,user,['INFORME']); product=((generated or {}).get('documentos') or [None])[0]
         if not product:return jsonify({'error':'El generador no produjo un archivo verificable.'}),500
         latest=repo.fetch_one('SELECT COALESCE(MAX(version),0) version FROM sn_informes_tematicos WHERE fundacion_id=? AND actividad_id=?',(tenant,activity_id)); version=int((latest or {}).get('version') or 0)+1; now=_now(); state='BORRADOR_INCOMPLETO' if missing else 'BORRADOR'
-        report_id=repo.execute('''INSERT INTO sn_informes_tematicos(fundacion_id,actividad_id,version,snapshot_hash,snapshot_json,faltantes_json,estado,producto_id,disparador,creado_por,creado_en,actualizado_en) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',(tenant,activity_id,version,digest,json.dumps(snapshot,ensure_ascii=False,default=str),json.dumps(missing,ensure_ascii=False),state,product['id'],str(data.get('disparador') or 'MANUAL').upper(),user_id,now,now))
+        report_id=repo.execute('''INSERT INTO sn_informes_tematicos(fundacion_id,actividad_id,version,snapshot_hash,snapshot_json,faltantes_json,estado,producto_id,plantilla_codigo,plantilla_version,producto_sha256,disparador,creado_por,creado_en,actualizado_en) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(tenant,activity_id,version,digest,json.dumps(snapshot,ensure_ascii=False,default=str),json.dumps(missing,ensure_ascii=False),state,product['id'],product.get('plantilla_codigo'),product.get('plantilla_version'),product.get('sha256'),str(data.get('disparador') or 'MANUAL').upper(),user_id,now,now))
         institutional=_institutional_product(product,'INFORME')
         format_status={'institucional':institutional,'estado':'PLANTILLA_INSTITUCIONAL' if institutional else 'FORMATO_INTERNO','plantilla_aprobada':template,'advertencia':None if institutional else 'No hay una plantilla limpia y un mapeo aprobados con código INFORME_SALUD_NUTRICION.'}
         return jsonify({'message':'Borrador generado desde hechos registrados.' if not missing else 'BORRADOR INCOMPLETO generado sin inventar los campos faltantes.','informe':{'id':report_id,'version':version,'estado':state,'producto':product,'formato':format_status},'faltantes':missing}),201
@@ -421,7 +427,7 @@ def register_tematicas_routes(bp, repo, integral_service=None, database_path=Non
     def thematic_reports():
         tenant,_=_ctx(); user=_user(); activity_id=request.args.get('actividad_id',type=int); where=['i.fundacion_id=?']; params=[tenant]
         if activity_id:where.append('i.actividad_id=?');params.append(activity_id)
-        rows=repo.fetch_all(f'''SELECT i.id,i.actividad_id,i.version,i.snapshot_hash,i.faltantes_json,i.estado,i.producto_id,i.disparador,i.observaciones_revision,i.creado_en,i.revisado_en,i.aprobado_en,a.unidad_nombre,a.titulo FROM sn_informes_tematicos i JOIN sn_actividades_integrales a ON a.id=i.actividad_id AND a.fundacion_id=i.fundacion_id WHERE {' AND '.join(where)} ORDER BY i.id DESC LIMIT 500''',tuple(params))
+        rows=repo.fetch_all(f'''SELECT i.id,i.actividad_id,i.version,i.snapshot_hash,i.faltantes_json,i.estado,i.producto_id,i.plantilla_codigo,i.plantilla_version,i.producto_sha256,i.disparador,i.observaciones_revision,i.creado_en,i.revisado_en,i.aprobado_en,a.unidad_nombre,a.titulo FROM sn_informes_tematicos i JOIN sn_actividades_integrales a ON a.id=i.actividad_id AND a.fundacion_id=i.fundacion_id WHERE {' AND '.join(where)} ORDER BY i.id DESC LIMIT 500''',tuple(params))
         result=[]
         for row in rows:
             if _can_access_unit(row.get('unidad_nombre'),user):
