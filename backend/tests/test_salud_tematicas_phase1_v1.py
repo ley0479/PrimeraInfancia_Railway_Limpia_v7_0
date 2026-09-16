@@ -75,7 +75,7 @@ Resolución 2184 de 2019''',
         def __init__(self): self.event=None
         def log(self,*args,**kwargs): self.event=(args,kwargs)
     audit_repo=AuditRepo(); _audit(audit_repo,'PUBLICAR_TEMATICAS_SALUD','sn_materiales_tematicos',4,{'username':'revisor'}, {'periodo':'2026-09','asignaciones_creadas':3})
-    require(audit_repo.event[0][:3]==('PUBLICAR_TEMATICAS_SALUD','sn_materiales_tematicos',4) and audit_repo.event[1]['usuario']=='revisor','La auditoría temática no registró actor y recurso.')
+    require(audit_repo.event[0][:3]==('PUBLICAR_TEMATICAS_SALUD','sn_materiales_tematicos',4) and audit_repo.event[1]['usuario']=='revisor' and len(audit_repo.event[1]['nuevos']['trace_id'])>=16,'La auditoría temática no registró actor, recurso y trace_id.')
     db.close()
     print('PASS test_salud_tematicas_phase1_v1 (fixture textual; prueba visual real NO VERIFICADA)')
 

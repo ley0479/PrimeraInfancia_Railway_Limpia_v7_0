@@ -4,6 +4,7 @@ import json
 import hashlib
 import re
 import unicodedata
+import uuid
 from datetime import datetime
 
 from flask import g, jsonify, request
@@ -143,7 +144,10 @@ def _institutional_product(product, kind='INFORME'):
 
 def _audit(repo, action, entity, entity_id, user=None, details=None):
     if hasattr(repo,'log'):
-        repo.log(action,entity,entity_id,usuario=str((user or {}).get('username') or 'sistema'),nuevos=details or {})
+        try: trace_id=str(request.headers.get('X-Request-ID') or request.headers.get('X-Trace-Id') or uuid.uuid4().hex)[:80]
+        except RuntimeError: trace_id=uuid.uuid4().hex
+        payload=dict(details or {}); payload['trace_id']=trace_id
+        repo.log(action,entity,entity_id,usuario=str((user or {}).get('username') or 'sistema'),nuevos=payload)
 
 
 def _serialize_theme(row):
