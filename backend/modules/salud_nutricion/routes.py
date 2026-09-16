@@ -35,6 +35,10 @@ ENTREGABLES_READ_ROLES = ('SUPERADMIN', 'GERENTE', 'COORDINADOR', 'AUXILIAR_ADMI
 ENTREGABLES_EDIT_ROLES = ('SUPERADMIN', 'GERENTE', 'COORDINADOR', 'NUTRICIONISTA')
 
 
+def health_themes_enabled() -> bool:
+    return str(os.environ.get('ENABLE_HEALTH_THEMES','true')).strip().lower() in {'1','true','yes','on','si','sí'}
+
+
 def allowed_data_file(filename: str) -> bool:
     return os.path.splitext(filename.lower())[1] in {'.xlsx', '.xls', '.xlsm', '.csv', '.txt'}
 
@@ -66,6 +70,8 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
 
     @bp.before_request
     def _ensure_schema():
+        if request.path.startswith('/api/salud-nutricion/tematicas') and not health_themes_enabled():
+            return jsonify({'error':'Temáticas, actividades e informes está desactivado por configuración.','codigo':'FEATURE_DISABLED'}),404
         repo.init_schema()
         entregables_service.init_schema()
         integral_service.init_schema()

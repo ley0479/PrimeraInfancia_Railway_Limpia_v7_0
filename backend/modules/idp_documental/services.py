@@ -19,6 +19,11 @@ from .schema import IDP_SCHEMA_SQL
 
 ALLOWED_EXTENSIONS = {'.xlsx', '.xlsm', '.docx', '.pptx', '.pdf', '.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.heif', '.heic'}
 MAX_FILE_SIZE = 50 * 1024 * 1024
+MAX_ARCHIVE_ENTRIES = max(100, int(os.environ.get('IDP_MAX_ARCHIVE_ENTRIES','10000')))
+MAX_ARCHIVE_UNCOMPRESSED = max(MAX_FILE_SIZE, int(os.environ.get('IDP_MAX_ARCHIVE_UNCOMPRESSED_BYTES',str(200 * 1024 * 1024))))
+MAX_ARCHIVE_RATIO = max(10, int(os.environ.get('IDP_MAX_ARCHIVE_RATIO','200')))
+MAX_PDF_PAGES = max(1, int(os.environ.get('IDP_MAX_PDF_PAGES','200')))
+MAX_IMAGE_PIXELS = max(1_000_000, int(os.environ.get('IDP_MAX_IMAGE_PIXELS','40000000')))
 IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.heif', '.heic'}
 AZURE_API_VERSION = '2024-11-30'
 
@@ -53,6 +58,17 @@ def validate_file_signature(path: Path) -> None:
     if ext in {'.xlsx', '.xlsm', '.docx', '.pptx'}:
         if not zipfile.is_zipfile(path):
             raise ValueError('El archivo Office no tiene una estructura válida.')
+        with zipfile.ZipFile(path) as archive:
+            entries=archive.infolist()
+            if len(entries)>MAX_ARCHIVE_ENTRIES:raise ValueError('El archivo Office contiene demasiados elementos internos.')
+            total=0
+            for item in entries:
+                normalized=item.filename.replace('\\','/')
+                if normalized.startswith('/') or '..' in normalized.split('/'):raise ValueError('El archivo Office contiene una ruta interna no permitida.')
+                if (item.external_attr >> 16) & 0o170000 == 0o120000:raise ValueError('El archivo Office contiene enlaces simbólicos no permitidos.')
+                total+=int(item.file_size or 0)
+                if total>MAX_ARCHIVE_UNCOMPRESSED:raise ValueError('El contenido descomprimido supera el límite permitido.')
+                if item.compress_size and item.file_size/item.compress_size>MAX_ARCHIVE_RATIO:raise ValueError('El archivo Office presenta una relación de compresión no permitida.')
         return
     if ext == '.pdf':
         with path.open('rb') as stream:
@@ -63,6 +79,7 @@ def validate_file_signature(path: Path) -> None:
         try:
             from PIL import Image
             with Image.open(path) as image:
+                if image.width*image.height>MAX_IMAGE_PIXELS:raise ValueError('La imagen supera el límite de píxeles permitido.')
                 image.verify()
         except Exception as exc:
             raise ValueError('La imagen está dañada o no corresponde al formato indicado.') from exc
@@ -174,6 +191,9 @@ def _read_pdf(path: Path) -> dict:
     except Exception as exc:
         return {'motor': 'PDF_PENDIENTE', 'texto': '', 'paginas': [], 'requiere_ocr': True, 'advertencia': f'PyMuPDF no disponible: {exc}'}
     document = fitz.open(str(path))
+    if document.page_count > MAX_PDF_PAGES:
+        document.close()
+        raise ValueError(f'El PDF supera el límite de {MAX_PDF_PAGES} páginas.')
     pages, fragments = [], []
     for index, page in enumerate(document, 1):
         text = page.get_text('text') or ''
