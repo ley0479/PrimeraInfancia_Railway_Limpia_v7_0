@@ -501,17 +501,34 @@ async function snTematicasRequest(path, options = {}) {
 
 async function snTematicasCargar() {
     try {
-        const [materials, units] = await Promise.all([
+        const [materials, units, assignments] = await Promise.all([
             snTematicasRequest('/api/salud-nutricion/tematicas/materiales'),
-            snTematicasRequest('/api/salud-nutricion/tematicas/unidades')
+            snTematicasRequest('/api/salud-nutricion/tematicas/unidades'),
+            snTematicasRequest('/api/salud-nutricion/tematicas/asignaciones')
         ]);
         snEstado.tematicas = materials.materiales || [];
         const unitBox = document.getElementById('sn-theme-units');
         if (unitBox) unitBox.innerHTML = (units.unidades || []).map((u) => `<label class="flex gap-2"><input type="checkbox" value="${Number(u.id)}"><span>${escaparHtml(u.nombre || '')}</span></label>`).join('') || '<span class="text-amber-300">No hay unidades activas en Base Maestra.</span>';
+        const planUnit=document.getElementById('sn-theme-plan-unit');
+        if(planUnit) planUnit.innerHTML='<option value="">Unidad</option>'+(units.unidades || []).map((u)=>`<option value="${Number(u.id)}">${escaparHtml(u.nombre || '')}</option>`).join('');
+        const published=document.getElementById('sn-theme-published');
+        const unique=new Map(); (assignments.asignaciones || []).forEach((a)=>unique.set(`${a.tema_id}:${a.periodo}:${a.unidad_id}`,a));
+        if(published) published.innerHTML=[...unique.values()].map((a)=>`<label class="rounded-xl border border-slate-700 p-2"><input type="checkbox" value="${Number(a.tema_id)}" data-period="${escaparHtml(a.periodo || '')}" data-unit="${Number(a.unidad_id)}"> <span>${escaparHtml(a.titulo_normalizado || a.titulo_original || '')}</span><small class="block text-slate-500">${escaparHtml(a.periodo || '')} · ${escaparHtml(a.unidad_nombre || '')}</small></label>`).join('') || '<span class="text-slate-500">Publica temáticas para habilitar la planeación.</span>';
         const host = document.getElementById('sn-theme-materials');
         if (!host) return;
         host.innerHTML = snEstado.tematicas.length ? snEstado.tematicas.map((m) => `<article class="sn-card"><div class="flex flex-wrap justify-between gap-2"><div><strong>${escaparHtml(m.titulo_documento || '')}</strong><p class="text-xs text-slate-400">${escaparHtml(m.estado || '')} · ${escaparHtml(m.metodo_extraccion || '')}</p></div><a class="text-cyan-300" target="_blank" href="${backendUrl}/api/idp/documentos/${Number(m.idp_documento_id)}/vista-previa">Ver original</a></div><div class="mt-3 grid gap-3">${(m.temas || []).map((t) => `<div class="rounded-xl border border-slate-700 p-3"><label class="text-xs text-slate-400">Título extraído</label><p>${escaparHtml(t.titulo_original || '')}</p><label class="mt-2 block text-xs text-slate-400">Denominación normalizada propuesta</label><input class="sn-ent-input w-full" value="${escaparHtml(t.titulo_normalizado || '')}" onchange="snTematicaEditar(${Number(t.id)},${Number(t.revision)},this.value)"><p class="mt-2 text-xs text-slate-500">Procedencia: ${escaparHtml(JSON.stringify(t.procedencia || {}))}</p></div>`).join('') || '<p class="text-amber-300">Sin contenido temático identificado.</p>'}</div><button class="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm" onclick="snTematicasPublicar(${Number(m.id)})">Revisar alcance y publicar</button></article>`).join('') : '<p class="text-slate-400">Aún no hay materiales temáticos.</p>';
     } catch (error) { snMensaje(error.message, 'error'); }
+}
+
+async function snTematicasPlanificar() {
+    const unidad_id=Number(document.getElementById('sn-theme-plan-unit')?.value || 0);
+    const selected=[...document.querySelectorAll('#sn-theme-published input:checked')];
+    const periodos=[...new Set(selected.map((x)=>x.dataset.period))];
+    if(!unidad_id || !selected.length || periodos.length!==1) return snMensaje('Selecciona una unidad y temas de un mismo periodo.','error');
+    if(selected.some((x)=>Number(x.dataset.unit)!==unidad_id)) return snMensaje('Todas las temáticas deben estar publicadas para la unidad seleccionada.','error');
+    const payload={unidad_id,periodo:periodos[0],tema_ids:[...new Set(selected.map((x)=>Number(x.value)))],linea_componente:document.getElementById('sn-theme-plan-line')?.value,fecha_programada:document.getElementById('sn-theme-plan-date')?.value || null,titulo:document.getElementById('sn-theme-plan-title')?.value?.trim(),objetivo:document.getElementById('sn-theme-plan-objective')?.value?.trim(),metodologia:document.getElementById('sn-theme-plan-method')?.value?.trim()};
+    try { const data=await snTematicasRequest('/api/salud-nutricion/tematicas/planificar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); snMensaje(data.message,'success'); }
+    catch(error){ snMensaje(error.message,'error'); }
 }
 
 async function snTematicasExtraer() {
@@ -522,6 +539,31 @@ async function snTematicasExtraer() {
         const data = await snTematicasRequest('/api/salud-nutricion/tematicas/extraer', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({documento_id:documentoId,periodo}) });
         snMensaje(data.message, 'success'); await snTematicasCargar();
     } catch (error) { snMensaje(error.message, 'error'); }
+}
+
+async function snTematicasCargarArchivo() {
+    const file = document.getElementById('sn-theme-file')?.files?.[0];
+    if (!file) return snMensaje('Selecciona un material JPG, PNG o PDF.', 'error');
+    const form=new FormData(); form.append('file',file);
+    try {
+        snMensaje('Guardando el original privado y ejecutando la lectura…','success');
+        let uploaded=await snTematicasRequest('/api/idp/documentos',{method:'POST',body:form});
+        let docData=uploaded.documento || {};
+        for (let attempt=0; attempt<20 && ['EN_COLA','PROCESANDO','RECIBIDO'].includes(String(docData.estado || '').toUpperCase()); attempt+=1) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            const status=await snTematicasRequest(`/api/idp/documentos/${Number(docData.id)}`);
+            docData=status.documento || docData;
+        }
+        if (['EN_COLA','PROCESANDO','RECIBIDO'].includes(String(docData.estado || '').toUpperCase())) throw new Error('El material sigue procesándose. Conserva su ID y vuelve a intentar la extracción en unos minutos.');
+        if (['REQUIERE_OCR','ERROR'].includes(String(docData.estado || '').toUpperCase())) {
+            const retried=await snTematicasRequest(`/api/idp/documentos/${Number(docData.id)}/reintentar-ocr`,{method:'POST'});
+            docData=retried.documento || docData;
+        }
+        const id=Number(docData.id || uploaded.documento?.id || 0);
+        if (!id) throw new Error('El Motor Documental no devolvió el identificador del material.');
+        const idInput=document.getElementById('sn-theme-document-id'); if(idInput) idInput.value=String(id);
+        await snTematicasExtraer();
+    } catch(error) { snMensaje(error.message,'error'); }
 }
 
 async function snTematicaEditar(id, revision, value) {

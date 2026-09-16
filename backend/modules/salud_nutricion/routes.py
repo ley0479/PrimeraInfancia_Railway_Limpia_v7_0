@@ -62,7 +62,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
     entregables_service.init_schema()
     data_dir = os.environ.get('DATA_DIR') or os.path.dirname(os.path.abspath(upload_folder))
     integral_service = register_integral_routes(bp, repo, data_dir)
-    tematicas_service = register_tematicas_routes(bp, repo)
+    tematicas_service = register_tematicas_routes(bp, repo, integral_service, database_path, data_dir)
 
     @bp.before_request
     def _ensure_schema():

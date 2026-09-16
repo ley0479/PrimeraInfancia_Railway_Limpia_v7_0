@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from modules.salud_nutricion.tematicas import SCHEMA_SQL, SCHEMA_VERSION, _theme_candidates
+from modules.salud_nutricion.tematicas import SCHEMA_SQL, SCHEMA_VERSION, _can_access_unit, _theme_candidates
 
 
 def require(condition, message):
@@ -30,6 +30,9 @@ Resolución 2184 de 2019''',
     require(references == [{'texto':'Resolución 2184 de 2019','tipo':'REFERENCIA_DOCUMENTAL_EXTRAIDA','vigencia_verificada':False}], 'La referencia normativa no quedó explícita y sin certificar.')
     require(not any('fecha' in x for x in themes), '2019 se convirtió indebidamente en fecha de actividad.')
     require(not any(key in raw for key in ('periodo','unidad','asistentes','resultados','ejecucion')), 'El fixture inventó hechos operativos.')
+    require(_can_access_unit('UCA 1',{'rol':'NUTRICIONISTA','unidades':['UCA 1']}), 'Bloqueó una unidad asignada.')
+    require(not _can_access_unit('UCA 2',{'rol':'NUTRICIONISTA','unidades':['UCA 1']}), 'Permitió una unidad no asignada.')
+    require(_can_access_unit('UCA 2',{'rol':'COORDINADOR','unidades':[]}), 'Restringió incorrectamente coordinación.')
 
     empty, empty_refs = _theme_candidates({'texto':'Documento administrativo sin contenido relacionado'})
     require(empty == [] and empty_refs == [], 'Un archivo sin temáticas produjo contenido inventado.')
@@ -39,7 +42,7 @@ Resolución 2184 de 2019''',
     db.executescript(SCHEMA_SQL)
     db.executescript(SCHEMA_SQL)
     tables={row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    require({'sn_materiales_tematicos','sn_temas','sn_tema_correcciones','sn_tema_asignaciones','sn_actividad_temas'} <= tables, 'Migración temática incompleta.')
+    require({'sn_materiales_tematicos','sn_temas','sn_tema_correcciones','sn_tema_asignaciones','sn_actividad_temas','sn_actividad_calendario'} <= tables, 'Migración temática incompleta.')
     db.close()
     print('PASS test_salud_tematicas_phase1_v1 (fixture textual; prueba visual real NO VERIFICADA)')
 

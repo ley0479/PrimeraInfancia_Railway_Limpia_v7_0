@@ -5,7 +5,7 @@ import re
 import unicodedata
 from datetime import datetime
 
-from flask import jsonify, request
+from flask import g, jsonify, request
 from modules.seguridad.services import get_request_user_context, require_roles
 
 
@@ -53,6 +53,12 @@ CREATE TABLE IF NOT EXISTS sn_actividad_temas (
  PRIMARY KEY(fundacion_id,actividad_id,tema_id,tema_version),
  FOREIGN KEY(actividad_id) REFERENCES sn_actividades_integrales(id), FOREIGN KEY(tema_id) REFERENCES sn_temas(id)
 );
+CREATE TABLE IF NOT EXISTS sn_actividad_calendario (
+ fundacion_id INTEGER NOT NULL, actividad_id INTEGER NOT NULL, calendario_entregable_id INTEGER NOT NULL,
+ fecha_sincronizada TEXT NOT NULL, creado_por INTEGER, creado_en TEXT NOT NULL, actualizado_en TEXT NOT NULL,
+ PRIMARY KEY(fundacion_id,actividad_id), UNIQUE(fundacion_id,calendario_entregable_id),
+ FOREIGN KEY(actividad_id) REFERENCES sn_actividades_integrales(id)
+);
 CREATE INDEX IF NOT EXISTS idx_sn_material_tenant_estado ON sn_materiales_tematicos(fundacion_id,estado,periodo);
 CREATE INDEX IF NOT EXISTS idx_sn_tema_material ON sn_temas(fundacion_id,material_id,estado);
 CREATE INDEX IF NOT EXISTS idx_sn_asignacion_periodo ON sn_tema_asignaciones(fundacion_id,periodo,unidad_id,estado);
@@ -66,6 +72,28 @@ def _now():
 def _ctx():
     raw = get_request_user_context()
     return int(raw.get('fundacion_id') or 1), raw.get('usuario_id') or raw.get('id')
+
+
+def _user():
+    raw=getattr(g,'current_user',None) or {}
+    return {**raw,'id':raw.get('id'),'fundacion_id':int(raw.get('fundacion_id') or 1),'rol':str(raw.get('rol') or '').upper()}
+
+
+def _allowed_units(user):
+    if user.get('rol') in {'SUPERADMIN','GERENTE','COORDINADOR'}: return None
+    raw=user.get('unidades')
+    if isinstance(raw,str):
+        try: raw=json.loads(raw)
+        except Exception: raw=[x.strip() for x in raw.split(',') if x.strip()]
+    return [str(x).strip() for x in raw if str(x).strip()] if isinstance(raw,list) else []
+
+
+def _unit_key(value): return ' '.join(str(value or '').strip().upper().split())
+
+
+def _can_access_unit(name,user):
+    allowed=_allowed_units(user)
+    return True if allowed is None else _unit_key(name) in {_unit_key(x) for x in allowed}
 
 
 def _norm(value):
@@ -152,13 +180,14 @@ class TematicasService:
         return self.material(material_id,tenant)
 
 
-def register_tematicas_routes(bp, repo):
+def register_tematicas_routes(bp, repo, integral_service=None, database_path=None, data_dir=None):
     service=TematicasService(repo); service.init_schema()
 
     @bp.route('/tematicas/unidades',methods=['GET'])
     @require_roles(*READ_ROLES)
     def thematic_units():
-        tenant,_=_ctx(); rows=repo.fetch_all('SELECT id,nombre,codigo_unidad,coordinador FROM master_unidades WHERE fundacion_id=? AND activo=1 ORDER BY nombre',(tenant,))
+        tenant,_=_ctx(); user=_user(); rows=repo.fetch_all('SELECT id,nombre,codigo_unidad,coordinador FROM master_unidades WHERE fundacion_id=? AND activo=1 ORDER BY nombre',(tenant,))
+        rows=[row for row in rows if _can_access_unit(row.get('nombre'),user)]
         return jsonify({'unidades':rows,'fuente':'BASE_MAESTRA'})
 
     @bp.route('/tematicas/materiales',methods=['GET'])
@@ -166,6 +195,18 @@ def register_tematicas_routes(bp, repo):
     def thematic_materials():
         tenant,_=_ctx(); rows=repo.fetch_all('SELECT id FROM sn_materiales_tematicos WHERE fundacion_id=? ORDER BY actualizado_en DESC LIMIT 100',(tenant,))
         return jsonify({'materiales':[service.material(x['id'],tenant) for x in rows]})
+
+    @bp.route('/tematicas/asignaciones',methods=['GET'])
+    @require_roles(*READ_ROLES)
+    def thematic_assignments():
+        tenant,_=_ctx(); user=_user(); period=str(request.args.get('periodo') or '').strip()
+        where=['a.fundacion_id=?']; params=[tenant]
+        if period: where.append('a.periodo=?'); params.append(period)
+        rows=repo.fetch_all(f'''SELECT a.*,u.nombre unidad_nombre,t.titulo_original,t.titulo_normalizado,t.categoria_sugerida
+          FROM sn_tema_asignaciones a JOIN sn_temas t ON t.id=a.tema_id AND t.fundacion_id=a.fundacion_id
+          JOIN master_unidades u ON u.id=a.unidad_id AND u.fundacion_id=a.fundacion_id
+          WHERE {' AND '.join(where)} ORDER BY a.periodo DESC,u.nombre,t.titulo_original LIMIT 1000''',tuple(params))
+        return jsonify({'asignaciones':[row for row in rows if _can_access_unit(row.get('unidad_nombre'),user)]})
 
     @bp.route('/tematicas/extraer',methods=['POST'])
     @require_roles(*EDIT_ROLES)
@@ -207,7 +248,7 @@ def register_tematicas_routes(bp, repo):
     @bp.route('/tematicas/materiales/<int:material_id>/publicar',methods=['POST'])
     @require_roles(*EDIT_ROLES)
     def thematic_publish(material_id):
-        tenant,user_id=_ctx(); data=request.get_json(silent=True) or {}; material=service.material(material_id,tenant)
+        tenant,user_id=_ctx(); user=_user(); data=request.get_json(silent=True) or {}; material=service.material(material_id,tenant)
         if not material:return jsonify({'error':'Material no encontrado.'}),404
         if data.get('confirmar') is not True:return jsonify({'error':'La publicación requiere confirmación explícita.'}),400
         period=str(data.get('periodo') or material.get('periodo') or '').strip()
@@ -216,6 +257,8 @@ def register_tematicas_routes(bp, repo):
         if not unit_ids:return jsonify({'error':'Selecciona al menos una unidad autorizada.'}),400
         placeholders=','.join('?' for _ in unit_ids); units=repo.fetch_all(f'SELECT id FROM master_unidades WHERE fundacion_id=? AND activo=1 AND id IN ({placeholders})',(tenant,*unit_ids))
         if len(units)!=len(unit_ids):return jsonify({'error':'Una o más unidades no pertenecen al ámbito autorizado.'}),403
+        unit_rows=repo.fetch_all(f'SELECT id,nombre FROM master_unidades WHERE fundacion_id=? AND activo=1 AND id IN ({placeholders})',(tenant,*unit_ids))
+        if any(not _can_access_unit(row.get('nombre'),user) for row in unit_rows):return jsonify({'error':'Una o más unidades no están asignadas al usuario.'}),403
         themes=material.get('temas') or []
         if not themes:return jsonify({'error':'No hay temáticas revisables para publicar.'}),409
         now=_now(); created=0
@@ -227,5 +270,64 @@ def register_tematicas_routes(bp, repo):
                     repo.execute('INSERT INTO sn_tema_asignaciones(fundacion_id,tema_id,tema_version,periodo,unidad_id,responsable_id,estado,creado_por,creado_en,actualizado_en) VALUES(?,?,?,?,?,?,?,?,?,?)',(tenant,theme['id'],theme['version'],period,unit_id,data.get('responsable_id'),'PUBLICADA',user_id,now,now)); created+=1
         repo.execute("UPDATE sn_materiales_tematicos SET periodo=?,estado='PUBLICADO',revisado_por=?,revisado_en=?,publicado_en=?,actualizado_en=? WHERE id=? AND fundacion_id=?",(period,user_id,now,now,now,material_id,tenant))
         return jsonify({'message':'Temáticas publicadas. No se crearon actividades, fechas, asistentes ni resultados.','asignaciones_creadas':created,'material':service.material(material_id,tenant)})
+
+    @bp.route('/tematicas/actividades/<int:activity_id>/vincular',methods=['POST'])
+    @require_roles(*EDIT_ROLES)
+    def thematic_link_activity(activity_id):
+        tenant,user_id=_ctx(); user=_user(); data=request.get_json(silent=True) or {}
+        activity=repo.fetch_one('SELECT id,unidad_nombre,fecha_programada,fecha_ejecucion FROM sn_actividades_integrales WHERE id=? AND fundacion_id=?',(activity_id,tenant))
+        if not activity:return jsonify({'error':'Actividad no encontrada.'}),404
+        if not _can_access_unit(activity.get('unidad_nombre'),user):return jsonify({'error':'No tienes permiso sobre esta unidad.'}),403
+        theme_ids=sorted({int(x) for x in (data.get('tema_ids') or []) if str(x).isdigit()})
+        if not theme_ids:return jsonify({'error':'Selecciona al menos una temática publicada.'}),400
+        placeholders=','.join('?' for _ in theme_ids)
+        rows=repo.fetch_all(f'''SELECT DISTINCT t.id,t.version FROM sn_temas t JOIN sn_tema_asignaciones a ON a.tema_id=t.id AND a.tema_version=t.version AND a.fundacion_id=t.fundacion_id JOIN master_unidades u ON u.id=a.unidad_id AND u.fundacion_id=a.fundacion_id WHERE t.fundacion_id=? AND t.id IN ({placeholders}) AND t.estado='PUBLICADO' AND UPPER(TRIM(u.nombre))=UPPER(TRIM(?))''',(tenant,*theme_ids,activity.get('unidad_nombre')))
+        if len(rows)!=len(theme_ids):return jsonify({'error':'Alguna temática no está publicada para la unidad de la actividad.'}),409
+        now=_now(); created=0
+        for row in rows:
+            exists=repo.fetch_one('SELECT tema_id FROM sn_actividad_temas WHERE fundacion_id=? AND actividad_id=? AND tema_id=? AND tema_version=?',(tenant,activity_id,row['id'],row['version']))
+            if not exists:
+                repo.execute('INSERT INTO sn_actividad_temas(fundacion_id,actividad_id,tema_id,tema_version,creado_por,creado_en) VALUES(?,?,?,?,?,?)',(tenant,activity_id,row['id'],row['version'],user_id,now)); created+=1
+        total=repo.fetch_one('SELECT COUNT(*) total FROM sn_actividad_temas WHERE fundacion_id=? AND actividad_id=?',(tenant,activity_id))
+        return jsonify({'message':'Temáticas vinculadas. La asistencia existente no fue modificada.','vinculos_creados':created,'temas_vinculados':int((total or {}).get('total') or 0)})
+
+    @bp.route('/tematicas/planificar',methods=['POST'])
+    @require_roles(*EDIT_ROLES)
+    def thematic_plan():
+        if integral_service is None:return jsonify({'error':'El motor de actividades no está disponible.'}),503
+        tenant,user_id=_ctx(); user=_user(); data=request.get_json(silent=True) or {}
+        unit_id=int(data.get('unidad_id') or 0); unit=repo.fetch_one('SELECT id,nombre FROM master_unidades WHERE id=? AND fundacion_id=? AND activo=1',(unit_id,tenant))
+        if not unit:return jsonify({'error':'Unidad no encontrada en Base Maestra.'}),404
+        if not _can_access_unit(unit.get('nombre'),user):return jsonify({'error':'No tienes permiso sobre esta unidad.'}),403
+        period=str(data.get('periodo') or '').strip()
+        if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])',period):return jsonify({'error':'El periodo debe tener formato AAAA-MM.'}),400
+        theme_ids=sorted({int(x) for x in (data.get('tema_ids') or []) if str(x).isdigit()})
+        if not theme_ids:return jsonify({'error':'Selecciona al menos una temática publicada.'}),400
+        placeholders=','.join('?' for _ in theme_ids)
+        themes=repo.fetch_all(f'''SELECT DISTINCT t.id,t.version,t.titulo_original,t.titulo_normalizado FROM sn_temas t JOIN sn_tema_asignaciones a ON a.tema_id=t.id AND a.tema_version=t.version AND a.fundacion_id=t.fundacion_id WHERE t.fundacion_id=? AND t.id IN ({placeholders}) AND a.periodo=? AND a.unidad_id=? AND a.estado='PUBLICADA' ''',(tenant,*theme_ids,period,unit_id))
+        if len(themes)!=len(theme_ids):return jsonify({'error':'Alguna temática no está publicada para esa unidad y periodo.'}),409
+        date=str(data.get('fecha_programada') or '').strip() or None
+        if date and (not re.fullmatch(r'\d{4}-\d{2}-\d{2}',date) or not date.startswith(period+'-')):return jsonify({'error':'La fecha debe ser válida y pertenecer al periodo confirmado.'}),400
+        title=str(data.get('titulo') or '').strip()
+        if not title:return jsonify({'error':'El título de la actividad es obligatorio.'}),400
+        payload={'unidad_nombre':unit['nombre'],'linea_componente':data.get('linea_componente'),'tipo_actividad':data.get('tipo_actividad') or 'ENCUENTRO_EDUCATIVO','titulo':title,'objetivo':data.get('objetivo'),'metodologia':data.get('metodologia'),'fecha_programada':date,'estado':'PROGRAMADA' if date else 'SIN_PROGRAMAR','requiere_acta':data.get('requiere_acta',True),'requiere_listado':data.get('requiere_listado',True),'requiere_evidencias':data.get('requiere_evidencias',True),'responsable_id':data.get('responsable_id'),'responsable_nombre':data.get('responsable_nombre')}
+        try: result=integral_service.create_activity(tenant,payload,user)
+        except PermissionError as exc:return jsonify({'error':str(exc)}),403
+        except Exception as exc:return jsonify({'error':str(exc)}),400
+        activity=(result or {}).get('actividad') or {}; activity_id=int(activity.get('id') or 0); now=_now()
+        for theme in themes:
+            repo.execute('INSERT INTO sn_actividad_temas(fundacion_id,actividad_id,tema_id,tema_version,creado_por,creado_en) VALUES(?,?,?,?,?,?)',(tenant,activity_id,theme['id'],theme['version'],user_id,now))
+        calendar_item=None; calendar_warning=None
+        if date and database_path:
+            try:
+                from modules.calendario_inteligente.repository import CalendarioInteligenteRepository
+                calendar=CalendarioInteligenteRepository(database_path,data_dir)
+                calendar_item=calendar.create_entregable({'titulo':title,'descripcion':'Actividad planificada desde temáticas publicadas de Salud y Nutrición.','fecha_inicio':date,'fecha_limite':date,'modulo':'Salud y Nutrición','tipo_formato':'ACTIVIDAD_SALUD_NUTRICION','unidad':unit['nombre'],'responsable_id':data.get('responsable_id') or user_id,'responsable_nombre':data.get('responsable_nombre') or user.get('username'),'usuario_creador_id':user_id,'creado_por':user.get('username') or 'sistema','requiere_evidencia':False,'clave_unica':f'SN_ACTIVIDAD:{tenant}:{activity_id}'},origen='salud_tematicas')
+                repo.execute('INSERT INTO sn_actividad_calendario(fundacion_id,actividad_id,calendario_entregable_id,fecha_sincronizada,creado_por,creado_en,actualizado_en) VALUES(?,?,?,?,?,?,?)',(tenant,activity_id,calendar_item['id'],date,user_id,now,now))
+            except Exception:
+                calendar_warning='La actividad quedó creada, pero la sincronización con Calendario está pendiente de reintento.'
+        message='Actividad planificada. No se registraron asistentes, ejecución ni resultados.'
+        status=202 if calendar_warning else 201
+        return jsonify({'message':message,'actividad':result,'temas':themes,'calendario':calendar_item,'estado_sincronizacion':'PENDIENTE_REINTENTO' if calendar_warning else ('SINCRONIZADO' if date else 'SIN_FECHA'),'advertencias':[calendar_warning] if calendar_warning else []}),status
 
     return service

@@ -2449,13 +2449,28 @@
                             <h3 class="font-semibold text-lg">Material recibido y temáticas del periodo</h3>
                             <p class="mt-2 text-sm text-slate-400">Carga primero el JPG, PNG o PDF en Motor Documental. Aquí se conserva el original, se revisa la extracción y se publica únicamente al periodo y unidades confirmados.</p>
                             <div class="mt-4 grid gap-3 md:grid-cols-3">
-                                <label class="text-sm">ID del documento fuente<input id="sn-theme-document-id" type="number" min="1" class="sn-ent-input mt-1 w-full" placeholder="ID de Motor Documental"></label>
+                                <label class="text-sm">Material JPG, PNG o PDF<input id="sn-theme-file" type="file" accept=".jpg,.jpeg,.png,.pdf" class="sn-ent-input mt-1 w-full"></label>
                                 <label class="text-sm">Periodo<input id="sn-theme-period" type="month" class="sn-ent-input mt-1 w-full"></label>
-                                <div class="flex items-end"><button onclick="snTematicasExtraer()" class="w-full rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white">Extraer para revisión</button></div>
+                                <div class="flex items-end"><button onclick="snTematicasCargarArchivo()" class="w-full rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white">Cargar y extraer</button></div>
                             </div>
+                            <details class="mt-3 text-sm text-slate-400"><summary>Usar un documento ya cargado en Motor Documental</summary><div class="mt-2 flex gap-2"><input id="sn-theme-document-id" type="number" min="1" class="sn-ent-input flex-1" placeholder="ID documental"><button onclick="snTematicasExtraer()" class="rounded-xl border border-cyan-500 px-4 py-2">Extraer</button></div></details>
                             <fieldset class="mt-4"><legend class="text-sm font-semibold">Unidades autorizadas (Base Maestra)</legend><div id="sn-theme-units" class="mt-2 grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-3"></div></fieldset>
                         </div>
                         <div class="grid gap-4 xl:grid-cols-2" id="sn-theme-materials"><p class="text-slate-400">Cargando materiales…</p></div>
+                        <div class="sn-card">
+                            <h3 class="font-semibold">Planificar actividad desde temáticas publicadas</h3>
+                            <p class="mt-2 text-sm text-slate-400">La planeación queda editable. Sin fecha se conserva como pendiente de programación; no se inventa un día.</p>
+                            <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                <select id="sn-theme-plan-unit" class="sn-ent-input"><option value="">Unidad</option></select>
+                                <select id="sn-theme-plan-line" class="sn-ent-input"><option value="L2_EDUCACION_SALUD_ALIMENTARIA">Educación para la salud alimentaria</option><option value="L4_ALIMENTOS_SANOS_SEGUROS">Alimentos sanos y seguros</option><option value="L1_ARTICULACION_SALUD">Articulación en salud</option><option value="L3_PREVENCION_ENFERMEDADES">Prevención de enfermedades</option><option value="L5_SEGUIMIENTO_NUTRICIONAL">Seguimiento nutricional</option></select>
+                                <input id="sn-theme-plan-date" type="date" class="sn-ent-input" aria-label="Fecha programada opcional">
+                                <input id="sn-theme-plan-title" class="sn-ent-input" placeholder="Título de la actividad">
+                                <textarea id="sn-theme-plan-objective" class="sn-ent-input md:col-span-2" placeholder="Objetivo propuesto"></textarea>
+                                <textarea id="sn-theme-plan-method" class="sn-ent-input md:col-span-2" placeholder="Metodología propuesta"></textarea>
+                            </div>
+                            <fieldset class="mt-4"><legend class="text-sm font-semibold">Temáticas publicadas</legend><div id="sn-theme-published" class="mt-2 grid gap-2 text-sm md:grid-cols-2"></div></fieldset>
+                            <button onclick="snTematicasPlanificar()" class="mt-4 rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Crear propuesta de actividad</button>
+                        </div>
                     </div>
 
                     <div id="sn-view-mensuales" class="hidden space-y-6">
