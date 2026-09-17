@@ -104,6 +104,24 @@ def parse_fecha(value: Any) -> str | None:
             return datetime.strptime(text, fmt).date().isoformat()
         except ValueError:
             continue
+    # Documentos Word institucionales suelen incluir el día de la semana y un
+    # salto de línea: ``Miércoles\n16 de septiembre de 2026``. Normalizar el
+    # texto permite extraer la fecha sin exigir edición manual.
+    meses_es = {
+        "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
+        "julio": 7, "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10,
+        "noviembre": 11, "diciembre": 12,
+    }
+    texto_normalizado = normalizar_texto(text)
+    natural = re.search(
+        r"(?<!\d)(\d{1,2})\s+(?:de\s+)?(" + "|".join(meses_es) + r")\s+(?:de\s+)?(20\d{2})(?!\d)",
+        texto_normalizado,
+    )
+    if natural:
+        try:
+            return date(int(natural.group(3)), meses_es[natural.group(2)], int(natural.group(1))).isoformat()
+        except ValueError:
+            return None
     if pd is not None:
         try:
             if pd.isna(value):

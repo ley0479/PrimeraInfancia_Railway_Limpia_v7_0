@@ -1,4 +1,4 @@
-from modules.calendario_inteligente.services import _dataframe_from_plain_text
+from modules.calendario_inteligente.services import _dataframe_from_plain_text, parse_fecha
 
 
 text = """
@@ -66,5 +66,9 @@ assert [row["Fecha"] for row in production_rows] == ["2026-09-16", "2026-09-25",
 assert [row["Actividad"] for row in production_rows] == [
     "Entrega de cuentas de cobro", "Entrega de informe", "Socialización de los servicios",
 ]
+
+assert parse_fecha("Miércoles\n16 de septiembre de 2026") == "2026-09-16"
+assert parse_fecha("Viernes\n25 de septiembre de 2026") == "2026-09-25"
+assert parse_fecha("25 de septiembre de 2026") == "2026-09-25"
 
 print("CALENDAR_OCR_DATE_EXTRACTION_V7_PASS")
