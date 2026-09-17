@@ -279,6 +279,7 @@ def _dataframe_from_plain_text(texto: str):
         r"(?<!\d)(\d{1,2})\s*(?:de\s+)?(" + "|".join(meses) +
         r")\D{0,45}?(20\d{2})(?!\d)", re.I,
     )
+    dias_semana = {"lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"}
     filas_ocr = []
     indices_fecha: set[int] = set()
     for index, linea in enumerate(lineas):
@@ -311,9 +312,69 @@ def _dataframe_from_plain_text(texto: str):
                 actividad = siguiente
         if actividad and normalizar_texto(actividad) not in {"fecha", "entrega", "fecha entrega"}:
             filas_ocr.append({"Fecha": fecha, "Actividad": actividad})
+    # Ruta principal para afiches: cada aparición de ``día + mes`` representa
+    # un evento independiente, incluso si comparte fecha con otro. El año puede
+    # venir pegado (de2026), con adornos o hasta dos líneas después.
+    fecha_parcial = re.compile(
+        r"(?<!\d)(\d{1,2})\s*(?:de\s+)?(" + "|".join(meses) + r")(?![A-Za-zÁÉÍÓÚÜÑáéíóúüñ])",
+        re.I,
+    )
+    filas_afiche = []
+    for index, linea in enumerate(lineas):
+        parcial = fecha_parcial.search(linea)
+        if not parcial:
+            continue
+        ventana_anio = " ".join(lineas[index:min(len(lineas), index + 3)])
+        anio_match = re.search(r"(?<!\d)(20\d{2})(?!\d)", ventana_anio)
+        if not anio_match:
+            continue
+        try:
+            fecha = date(int(anio_match.group(1)), meses[parcial.group(2).lower()], int(parcial.group(1))).isoformat()
+        except ValueError:
+            continue
+        partes = []
+        for previo in range(index - 1, max(-1, index - 9), -1):
+            candidato = lineas[previo].strip(" -:|\t")
+            normalizado = normalizar_texto(candidato)
+            if not candidato or normalizado in dias_semana:
+                continue
+            if fecha_parcial.search(candidato) or re.search(r"20\d{2}", candidato):
+                if partes:
+                    break
+                continue
+            letras = re.findall(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]", candidato)
+            if len(letras) < 4 or len(letras) / max(1, len(candidato)) < 0.45:
+                continue
+            candidato = re.sub(r"^[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+", "", candidato)
+            candidato = re.sub(r"[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+$", "", candidato).strip()
+            candidato = re.sub(r"\s+[A-ZÁÉÍÓÚÜÑ]$", "", candidato).strip()
+            partes.insert(0, candidato)
+            if len(partes) >= 2 or (len(candidato) >= 24 and not normalizado.startswith(("de ", "del "))):
+                break
+        actividad = " ".join(partes).strip()
+        if actividad:
+            filas_afiche.append({"Fecha": fecha, "Actividad": actividad})
+    if filas_afiche:
+        from difflib import SequenceMatcher
+        unicas = []
+        for fila in filas_afiche:
+            titulo = normalizar_texto(fila["Actividad"])
+            repetida = False
+            for previa in unicas:
+                if previa["Fecha"] != fila["Fecha"]:
+                    continue
+                otro = normalizar_texto(previa["Actividad"])
+                if titulo in otro or otro in titulo or SequenceMatcher(None, titulo, otro).ratio() >= 0.72:
+                    repetida = True
+                    # Conservar el título más completo de las dos pasadas OCR.
+                    if len(fila["Actividad"]) > len(previa["Actividad"]):
+                        previa["Actividad"] = fila["Actividad"]
+                    break
+            if not repetida:
+                unicas.append(fila)
+        return pd.DataFrame(unicas)
     # Los afiches suelen conservar el diseño al pasar por OCR y una fecha como
     # ``16 de septiembre de 2026`` termina dividida en dos o tres líneas.
-    dias_semana = {"lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"}
     fragmento_fecha = re.compile(
         r"^(?:de\s+)?(?:\d{1,2}\s*(?:de\s+)?(?:" + "|".join(meses) +
         r")?|(?:" + "|".join(meses) + r")|20\d{2}|de\s*20\d{2})$", re.I,
