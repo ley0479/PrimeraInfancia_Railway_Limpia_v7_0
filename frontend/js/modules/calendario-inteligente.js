@@ -16,6 +16,8 @@
         selectedDate: null,
         weekAnchor: new Date().toISOString().slice(0, 10),
         previewCronograma: null,
+        cronogramaFile: null,
+        cronogramaObjectUrl: null,
     };
 
     function api(path, options = {}) {
@@ -107,18 +109,31 @@
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button data-help-id="calendario.activity.create" onclick="ciAbrirModalNuevo()" class="ci-btn ci-btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Nuevo entregable</button>
-                    <label data-help-id="calendario.schedule.upload" class="ci-btn ci-btn-muted cursor-pointer"><i data-lucide="upload" class="w-4 h-4"></i> Cargar cronograma<input id="ci-cronograma-file" type="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt,.tsv,.tab,.dat,.docx,.pdf,.pptx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" class="hidden" onchange="ciCargarCronograma()"></label><button onclick="ciExportarExcel()" class="ci-btn ci-btn-muted"><i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Exportar Excel</button><button onclick="ciExportarPdf()" class="ci-btn ci-btn-muted"><i data-lucide="file-text" class="w-4 h-4"></i> Exportar PDF</button>
+                    <button data-help-id="calendario.schedule.upload" onclick="ciAbrirCargaCronograma()" class="ci-btn ci-btn-muted"><i data-lucide="scan-text" class="w-4 h-4"></i> Leer foto o cronograma</button><button onclick="ciExportarExcel()" class="ci-btn ci-btn-muted"><i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Exportar Excel</button><button onclick="ciExportarPdf()" class="ci-btn ci-btn-muted"><i data-lucide="file-text" class="w-4 h-4"></i> Exportar PDF</button>
                 </div>
             </div>
             <div id="ci-message" class="hidden rounded-xl px-4 py-3 text-sm"></div>
-            <div class="ci-panel ci-help-panel">
-                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                    <div>
-                        <h3 class="font-semibold text-slate-100 flex items-center gap-2"><i data-lucide="scan-text" class="w-4 h-4 text-cyan-300"></i> Carga inteligente de cronograma mensual</h3>
-                        <p class="text-sm text-slate-400 mt-1">Sube Excel, PDF, Word o imagen. El sistema detecta fechas y actividades, pero siempre muestra una vista previa editable antes de guardar.</p>
+            <div id="ci-upload-workspace" class="ci-panel ci-help-panel">
+                <div class="ci-upload-layout">
+                    <div id="ci-upload-dropzone" class="ci-upload-dropzone" tabindex="0" role="button" aria-label="Cargar foto o cronograma" onclick="document.getElementById('ci-cronograma-file')?.click()" ondragover="ciCronogramaDrag(event)" ondragleave="ciCronogramaDrag(event)" ondrop="ciCronogramaDrop(event)">
+                        <div class="ci-upload-icon"><i data-lucide="scan-line"></i></div>
+                        <h3>Leer foto o cronograma</h3>
+                        <p>Arrastra aquí una foto, PDF, Word o Excel. También puedes elegir un archivo o tomar una foto con la cámara.</p>
+                        <div class="ci-upload-actions">
+                            <span class="ci-btn ci-btn-primary"><i data-lucide="folder-open" class="w-4 h-4"></i> Elegir archivo</span>
+                            <label class="ci-btn ci-btn-success" onclick="event.stopPropagation()"><i data-lucide="camera" class="w-4 h-4"></i> Tomar foto<input id="ci-camera-file" type="file" accept="image/*" capture="environment" class="hidden" onchange="ciPrepararCronograma(this.files[0])"></label>
+                        </div>
+                        <input id="ci-cronograma-file" type="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt,.tsv,.tab,.dat,.docx,.pdf,.pptx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" class="hidden" onchange="ciPrepararCronograma(this.files[0])">
+                        <small>La información sólo se guarda después de tu revisión y confirmación.</small>
                     </div>
-                    <span class="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-200">Revisar antes de guardar</span>
+                    <div id="ci-upload-preview" class="ci-upload-preview ci-upload-empty">
+                        <div id="ci-upload-visual" class="ci-upload-visual"><i data-lucide="image" class="w-10 h-10"></i></div>
+                        <div class="ci-upload-file-info"><strong id="ci-upload-name">Ningún archivo seleccionado</strong><span id="ci-upload-meta">Formatos admitidos: imagen, PDF, Word, Excel y texto.</span></div>
+                        <div id="ci-ocr-progress" class="ci-ocr-progress hidden"><div class="ci-progress"><div id="ci-ocr-progress-bar" class="ci-progress-bar"></div></div><p id="ci-ocr-stage">Preparando lectura…</p></div>
+                        <div class="ci-upload-preview-actions"><button id="ci-analyze-button" onclick="ciCargarCronograma()" class="ci-btn ci-btn-primary" disabled><i data-lucide="sparkles" class="w-4 h-4"></i> Leer y detectar actividades</button><button id="ci-clear-upload" onclick="ciLimpiarCargaCronograma()" class="ci-btn ci-btn-muted hidden">Quitar</button></div>
+                    </div>
                 </div>
+                <div class="ci-upload-steps"><span><b>1</b> Selecciona o toma la foto</span><span><b>2</b> OCR detecta texto y fechas</span><span><b>3</b> Corrige la vista previa</span><span><b>4</b> Confirma para guardar</span></div>
             </div>
             <div class="grid gap-4 xl:grid-cols-5">
                 <div class="ci-metric"><div class="flex items-center gap-3"><i data-lucide="calendar-check" class="text-blue-300"></i><p class="text-sm text-slate-400">Entregables del mes</p></div><p id="ci-stat-total" class="text-3xl font-bold mt-3">0</p><p class="text-xs text-slate-500 mt-1">Total programados</p></div>
@@ -540,34 +555,97 @@
         }
     }
 
-    async function cargarCronograma() {
-        const input = document.getElementById('ci-cronograma-file');
-        const file = input?.files?.[0];
+    function abrirCargaCronograma() {
+        const workspace = document.getElementById('ci-upload-workspace');
+        workspace?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        workspace?.classList.add('ci-upload-highlight');
+        setTimeout(() => workspace?.classList.remove('ci-upload-highlight'), 1400);
+    }
+
+    function cronogramaDrag(event) {
+        event.preventDefault();
+        document.getElementById('ci-upload-dropzone')?.classList.toggle('ci-dragging', event.type === 'dragover');
+    }
+
+    function cronogramaDrop(event) {
+        event.preventDefault();
+        document.getElementById('ci-upload-dropzone')?.classList.remove('ci-dragging');
+        const file = event.dataTransfer?.files?.[0];
+        if (file) prepararCronograma(file);
+    }
+
+    function prepararCronograma(file) {
         if (!file) return;
-        const fd = new FormData(); fd.append('file', file);
-        try {
-            message('Leyendo cronograma. En unos segundos se abrirá la vista previa editable...');
-            const data = await api('/cargar-cronograma', { method: 'POST', body: fd });
-            if (data.job_id) {
-                message('Cronograma recibido. Se está procesando en segundo plano para evitar error del túnel.');
-                input.value = '';
-                esperarJobCalendario(data.job_id);
-                return;
+        const allowed = /\.(xlsx?|xlsm|ods|csv|txt|tsv|tab|dat|docx|pdf|pptx|png|jpe?g|webp|bmp|tiff?)$/i;
+        if (!allowed.test(file.name || '')) { message('Formato no admitido. Usa una foto, PDF, Word, Excel o archivo de texto.', 'error'); return; }
+        if (file.size > 25 * 1024 * 1024) { message('El archivo supera 25 MB. Reduce el tamaño de la foto o del documento.', 'error'); return; }
+        if (state.cronogramaObjectUrl) URL.revokeObjectURL(state.cronogramaObjectUrl);
+        state.cronogramaFile = file;
+        const visual = document.getElementById('ci-upload-visual');
+        document.getElementById('ci-upload-preview')?.classList.remove('ci-upload-empty');
+        const name = document.getElementById('ci-upload-name'); if (name) name.textContent = file.name;
+        const meta = document.getElementById('ci-upload-meta'); if (meta) meta.textContent = `${Math.max(1, Math.ceil(file.size / 1024))} KB · ${file.type || 'archivo de cronograma'}`;
+        const analyze = document.getElementById('ci-analyze-button'); if (analyze) analyze.disabled = false;
+        document.getElementById('ci-clear-upload')?.classList.remove('hidden');
+        if (visual) {
+            if (file.type?.startsWith('image/')) {
+                state.cronogramaObjectUrl = URL.createObjectURL(file);
+                visual.innerHTML = `<img src="${state.cronogramaObjectUrl}" alt="Vista previa de ${esc(file.name)}">`;
+            } else {
+                visual.innerHTML = `<div class="ci-file-badge"><i data-lucide="file-text"></i><span>${esc((file.name.split('.').pop() || 'archivo').toUpperCase())}</span></div>`;
             }
+        }
+        if (window.lucide) lucide.createIcons();
+        message('Archivo listo. Presiona “Leer y detectar actividades”.');
+    }
+
+    function limpiarCargaCronograma() {
+        if (state.cronogramaObjectUrl) URL.revokeObjectURL(state.cronogramaObjectUrl);
+        state.cronogramaObjectUrl = null; state.cronogramaFile = null;
+        ['ci-cronograma-file', 'ci-camera-file'].forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; });
+        document.getElementById('ci-upload-preview')?.classList.add('ci-upload-empty');
+        const visual = document.getElementById('ci-upload-visual'); if (visual) visual.innerHTML = '<i data-lucide="image" class="w-10 h-10"></i>';
+        const name = document.getElementById('ci-upload-name'); if (name) name.textContent = 'Ningún archivo seleccionado';
+        const meta = document.getElementById('ci-upload-meta'); if (meta) meta.textContent = 'Formatos admitidos: imagen, PDF, Word, Excel y texto.';
+        const analyze = document.getElementById('ci-analyze-button'); if (analyze) analyze.disabled = true;
+        document.getElementById('ci-clear-upload')?.classList.add('hidden');
+        document.getElementById('ci-ocr-progress')?.classList.add('hidden');
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function actualizarProgresoOcr(percent, stage) {
+        document.getElementById('ci-ocr-progress')?.classList.remove('hidden');
+        const bar = document.getElementById('ci-ocr-progress-bar'); if (bar) bar.style.width = `${Math.max(4, Math.min(100, percent))}%`;
+        const label = document.getElementById('ci-ocr-stage'); if (label) label.textContent = stage;
+    }
+
+    async function cargarCronograma() {
+        const file = state.cronogramaFile || document.getElementById('ci-cronograma-file')?.files?.[0];
+        if (!file) { message('Primero selecciona una foto o un cronograma.', 'error'); abrirCargaCronograma(); return; }
+        const fd = new FormData(); fd.append('file', file);
+        const analyze = document.getElementById('ci-analyze-button');
+        let timer;
+        try {
+            if (analyze) analyze.disabled = true;
+            actualizarProgresoOcr(18, file.type?.startsWith('image/') ? 'Preparando imagen para OCR…' : 'Preparando documento…');
+            message('Leyendo cronograma. En unos segundos se abrirá la vista previa editable...');
+            timer = setTimeout(() => actualizarProgresoOcr(58, 'Reconociendo texto, fechas y actividades…'), 900);
+            const data = await api('/cargar-cronograma', { method: 'POST', body: fd });
+            clearTimeout(timer);
+            actualizarProgresoOcr(100, 'Lectura terminada. Revisa los resultados.');
+            if (data.job_id) { message('Cronograma recibido. Se está procesando en segundo plano.'); esperarJobCalendario(data.job_id); return; }
             if (data.preview) {
-                state.previewCronograma = data.preview;
-                abrirPreviewCronograma(data.preview);
-                input.value = '';
-                message(`Cronograma leído: ${data.preview.actividades?.length || 0} actividades detectadas. Revisa y guarda.`);
-                return;
+                state.previewCronograma = data.preview; abrirPreviewCronograma(data.preview);
+                message(`Cronograma leído: ${data.preview.actividades?.length || 0} actividades detectadas. Revisa y guarda.`); return;
             }
             const r = data.resultado || {};
             message(`Cronograma procesado: ${r.creados || 0} creados, ${r.duplicados || 0} duplicados, ${r.errores?.length || 0} errores.`);
-            input.value = ''; await cargarDashboard();
+            await cargarDashboard();
         } catch (err) {
+            clearTimeout(timer);
+            actualizarProgresoOcr(100, 'No fue posible completar la lectura. Corrige la foto y reintenta.');
             message(err?.message || 'No se pudo procesar el cronograma cargado.', 'error');
-            input.value = '';
-        }
+        } finally { if (analyze) analyze.disabled = false; }
     }
 
     function abrirPreviewCronograma(preview) {
@@ -652,6 +730,7 @@
             const r = data.resultado || {};
             closeModal();
             state.previewCronograma = null;
+            limpiarCargaCronograma();
             message(`Cronograma guardado: ${r.creados || 0} creados, ${r.duplicados || 0} duplicados, ${r.errores?.length || 0} errores.`);
             await cargarDashboard();
         } catch (err) {
@@ -746,6 +825,11 @@
     window.ciImportarChecklist = importarChecklist;
     window.ciConfirmarChecklistImportado = confirmarChecklistImportado;
     window.ciCargarCronograma = cargarCronograma;
+    window.ciAbrirCargaCronograma = abrirCargaCronograma;
+    window.ciPrepararCronograma = prepararCronograma;
+    window.ciLimpiarCargaCronograma = limpiarCargaCronograma;
+    window.ciCronogramaDrag = cronogramaDrag;
+    window.ciCronogramaDrop = cronogramaDrop;
     window.ciConfirmarCronograma = confirmarCronograma;
     window.ciAbrirPreviewExterno = abrirPreviewExterno;
     window.ciExportarExcel = exportarExcel;

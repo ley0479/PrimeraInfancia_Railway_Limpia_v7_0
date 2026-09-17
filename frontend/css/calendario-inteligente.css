@@ -110,6 +110,33 @@
 
 /* ALPHA33: vista previa editable de cronogramas antes de guardar */
 .ci-help-panel { border-color: rgba(34, 211, 238, .24); background: linear-gradient(135deg, rgba(8, 47, 73, .40), rgba(15, 23, 42, .84)); }
+.ci-upload-highlight { box-shadow: 0 0 0 3px rgba(34,211,238,.28), 0 22px 55px rgba(8,145,178,.22); }
+.ci-upload-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, .75fr); gap: 1rem; }
+.ci-upload-dropzone { min-height: 260px; border: 2px dashed rgba(34,211,238,.42); border-radius: 1.15rem; background: rgba(8,47,73,.28); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1.5rem; cursor: pointer; transition: .2s ease; }
+.ci-upload-dropzone:hover, .ci-upload-dropzone:focus, .ci-upload-dropzone.ci-dragging { border-color: rgb(34 211 238); background: rgba(8,145,178,.18); outline: none; transform: translateY(-1px); }
+.ci-upload-icon { width: 4rem; height: 4rem; display: grid; place-items: center; border-radius: 1.1rem; color: rgb(103 232 249); background: rgba(6,182,212,.14); border: 1px solid rgba(34,211,238,.32); }
+.ci-upload-icon svg { width: 2rem; height: 2rem; }
+.ci-upload-dropzone h3 { margin-top: .9rem; color: rgb(241 245 249); font-size: 1.15rem; font-weight: 800; }
+.ci-upload-dropzone p { max-width: 620px; margin-top: .4rem; color: rgb(148 163 184); font-size: .86rem; }
+.ci-upload-dropzone small { margin-top: .9rem; color: rgb(100 116 139); }
+.ci-upload-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .65rem; margin-top: 1rem; }
+.ci-upload-preview { min-height: 260px; display: flex; flex-direction: column; border: 1px solid rgba(51,65,85,.95); border-radius: 1.15rem; background: rgba(2,6,23,.6); padding: 1rem; }
+.ci-upload-visual { min-height: 128px; max-height: 220px; display: grid; place-items: center; overflow: hidden; border-radius: .9rem; background: rgba(15,23,42,.9); color: rgb(71 85 105); }
+.ci-upload-visual img { width: 100%; height: 100%; min-height: 128px; max-height: 220px; object-fit: contain; background: rgb(2 6 23); }
+.ci-file-badge { display: grid; place-items: center; gap: .45rem; color: rgb(125 211 252); font-weight: 800; }
+.ci-file-badge svg { width: 2.4rem; height: 2.4rem; }
+.ci-upload-file-info { margin-top: .8rem; min-width: 0; }
+.ci-upload-file-info strong, .ci-upload-file-info span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ci-upload-file-info strong { color: rgb(226 232 240); }
+.ci-upload-file-info span { margin-top: .2rem; color: rgb(100 116 139); font-size: .72rem; }
+.ci-upload-preview-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: auto; padding-top: .9rem; }
+.ci-upload-preview-actions .ci-btn:disabled { cursor: not-allowed; opacity: .42; }
+.ci-ocr-progress { margin-top: .8rem; }
+.ci-ocr-progress p { margin-top: .35rem; color: rgb(165 243 252); font-size: .72rem; }
+.ci-ocr-progress .ci-progress-bar { width: 4%; background: linear-gradient(90deg, rgb(6 182 212), rgb(99 102 241)); transition: width .35s ease; }
+.ci-upload-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: .65rem; margin-top: 1rem; }
+.ci-upload-steps span { display: flex; align-items: center; gap: .55rem; color: rgb(148 163 184); font-size: .76rem; }
+.ci-upload-steps b { flex: 0 0 auto; width: 1.65rem; height: 1.65rem; display: grid; place-items: center; border-radius: 999px; background: rgba(34,211,238,.13); color: rgb(103 232 249); border: 1px solid rgba(34,211,238,.28); }
 .ci-preview-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
 .ci-preview-summary > div { border: 1px solid rgba(51,65,85,.9); border-radius: .95rem; background: rgba(2,6,23,.55); padding: .8rem; }
 .ci-preview-summary strong { display: block; font-size: 1.55rem; line-height: 1.8rem; color: rgb(103 232 249); }
@@ -122,3 +149,11 @@
 .ci-preview-table td { padding: .55rem; border-bottom: 1px solid rgb(30 41 59); vertical-align: top; }
 .ci-preview-table tr:hover td { background: rgba(30,41,59,.45); }
 .ci-preview-table .ci-input { padding: .45rem .55rem; border-radius: .55rem; font-size: .78rem; }
+@media (max-width: 900px) {
+    .ci-upload-layout { grid-template-columns: 1fr; }
+    .ci-upload-steps { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+    .ci-upload-steps { grid-template-columns: 1fr; }
+    .ci-upload-dropzone { min-height: 230px; padding: 1rem; }
+}
