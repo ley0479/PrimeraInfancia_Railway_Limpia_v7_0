@@ -34,4 +34,19 @@ assert poster_rows[0]["Actividad"] == "Entrega de cuentas de cobro"
 assert poster_rows[1]["Actividad"] == "Entrega de informe"
 assert poster_rows[2]["Actividad"] == "Socialización de los servicios"
 
+noisy_text = """
+<< / =— Entrega de informe == A
+4 A (Y) 25 de septiembre «iD
+de 2026
+Socialización
+P=X=
+de los servicios ha ai sat
+A 25 de septiembre |
+de 2026
+"""
+noisy_rows = _dataframe_from_plain_text(noisy_text).to_dict("records")
+assert [row["Fecha"] for row in noisy_rows] == ["2026-09-25", "2026-09-25"]
+assert "Entrega de informe" in noisy_rows[0]["Actividad"]
+assert "Socialización" in noisy_rows[1]["Actividad"]
+
 print("CALENDAR_OCR_DATE_EXTRACTION_V7_PASS")

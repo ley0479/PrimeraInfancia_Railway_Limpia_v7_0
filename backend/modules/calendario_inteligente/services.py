@@ -275,6 +275,10 @@ def _dataframe_from_plain_text(texto: str):
     fecha_numerica = re.compile(r"(?<!\d)(\d{1,2})[\s/.-](\d{1,2})[\s/.-](20\d{2})(?!\d)")
     fecha_iso = re.compile(r"(?<!\d)(20\d{2})[/-](\d{1,2})[/-](\d{1,2})(?!\d)")
     fecha_texto = re.compile(r"(?<!\d)(\d{1,2})\s*(?:de\s+)?(" + "|".join(meses) + r")(?:\s+de)?\s+(20\d{2})(?!\d)", re.I)
+    fecha_texto_ocr = re.compile(
+        r"(?<!\d)(\d{1,2})\s*(?:de\s+)?(" + "|".join(meses) +
+        r")[^\d\n]{0,30}(?:\n\s*(?:de\s+)?)?(20\d{2})(?!\d)", re.I,
+    )
     filas_ocr = []
     indices_fecha: set[int] = set()
     for index, linea in enumerate(lineas):
@@ -320,7 +324,12 @@ def _dataframe_from_plain_text(texto: str):
             if fin > len(lineas):
                 continue
             combinado = " ".join(lineas[inicio:fin])
-            match = fecha_texto.fullmatch(combinado.strip())
+            # La decoración del afiche suele convertirse en símbolos alrededor
+            # de la fecha (``A 25 de septiembre |``). La fecha debe buscarse
+            # dentro de la ventana, no exigir que ocupe todo el texto OCR.
+            match = fecha_texto.search(combinado)
+            if not match:
+                match = fecha_texto_ocr.search("\n".join(lineas[inicio:fin]))
             if not match:
                 continue
             try:
@@ -330,7 +339,19 @@ def _dataframe_from_plain_text(texto: str):
             if any(idx in indices_fecha for idx in range(inicio, fin)):
                 continue
             titulo_partes = []
+            prefijo = combinado[:match.start()].strip(" -:|\t")
+            prefijo_letras = re.findall(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]", prefijo)
+            prefijo_normalizado = normalizar_texto(prefijo)
+            if (prefijo_normalizado not in dias_semana
+                    and not prefijo_normalizado.startswith(("de ", "del ", "la ", "los ", "las "))
+                    and len(prefijo_letras) >= 4
+                    and len(prefijo_letras) / max(1, len(prefijo)) >= 0.55):
+                prefijo = re.sub(r"^[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+", "", prefijo)
+                prefijo = re.sub(r"[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+$", "", prefijo).strip()
+                titulo_partes.append(prefijo)
             for previo in range(inicio - 1, max(-1, inicio - 6), -1):
+                if titulo_partes:
+                    break
                 candidato = lineas[previo].strip(" -:|\t")
                 normalizado = normalizar_texto(candidato)
                 if not candidato or normalizado in dias_semana:
@@ -339,8 +360,15 @@ def _dataframe_from_plain_text(texto: str):
                     if titulo_partes:
                         break
                     continue
+                letras = re.findall(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]", candidato)
+                # Descarta residuos visuales como ``Y``, ``3418`` o ``P=X=``.
+                if len(letras) < 4 or len(letras) / max(1, len(candidato)) < 0.45:
+                    continue
+                candidato = re.sub(r"^[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+", "", candidato)
+                candidato = re.sub(r"[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+$", "", candidato).strip()
                 titulo_partes.insert(0, candidato)
-                if len(titulo_partes) >= 2 or len(candidato) >= 24:
+                es_continuacion = normalizar_texto(candidato).startswith(("de ", "del ", "la ", "los ", "las "))
+                if len(titulo_partes) >= 2 or (len(candidato) >= 24 and not es_continuacion):
                     break
             actividad = " ".join(titulo_partes).strip()
             if actividad:
@@ -488,7 +516,13 @@ def _dataframe_from_image(path: str):
     imagen = ImageOps.autocontrast(imagen)
     imagen = ImageEnhance.Contrast(imagen).enhance(1.35).filter(ImageFilter.SHARPEN)
     try:
-        texto = pytesseract.image_to_string(imagen, lang="spa+eng", config="--oem 3 --psm 6")
+        # Dos segmentaciones complementarias: PSM 6 conserva los bloques y
+        # PSM 11 recupera textos aislados que se pierden entre ilustraciones.
+        textos = [
+            pytesseract.image_to_string(imagen, lang="spa+eng", config="--oem 3 --psm 6"),
+            pytesseract.image_to_string(imagen, lang="spa+eng", config="--oem 3 --psm 11"),
+        ]
+        texto = "\n".join(item for item in textos if item and item.strip())
     except Exception:
         # Algunos equipos tienen Tesseract instalado sin paquete de idioma español.
         # Se reintenta con el idioma por defecto para no bloquear el menú.
