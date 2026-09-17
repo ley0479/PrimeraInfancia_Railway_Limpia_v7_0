@@ -276,6 +276,7 @@ def _dataframe_from_plain_text(texto: str):
     fecha_iso = re.compile(r"(?<!\d)(20\d{2})[/-](\d{1,2})[/-](\d{1,2})(?!\d)")
     fecha_texto = re.compile(r"(?<!\d)(\d{1,2})\s*(?:de\s+)?(" + "|".join(meses) + r")(?:\s+de)?\s+(20\d{2})(?!\d)", re.I)
     filas_ocr = []
+    indices_fecha: set[int] = set()
     for index, linea in enumerate(lineas):
         fecha = None
         match = fecha_iso.search(linea)
@@ -294,6 +295,7 @@ def _dataframe_from_plain_text(texto: str):
                 except ValueError: fecha = None
         if not fecha or not match:
             continue
+        indices_fecha.add(index)
         actividad = (linea[:match.start()] + " " + linea[match.end():]).strip(" -:|\t")
         if len(actividad) < 4 and index > 0:
             anterior = lineas[index - 1].strip(" -:|\t")
@@ -305,6 +307,46 @@ def _dataframe_from_plain_text(texto: str):
                 actividad = siguiente
         if actividad and normalizar_texto(actividad) not in {"fecha", "entrega", "fecha entrega"}:
             filas_ocr.append({"Fecha": fecha, "Actividad": actividad})
+    # Los afiches suelen conservar el diseño al pasar por OCR y una fecha como
+    # ``16 de septiembre de 2026`` termina dividida en dos o tres líneas.
+    dias_semana = {"lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"}
+    fragmento_fecha = re.compile(
+        r"^(?:de\s+)?(?:\d{1,2}\s*(?:de\s+)?(?:" + "|".join(meses) +
+        r")?|(?:" + "|".join(meses) + r")|20\d{2}|de\s+20\d{2})$", re.I,
+    )
+    for inicio in range(len(lineas)):
+        for cantidad in (2, 3):
+            fin = inicio + cantidad
+            if fin > len(lineas):
+                continue
+            combinado = " ".join(lineas[inicio:fin])
+            match = fecha_texto.fullmatch(combinado.strip())
+            if not match:
+                continue
+            try:
+                fecha = date(int(match.group(3)), meses[match.group(2).lower()], int(match.group(1))).isoformat()
+            except ValueError:
+                continue
+            if any(idx in indices_fecha for idx in range(inicio, fin)):
+                continue
+            titulo_partes = []
+            for previo in range(inicio - 1, max(-1, inicio - 6), -1):
+                candidato = lineas[previo].strip(" -:|\t")
+                normalizado = normalizar_texto(candidato)
+                if not candidato or normalizado in dias_semana:
+                    continue
+                if fragmento_fecha.match(candidato):
+                    if titulo_partes:
+                        break
+                    continue
+                titulo_partes.insert(0, candidato)
+                if len(titulo_partes) >= 2 or len(candidato) >= 24:
+                    break
+            actividad = " ".join(titulo_partes).strip()
+            if actividad:
+                filas_ocr.append({"Fecha": fecha, "Actividad": actividad})
+                indices_fecha.update(range(inicio, fin))
+            break
     if filas_ocr:
         return pd.DataFrame(filas_ocr)
     muestra = "\n".join(lineas)
