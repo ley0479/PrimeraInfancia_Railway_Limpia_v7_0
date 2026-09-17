@@ -10,6 +10,7 @@ import re
 import csv
 import zipfile
 from datetime import datetime
+from pathlib import Path
 
 from flask import Blueprint, jsonify, request, send_from_directory, g
 
@@ -239,11 +240,7 @@ def register_gestion_pedagogica(app, database_path: str, upload_folder: str) -> 
 
     @bp.route('/calendario/importar', methods=['POST'])
     def importar_calendario_informativo():
-        """Lee texto de un documento mensual y crea eventos/entregables con fechas detectadas.
-
-        Funciona con texto pegado, .txt y .docx. Las imágenes se guardan como evidencia,
-        pero requieren transcripción porque no se aplica OCR en este módulo.
-        """
+        """Lee texto u OCR de un documento mensual y crea eventos con fechas detectadas."""
         texto = request.form.get('texto', '') or ''
         periodo = request.form.get('periodo') or periodo_actual()
         archivo_nombre = ''
@@ -262,8 +259,16 @@ def register_gestion_pedagogica(app, database_path: str, upload_folder: str) -> 
                     from docx import Document
                     doc = Document(ruta)
                     texto += '\n' + '\n'.join(p.text for p in doc.paragraphs)
-            except Exception:
-                pass
+                elif ext in {'.pdf', '.png', '.jpg', '.jpeg'}:
+                    from modules.idp_documental.services import read_document_intelligent
+                    lectura = read_document_intelligent(Path(ruta))
+                    texto_ocr = str(lectura.get('texto') or '').strip()
+                    if lectura.get('requiere_ocr') or len(texto_ocr) < 10:
+                        advertencia = lectura.get('advertencia') or 'El OCR no encontró texto suficiente.'
+                        return jsonify({'error': advertencia, 'codigo': 'OCR_SIN_TEXTO'}), 422
+                    texto += '\n' + texto_ocr
+            except Exception as exc:
+                return jsonify({'error': f'No se pudo leer el archivo mediante OCR: {exc}', 'codigo': 'OCR_ERROR'}), 400
 
         meses = {
             'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
@@ -272,10 +277,25 @@ def register_gestion_pedagogica(app, database_path: str, upload_folder: str) -> 
         }
         eventos = []
         patron = re.compile(r'(\d{1,2})\s+de\s+(' + '|'.join(meses.keys()) + r')\s+de\s+(\d{4})', re.I)
-        coincidencias = list(patron.finditer(texto))
+        coincidencias = []
+        for match in patron.finditer(texto):
+            dia, mes_nombre, anio = match.group(1), match.group(2).lower(), match.group(3)
+            coincidencias.append((match.start(), f"{anio}-{meses[mes_nombre]}-{int(dia):02d}"))
+        patron_numerico = re.compile(r'(?<!\d)(\d{1,2})[\s/.-](\d{1,2})[\s/.-](20\d{2})(?!\d)')
+        for match in patron_numerico.finditer(texto):
+            dia, mes, anio = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+            try:
+                fecha = datetime(anio, mes, dia).date().isoformat()
+            except ValueError:
+                continue
+            coincidencias.append((match.start(), fecha))
+        coincidencias.sort(key=lambda item: item[0])
 
-        # Si el archivo es una imagen/PDF sin texto legible, se usa el calendario operativo base
-        # para el periodo seleccionado. Esto evita que el importador quede en 0 eventos.
+        # No se inventan fechas cuando una imagen fue legible pero no contiene fechas.
+        if not coincidencias and archivo_nombre and ext in {'.pdf', '.png', '.jpg', '.jpeg'}:
+            return jsonify({'error': 'La foto fue leída, pero no se detectaron fechas. Usa una imagen completa y nítida o corrige el texto antes de importar.', 'codigo': 'OCR_SIN_FECHAS'}), 422
+
+        # Compatibilidad para documentos no visuales sin fechas detectables.
         if not coincidencias and archivo_nombre:
             for ev in calendario_operativo_default(periodo):
                 now = now_iso()
@@ -299,10 +319,8 @@ def register_gestion_pedagogica(app, database_path: str, upload_folder: str) -> 
                 eventos.append({'id': evento_id, 'entregable_id': entregable_id, 'titulo': ev['titulo'], 'fecha': ev['fecha']})
             return jsonify({'message': f'No se detectó texto editable; se creó calendario base del periodo. Eventos importados: {len(eventos)}.', 'eventos': eventos}), 201
 
-        for match in coincidencias:
-            dia, mes_nombre, anio = match.group(1), match.group(2).lower(), match.group(3)
-            fecha = f"{anio}-{meses[mes_nombre]}-{int(dia):02d}"
-            contexto = texto[max(0, match.start() - 120):match.start()].strip()
+        for posicion, fecha in coincidencias:
+            contexto = texto[max(0, posicion - 120):posicion].strip()
             lineas = [l.strip(' :-\t') for l in contexto.splitlines() if l.strip()]
             titulo = lineas[-1] if lineas else 'Entregable mensual'
             titulo = re.sub(r'^\d+\s*', '', titulo).strip()[:120] or 'Entregable mensual'
