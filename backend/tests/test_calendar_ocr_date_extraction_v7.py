@@ -63,5 +63,8 @@ A de 2026 nines yo
 """
 production_rows = _dataframe_from_plain_text(production_ocr).to_dict("records")
 assert [row["Fecha"] for row in production_rows] == ["2026-09-16", "2026-09-25", "2026-09-25"]
+assert [row["Actividad"] for row in production_rows] == [
+    "Entrega de cuentas de cobro", "Entrega de informe", "Socialización de los servicios",
+]
 
 print("CALENDAR_OCR_DATE_EXTRACTION_V7_PASS")

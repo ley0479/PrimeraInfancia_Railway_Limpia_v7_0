@@ -353,6 +353,15 @@ def _dataframe_from_plain_text(texto: str):
                 break
         actividad = " ".join(partes).strip()
         if actividad:
+            actividad_normalizada = normalizar_texto(actividad)
+            # Recupera títulos institucionales aunque el afiche agregue ruido
+            # alrededor. Son actividades distintas aun cuando compartan fecha.
+            if "cuentas" in actividad_normalizada and "cobro" in actividad_normalizada:
+                actividad = "Entrega de cuentas de cobro"
+            elif "informe" in actividad_normalizada:
+                actividad = "Entrega de informe"
+            elif "socializacion" in actividad_normalizada or "servicios" in actividad_normalizada:
+                actividad = "Socialización de los servicios"
             filas_afiche.append({"Fecha": fecha, "Actividad": actividad})
     if filas_afiche:
         from difflib import SequenceMatcher
@@ -364,7 +373,8 @@ def _dataframe_from_plain_text(texto: str):
                 if previa["Fecha"] != fila["Fecha"]:
                     continue
                 otro = normalizar_texto(previa["Actividad"])
-                if titulo in otro or otro in titulo or SequenceMatcher(None, titulo, otro).ratio() >= 0.72:
+                tokens_comunes = set(titulo.split()) & set(otro.split())
+                if titulo == otro or (len(tokens_comunes) >= 2 and SequenceMatcher(None, titulo, otro).ratio() >= 0.88):
                     repetida = True
                     # Conservar el título más completo de las dos pasadas OCR.
                     if len(fila["Actividad"]) > len(previa["Actividad"]):
