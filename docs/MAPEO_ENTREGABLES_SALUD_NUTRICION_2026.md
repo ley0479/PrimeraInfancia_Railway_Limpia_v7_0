@@ -1,6 +1,6 @@
 # Mapeo institucional de entregables de Salud y Nutrición 2026
 
-Fuente revisada: `C:\Users\kioskUser0\Desktop\2026\ENTREGABLES MARINA`.
+Fuente revisada: carpeta institucional de entregables 2026, conservada fuera del repositorio.
 
 Los archivos de la fuente son documentos diligenciados con nombres, documentos de identidad y fotografías. Se usan como evidencia funcional para diseñar la automatización, pero no se copian al repositorio ni se convierten directamente en semillas.
 
@@ -13,7 +13,7 @@ Los archivos de la fuente son documentos diligenciados con nombres, documentos d
 | E05_ANTROPOMETRIA | Salud y Nutrición → Valoraciones y Entregables | `f6.mt1_.pp_formato_captura_de_datos_antropometricos_de_las_ninas_y_los_ninos_segunda_toma_MARINA_AGOSTO26.xlsx`, `f7.mt1_.pp_formato_de_captura_de_datos_antropometricos_de_mujeres_y_personas_en_gestacion_v1_Segunda_toma_MarinaAGOSTO26.xlsx` | Dos salidas oficiales: niñas/niños y mujeres/personas gestantes. Alimentar desde Base Maestra y valoraciones validadas. |
 | E06_SIGNOS_FISICOS | Salud y Nutrición → Entregables → Signos físicos | `f1.go4_.mt1_.pp_F.I_de_signos_fisicos__a_la_desnutricion_aguda_v1_2 -MARINA_AGOSTO26.xlsx` | Conservar estructura Excel oficial y generar por tenant, periodo y UCA. |
 | E07_MONITOREO_DNT | Salud y Nutrición → Alertas/seguimiento y Entregables | No suministrado | Requiere formato oficial de monitoreo semanal DNT/riesgo antes de automatizar la salida. |
-| E08_CONCERTACION_MINUTA | Salud y Nutrición → Entregables → Concertación de minuta | `ACTA_CONCERTACION _MINUTA_KIPHARA_AGOSTO_2026.docx` | Generar por comunidad/UCA, minuta y grupo etario; anexar listado y fotos. |
+| E08_CONCERTACION_MINUTA | Salud y Nutrición → Entregables → Concertación de minuta | Acta institucional de concertación de minuta | Generar por comunidad/UCA, minuta y grupo etario; anexar listado y fotos. |
 | E09_CONTROL_CALIDAD | Salud y Nutrición → Entregables → Control de calidad | `ACTA_AGOSTO26_CONTROL_CALIDAD.docx` | Acta de verificación de alimentos, almacenamiento, vencimientos y evidencias. |
 | E10_LIMPIEZA_DESINFECCION | Salud y Nutrición → Entregables → Limpieza y desinfección | `ACTA_AGOSTO_26_LIMPIEZA Y DESINFECCION.docx` | Acta y fotografías por UCA; anexar muestras de saneamiento básico. |
 | E11_ENCUENTROS_HOGAR | Salud y Nutrición → Expediente integral y Entregables | `ENCUENTRO EN EL HOGAR_ELBIMAR_AGOSTO26.docx` | Documento individual asociado al beneficiario; consolidar muestras en el informe mensual. |

@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-17T02:09:18+00:00",
+  "baseline_version": "2.7.0",
+  "duration_seconds": 64.835,
+  "status": "PASS",
+  "blocking_failures": 0,
+  "checks": [
+    {
+      "name": "Archivos críticos",
+      "status": "PASS",
+      "detail": "",
+      "evidence": []
+    },
+    {
+      "name": "Módulos críticos",
+      "status": "PASS",
+      "detail": "",
+      "evidence": []
+    },
+    {
+      "name": "Rutas críticas",
+      "status": "PASS",
+      "detail": "",
+      "evidence": []
+    },
+    {
+      "name": "Roles estables",
+      "status": "PASS",
+      "detail": "",
+      "evidence": []
+    },
+    {
+      "name": "Capacidades de formatos",
+      "status": "PASS",
+      "detail": "",
+      "evidence": []
+    },
+    {
+      "name": "Plantillas oficiales estables",
+      "status": "PASS",
+      "detail": "",
+      "evidence": []
+    },
+    {
+      "name": "Registro funcional de todos los formatos",
+      "status": "PASS",
+      "detail": "9 familias; 16 protecciones universales",
+      "evidence": {
+        "registry": "integrity/format_capabilities.json",
+        "errors": []
+      }
+    },
+    {
+      "name": "Baseline funcional protegida",
+      "status": "PASS",
+      "detail": "11 funcionalidades protegidas",
+      "evidence": {
+        "registry": "integrity/protected_functionality.json",
+        "errors": []
+      }
+    },
+    {
+      "name": "Sintaxis Python",
+      "status": "PASS",
+      "detail": "511 archivos",
+      "evidence": []
+    },
+    {
+      "name": "Sintaxis JavaScript",
+      "status": "PASS",
+      "detail": "72 archivos",
+      "evidence": []
+    },
+    {
+      "name": "Runtime sin sqlite3 directo",
+      "status": "PASS",
+      "detail": "",
+      "evidence": []
+    },
+    {
+      "name": "SQL runtime compatible con PostgreSQL",
+      "status": "PASS",
+      "detail": "sql=2196, legado_soportado=197, no_soportado=0, contrato_faltante=0",
+      "evidence": {
+        "unsupported": [],
+        "missing_contract": []
+      }
+    },
+    {
+      "name": "Driver PostgreSQL declarado",
+      "status": "PASS",
+      "detail": "psycopg[binary]",
+      "evidence": null
+    },
+    {
+      "name": "Producción exige PostgreSQL",
+      "status": "PASS",
+      "detail": "guard productivo",
+      "evidence": null
+    },
+    {
+      "name": "Regresión crítica",
+      "status": "PASS",
+      "detail": "32 pruebas",
+      "evidence": []
+    }
+  ]
+}

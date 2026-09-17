@@ -32,5 +32,5 @@ assert "if self.table_exists(table)" in repository and "if not tables:" in repos
 assert "enable_rls = getattr(self.repo, '_enable_institutional_rls', None)" in service
 assert "set_config('app.current_fundacion_id'" in compat and "app.allow_global" in compat
 assert 'snMostrarVista(\'mensuales\')' in index and 'snMostrarVista(\'actas\')' in index
-assert "salud-nutricion.js?v=2.7.0-informes-actas-1" in index
+assert "salud-nutricion.js?v=2.7.6-tematicas-revision-1" in index
 print("SALUD_NUTRICION_INFORMES_ACTAS_V7_PASS")
