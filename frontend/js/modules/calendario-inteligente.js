@@ -642,18 +642,24 @@
             if (data.job_id) { message('Cronograma recibido. Se está procesando en segundo plano.'); esperarJobCalendario(data.job_id); return; }
             if (data.preview) {
                 const creadas = Number(data.resultado?.creados || 0);
+                const duplicadas = Number(data.resultado?.duplicados || 0);
                 const pendientes = (data.preview.actividades || []).filter(item => !item.fecha_limite || !item.titulo);
                 if (data.preview.periodo) {
                     state.periodo = data.preview.periodo; state.anio = data.preview.periodo.slice(0, 4);
                     const periodInput = document.getElementById('ci-periodo'); if (periodInput) periodInput.value = state.periodo;
                     const yearInput = document.getElementById('ci-anio'); if (yearInput) yearInput.value = state.anio;
                 }
+                state.vista = 'mes';
+                state.filtros = {};
+                ['ci-filtro-coordinador','ci-filtro-unidad','ci-filtro-modulo','ci-filtro-estado'].forEach(id => {
+                    const input = document.getElementById(id); if (input) input.value = '';
+                });
                 await cargarDashboard();
                 if (pendientes.length) {
                     state.previewCronograma = {...data.preview, actividades: pendientes}; abrirPreviewCronograma(state.previewCronograma);
                     message(`${creadas} actividades ubicadas en el calendario. Corrige ${pendientes.length} filas pendientes.`);
                 } else {
-                    message(`${creadas} actividades ubicadas automáticamente en sus días.`); limpiarCargaCronograma();
+                    message(`${creadas} actividades nuevas y ${duplicadas} ya existentes, visibles en ${state.periodo}.`); limpiarCargaCronograma();
                 }
                 return;
             }

@@ -21,7 +21,7 @@ for token in (
 assert ".ci-upload-layout" in styles
 assert ".ci-upload-visual img" in styles
 assert "calendario-inteligente.css?v=2.7.6-ocr-auto-calendar-2" in index
-assert "calendario-inteligente.js?v=2.7.6-ocr-auto-calendar-2" in index
+assert "calendario-inteligente.js?v=2.7.6-ocr-auto-calendar-3" in index
 assert "fd.append('auto_confirmar', 'true')" in frontend
 
 print("CALENDAR_OCR_WORKSPACE_V7_PASS")
