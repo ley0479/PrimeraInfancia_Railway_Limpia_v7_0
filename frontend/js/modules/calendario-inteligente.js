@@ -145,7 +145,7 @@
             <div class="ci-panel">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div><h3 class="font-semibold text-slate-100 flex items-center gap-2"><i data-lucide="clipboard-check" class="w-5 h-5 text-emerald-300"></i> Lista de chequeo institucional</h3><p id="ci-checklist-summary" class="text-sm text-slate-400 mt-1">Sin obligaciones para el periodo.</p></div>
-                    <div class="flex flex-wrap gap-2"><label class="ci-btn ci-btn-success cursor-pointer"><i data-lucide="scan-text" class="w-4 h-4"></i> Importar checklist<input id="ci-checklist-file" type="file" accept=".xlsx,.xls,.docx,.pdf,.pptx" class="hidden" onchange="ciImportarChecklist()"></label><button onclick="ciNuevaObligacion()" class="ci-btn ci-btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Nueva obligación</button></div>
+                    <div class="flex flex-wrap gap-2"><label class="ci-btn ci-btn-success cursor-pointer"><i data-lucide="scan-text" class="w-4 h-4"></i> Importar checklist<input id="ci-checklist-file" type="file" accept=".xlsx,.xls,.docx,.pdf,.pptx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" class="hidden" onchange="ciImportarChecklist()"></label><button onclick="ciNuevaObligacion()" class="ci-btn ci-btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Nueva obligación</button></div>
                 </div>
                 <div id="ci-checklist-list" class="ci-checklist-list mt-4"></div>
                 <div id="ci-compliance-board" class="mt-5"></div>
@@ -432,8 +432,14 @@
     async function importarChecklist() {
         const input=document.getElementById('ci-checklist-file'), file=input?.files?.[0];
         if(!file)return;
-        const fd=new FormData(); fd.append('file',file);
-        try { const data=await api('/checklist/importar',{method:'POST',body:fd}); state.checklistImport=data; abrirPreviewChecklist(data); }
+        const fd=new FormData(); fd.append('file',file); fd.append('periodo',state.periodo); fd.append('auto_confirmar','true');
+        try {
+            message('Leyendo lista de chequeo y ubicando actividades en el calendario…');
+            const data=await api('/checklist/importar',{method:'POST',body:fd});
+            const creadas=Number(data.resultado_calendario?.creados||0), sinFecha=(data.propuestas||[]).filter(p=>!p.fecha_sugerida);
+            if(sinFecha.length){ state.checklistImport={...data,propuestas:sinFecha}; abrirPreviewChecklist(state.checklistImport); message(`${creadas} actividades ubicadas en el calendario. Asigna fecha a ${sinFecha.length} pendientes.`); }
+            else { message(`${creadas} actividades ubicadas automáticamente en sus días.`); await cargarDashboard(); }
+        }
         catch(err){ message(err.message||'No se pudo leer la lista de chequeo.','error'); }
         finally { if(input)input.value=''; }
     }
@@ -445,7 +451,7 @@
         const data=state.checklistImport; if(!data)return;
         const proposals=[...document.querySelectorAll('[data-ci-check-import]')].map(tr=>({ignorar:!tr.querySelector('.ci-chk-use').checked,componente:tr.querySelector('.ci-chk-comp').value,actividad:tr.querySelector('.ci-chk-act').value,responsable_nombre:tr.querySelector('.ci-chk-role').value,entregables:tr.querySelector('.ci-chk-req').value,fecha_sugerida:tr.querySelector('.ci-chk-date').value}));
         const result=await api(`/checklist/importar/${data.importacion_id}/confirmar`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({periodo:state.periodo,propuestas:proposals})});
-        closeModal(); state.checklistImport=null; message(`${result.resultado?.creadas||0} obligaciones incorporadas.`); await cargarDashboard();
+        closeModal(); state.checklistImport=null; message(`${result.resultado?.creadas||0} obligaciones y ${result.resultado_calendario?.creados||0} actividades incorporadas al calendario.`); await cargarDashboard();
     }
 
     function renderCumplimiento(rows) {
@@ -622,7 +628,7 @@
     async function cargarCronograma() {
         const file = state.cronogramaFile || document.getElementById('ci-cronograma-file')?.files?.[0];
         if (!file) { message('Primero selecciona una foto o un cronograma.', 'error'); abrirCargaCronograma(); return; }
-        const fd = new FormData(); fd.append('file', file);
+        const fd = new FormData(); fd.append('file', file); fd.append('periodo', state.periodo); fd.append('auto_confirmar', 'true');
         const analyze = document.getElementById('ci-analyze-button');
         let timer;
         try {
@@ -635,8 +641,21 @@
             actualizarProgresoOcr(100, 'Lectura terminada. Revisa los resultados.');
             if (data.job_id) { message('Cronograma recibido. Se está procesando en segundo plano.'); esperarJobCalendario(data.job_id); return; }
             if (data.preview) {
-                state.previewCronograma = data.preview; abrirPreviewCronograma(data.preview);
-                message(`Cronograma leído: ${data.preview.actividades?.length || 0} actividades detectadas. Revisa y guarda.`); return;
+                const creadas = Number(data.resultado?.creados || 0);
+                const pendientes = (data.preview.actividades || []).filter(item => !item.fecha_limite || !item.titulo);
+                if (data.preview.periodo) {
+                    state.periodo = data.preview.periodo; state.anio = data.preview.periodo.slice(0, 4);
+                    const periodInput = document.getElementById('ci-periodo'); if (periodInput) periodInput.value = state.periodo;
+                    const yearInput = document.getElementById('ci-anio'); if (yearInput) yearInput.value = state.anio;
+                }
+                await cargarDashboard();
+                if (pendientes.length) {
+                    state.previewCronograma = {...data.preview, actividades: pendientes}; abrirPreviewCronograma(state.previewCronograma);
+                    message(`${creadas} actividades ubicadas en el calendario. Corrige ${pendientes.length} filas pendientes.`);
+                } else {
+                    message(`${creadas} actividades ubicadas automáticamente en sus días.`); limpiarCargaCronograma();
+                }
+                return;
             }
             const r = data.resultado || {};
             message(`Cronograma procesado: ${r.creados || 0} creados, ${r.duplicados || 0} duplicados, ${r.errores?.length || 0} errores.`);

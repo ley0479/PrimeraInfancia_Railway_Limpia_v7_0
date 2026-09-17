@@ -154,7 +154,18 @@ def register_calendario_inteligente(app, database_path: str, upload_folder: str)
                 "confianza": item.get("confianza", 0),
                 "errores": item.get("errores") or [],
             })
-        return jsonify({"message": "Lista detectada. Revisa las propuestas antes de incorporarlas.", "importacion_id": preview["cronograma_id"], "propuestas": propuestas}), 200
+        auto_confirmar = str(request.form.get("auto_confirmar") or "").lower() in {"1", "true", "si", "sí"}
+        checklist_result = None
+        calendar_result = None
+        if auto_confirmar:
+            checklist_result = repo.confirmar_importacion_checklist(preview["cronograma_id"], propuestas, request.form.get("periodo") or date.today().isoformat()[:7], user)
+            validas = [item for item in (preview.get("actividades") or []) if item.get("fecha_limite") and item.get("titulo")]
+            calendar_result = repo.confirmar_cronograma(preview["cronograma_id"], validas, usuario=user.get("username") or "sistema")
+        return jsonify({
+            "message": "Lista incorporada al checklist y al calendario." if auto_confirmar else "Lista detectada. Revisa las propuestas antes de incorporarlas.",
+            "importacion_id": preview["cronograma_id"], "propuestas": propuestas,
+            "resultado": checklist_result, "resultado_calendario": calendar_result,
+        }), 200
 
     @bp.route("/checklist/importar/<int:importacion_id>/confirmar", methods=["POST"])
     def confirmar_importacion_checklist(importacion_id: int):
@@ -164,9 +175,18 @@ def register_calendario_inteligente(app, database_path: str, upload_folder: str)
         data = _json_payload()
         try:
             result = repo.confirmar_importacion_checklist(importacion_id, data.get("propuestas") or [], data.get("periodo") or date.today().isoformat()[:7], user)
+            actividades = [{
+                "fecha_limite": item.get("fecha_sugerida") or item.get("fecha"),
+                "titulo": item.get("actividad") or item.get("titulo"),
+                "componente": item.get("componente") or "Checklist institucional",
+                "responsable_nombre": item.get("responsable_nombre") or "",
+                "entregables": item.get("entregables") or "",
+                "descartar": bool(item.get("ignorar") or item.get("descartar")),
+            } for item in (data.get("propuestas") or [])]
+            calendar_result = repo.confirmar_cronograma(importacion_id, actividades, usuario=user.get("username") or "sistema")
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 422
-        return jsonify({"message": "Propuestas confirmadas e incorporadas al checklist.", "resultado": result}), 201
+        return jsonify({"message": "Propuestas incorporadas al checklist y al calendario.", "resultado": result, "resultado_calendario": calendar_result}), 201
 
     @bp.route("/entregables", methods=["GET", "POST"])
     def entregables():
@@ -234,6 +254,7 @@ def register_calendario_inteligente(app, database_path: str, upload_folder: str)
         file.save(path)
 
         usuario = request.form.get("usuario") or request.headers.get("X-User-Name") or "sistema"
+        auto_confirmar = str(request.form.get("auto_confirmar") or request.args.get("auto_confirmar") or "").lower() in {"1", "true", "si", "sí"}
         # ALPHA33: por defecto NO guarda actividades. Primero devuelve vista previa editable.
         guardar_directo = str(request.args.get("guardar_directo") or request.form.get("guardar_directo") or "").lower() in {"1", "true", "si", "sí"}
         if not guardar_directo:
@@ -245,11 +266,16 @@ def register_calendario_inteligente(app, database_path: str, upload_folder: str)
                     "archivo": saved,
                     "recomendacion": "Verifique que el documento tenga fecha, actividad, módulo/responsable o que la imagen tenga texto legible. Si es foto o PDF escaneado, revise OCR/Tesseract."
                 }), 400
+            resultado = None
+            if auto_confirmar:
+                validas = [item for item in (preview.get("actividades") or []) if item.get("fecha_limite") and item.get("titulo")]
+                resultado = repo.confirmar_cronograma(preview["cronograma_id"], validas, usuario=usuario)
             return jsonify({
-                "message": "Cronograma leído. Revisa la vista previa antes de guardar en calendario.",
+                "message": "Cronograma leído y actividades incorporadas al calendario." if auto_confirmar else "Cronograma leído. Revisa la vista previa antes de guardar en calendario.",
                 "archivo": saved,
                 "cronograma_id": preview.get("cronograma_id"),
                 "preview": preview,
+                "resultado": resultado,
                 "modo": "preview",
             }), 200
 

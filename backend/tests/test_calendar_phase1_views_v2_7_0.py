@@ -28,7 +28,7 @@ def run() -> None:
     require("document.getElementById('dashboard')?.parentElement" in frontend, "El calendario no usa un anclaje estable de la SPA")
     index = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
     require("onclick=\"mostrarSeccion('calendario-inteligente')\"" in index, "El menú no abre el calendario mejorado")
-    require("2.7.6-ocr-workspace-1" in index, "Falta invalidar la caché del calendario")
+    require("2.7.6-ocr-auto-calendar-2" in index, "Falta invalidar la caché del calendario")
     require("waitForElement('#ci-periodo')" in liam, "LIAM no espera la carga real del calendario")
     require("window.ciSetPeriodo(action.period)" in liam, "LIAM no aplica el periodo consultado")
     require("d.name==='get_pending_activities_summary'" in liam, "La voz Realtime no navega al resultado de pendientes")

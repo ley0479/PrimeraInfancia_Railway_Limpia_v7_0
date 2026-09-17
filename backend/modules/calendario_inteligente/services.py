@@ -265,6 +265,48 @@ def _dataframe_from_plain_text(texto: str):
     lineas = [linea.strip() for linea in str(texto or "").splitlines() if linea and linea.strip()]
     if not lineas:
         raise ValueError("No se encontró texto legible con estructura de cronograma.")
+    # OCR suele perder las columnas, pero conserva cada fecha y actividad en la
+    # misma línea o en líneas vecinas. Resolver esto antes evita falsos CSV.
+    meses = {
+        "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
+        "julio": 7, "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10,
+        "noviembre": 11, "diciembre": 12,
+    }
+    fecha_numerica = re.compile(r"(?<!\d)(\d{1,2})[\s/.-](\d{1,2})[\s/.-](20\d{2})(?!\d)")
+    fecha_iso = re.compile(r"(?<!\d)(20\d{2})[/-](\d{1,2})[/-](\d{1,2})(?!\d)")
+    fecha_texto = re.compile(r"(?<!\d)(\d{1,2})\s*(?:de\s+)?(" + "|".join(meses) + r")(?:\s+de)?\s+(20\d{2})(?!\d)", re.I)
+    filas_ocr = []
+    for index, linea in enumerate(lineas):
+        fecha = None
+        match = fecha_iso.search(linea)
+        if match:
+            try: fecha = date(int(match.group(1)), int(match.group(2)), int(match.group(3))).isoformat()
+            except ValueError: fecha = None
+        if not fecha:
+            match = fecha_numerica.search(linea)
+            if match:
+                try: fecha = date(int(match.group(3)), int(match.group(2)), int(match.group(1))).isoformat()
+                except ValueError: fecha = None
+        if not fecha:
+            match = fecha_texto.search(linea)
+            if match:
+                try: fecha = date(int(match.group(3)), meses[match.group(2).lower()], int(match.group(1))).isoformat()
+                except ValueError: fecha = None
+        if not fecha or not match:
+            continue
+        actividad = (linea[:match.start()] + " " + linea[match.end():]).strip(" -:|\t")
+        if len(actividad) < 4 and index > 0:
+            anterior = lineas[index - 1].strip(" -:|\t")
+            if not fecha_numerica.search(anterior) and not fecha_iso.search(anterior) and not fecha_texto.search(anterior):
+                actividad = anterior
+        if len(actividad) < 4 and index + 1 < len(lineas):
+            siguiente = lineas[index + 1].strip(" -:|\t")
+            if not fecha_numerica.search(siguiente) and not fecha_iso.search(siguiente) and not fecha_texto.search(siguiente):
+                actividad = siguiente
+        if actividad and normalizar_texto(actividad) not in {"fecha", "entrega", "fecha entrega"}:
+            filas_ocr.append({"Fecha": fecha, "Actividad": actividad})
+    if filas_ocr:
+        return pd.DataFrame(filas_ocr)
     muestra = "\n".join(lineas)
     from io import StringIO
     for sep in ["\t", ";", ",", "|"]:
@@ -283,7 +325,7 @@ def _dataframe_from_plain_text(texto: str):
         pass
     # Último recurso: extraer eventos con fecha al inicio o dentro de la línea.
     filas = []
-    patron_fecha = re.compile(r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})")
+    patron_fecha = re.compile(r"(\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})")
     for linea in lineas:
         m = patron_fecha.search(linea)
         if not m:
@@ -390,16 +432,21 @@ def _dataframe_from_pptx(path: str):
 
 def _dataframe_from_image(path: str):
     try:
-        from PIL import Image
+        from PIL import Image, ImageEnhance, ImageFilter, ImageOps
         import pytesseract
     except Exception as exc:
         raise ValueError(
             "La imagen fue recibida, pero para extraer cronogramas desde fotografía se requiere OCR "
             "(Pillow + pytesseract + motor Tesseract). Sube Excel/Word/PDF o instala OCR para leer imágenes."
         ) from exc
-    imagen = Image.open(path)
+    imagen = ImageOps.exif_transpose(Image.open(path)).convert("L")
+    if imagen.width < 1800:
+        factor = min(3.0, 1800 / max(1, imagen.width))
+        imagen = imagen.resize((int(imagen.width * factor), int(imagen.height * factor)))
+    imagen = ImageOps.autocontrast(imagen)
+    imagen = ImageEnhance.Contrast(imagen).enhance(1.35).filter(ImageFilter.SHARPEN)
     try:
-        texto = pytesseract.image_to_string(imagen, lang="spa+eng")
+        texto = pytesseract.image_to_string(imagen, lang="spa+eng", config="--oem 3 --psm 6")
     except Exception:
         # Algunos equipos tienen Tesseract instalado sin paquete de idioma español.
         # Se reintenta con el idioma por defecto para no bloquear el menú.
