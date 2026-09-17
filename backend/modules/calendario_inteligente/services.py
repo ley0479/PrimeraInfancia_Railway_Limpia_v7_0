@@ -274,10 +274,10 @@ def _dataframe_from_plain_text(texto: str):
     }
     fecha_numerica = re.compile(r"(?<!\d)(\d{1,2})[\s/.-](\d{1,2})[\s/.-](20\d{2})(?!\d)")
     fecha_iso = re.compile(r"(?<!\d)(20\d{2})[/-](\d{1,2})[/-](\d{1,2})(?!\d)")
-    fecha_texto = re.compile(r"(?<!\d)(\d{1,2})\s*(?:de\s+)?(" + "|".join(meses) + r")(?:\s+de)?\s+(20\d{2})(?!\d)", re.I)
+    fecha_texto = re.compile(r"(?<!\d)(\d{1,2})\s*(?:de\s+)?(" + "|".join(meses) + r")(?:\s+de)?\s*(20\d{2})(?!\d)", re.I)
     fecha_texto_ocr = re.compile(
         r"(?<!\d)(\d{1,2})\s*(?:de\s+)?(" + "|".join(meses) +
-        r")[^\d\n]{0,30}(?:\n\s*(?:de\s+)?)?(20\d{2})(?!\d)", re.I,
+        r")\D{0,45}?(20\d{2})(?!\d)", re.I,
     )
     filas_ocr = []
     indices_fecha: set[int] = set()
@@ -316,7 +316,7 @@ def _dataframe_from_plain_text(texto: str):
     dias_semana = {"lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"}
     fragmento_fecha = re.compile(
         r"^(?:de\s+)?(?:\d{1,2}\s*(?:de\s+)?(?:" + "|".join(meses) +
-        r")?|(?:" + "|".join(meses) + r")|20\d{2}|de\s+20\d{2})$", re.I,
+        r")?|(?:" + "|".join(meses) + r")|20\d{2}|de\s*20\d{2})$", re.I,
     )
     for inicio in range(len(lineas)):
         for cantidad in (2, 3):

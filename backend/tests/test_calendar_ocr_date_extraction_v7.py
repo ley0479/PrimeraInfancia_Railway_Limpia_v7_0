@@ -49,4 +49,19 @@ assert [row["Fecha"] for row in noisy_rows] == ["2026-09-25", "2026-09-25"]
 assert "Entrega de informe" in noisy_rows[0]["Actividad"]
 assert "Socialización" in noisy_rows[1]["Actividad"]
 
+production_ocr = """
+Entrega de cuentas de cobro
+e Y - A 16 de septiembre es
+E x de2026 A
+Entrega de informe
+lá 4 — 25 de septiembre Zz ——
+a de2026  “», —
+Socialización
+de los servicios
+A 25 de septiembre ES
+A de 2026 nines yo
+"""
+production_rows = _dataframe_from_plain_text(production_ocr).to_dict("records")
+assert [row["Fecha"] for row in production_rows] == ["2026-09-16", "2026-09-25", "2026-09-25"]
+
 print("CALENDAR_OCR_DATE_EXTRACTION_V7_PASS")
