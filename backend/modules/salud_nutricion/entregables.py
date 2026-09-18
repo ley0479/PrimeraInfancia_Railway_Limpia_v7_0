@@ -7,6 +7,7 @@ la lógica estable de procesamiento.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -18,7 +19,8 @@ from typing import Any, Iterable
 
 from docx import Document
 from docx.shared import Inches
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.cell.cell import MergedCell
 from werkzeug.utils import secure_filename
 
 from modules.seguridad.tenant_context import current_tenant_context, current_tenant_id
@@ -158,11 +160,27 @@ CREATE TABLE IF NOT EXISTS sn_entregables_actividades (
     FOREIGN KEY (entregable_id) REFERENCES sn_entregables_mes(id)
 );
 
+CREATE TABLE IF NOT EXISTS sn_entregables_plantillas_oficiales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER DEFAULT 1,
+    codigo_entregable TEXT NOT NULL,
+    tipo TEXT NOT NULL,
+    nombre_original TEXT NOT NULL,
+    ruta_archivo TEXT NOT NULL,
+    extension TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    version INTEGER DEFAULT 1,
+    estado TEXT DEFAULT 'ACTIVA',
+    fecha_registro TEXT,
+    usuario_id INTEGER
+);
+
 CREATE INDEX IF NOT EXISTS idx_sn_entregables_mes_periodo ON sn_entregables_mes(anio, mes, uds);
 CREATE INDEX IF NOT EXISTS idx_sn_entregables_mes_estado ON sn_entregables_mes(estado);
 CREATE INDEX IF NOT EXISTS idx_sn_entregables_evidencias_entregable ON sn_entregables_evidencias(entregable_id);
 CREATE INDEX IF NOT EXISTS idx_sn_entregables_archivos_entregable ON sn_entregables_archivos(entregable_id);
 CREATE INDEX IF NOT EXISTS idx_sn_entregables_actividades_entregable ON sn_entregables_actividades(entregable_id);
+CREATE INDEX IF NOT EXISTS idx_sn_entregables_plantillas_codigo ON sn_entregables_plantillas_oficiales(codigo_entregable, tipo, fundacion_id, estado);
 """
 
 CATALOGO_BASE = [
@@ -198,7 +216,7 @@ CATALOGO_BASE = [
          evidencias='Acta, evidencias fotográficas y muestras de saneamiento básico.', acta=1, listado=0, fotos=1, oficio=0, excel=1, word=1),
     dict(codigo='E11_ENCUENTROS_HOGAR', nombre='Encuentros en el hogar',
          actividad='Encuentros en hogares priorizados: puerperio, DNT, riesgo, enfermedad o garantía de derechos.',
-         evidencias='Formato de encuentro en el hogar, mínimo 10 muestras y evidencias fotográficas.', acta=0, listado=1, fotos=1, oficio=0, excel=1, word=1),
+         evidencias='Formato de encuentro en el hogar, mínimo 2 muestras por informe y evidencias fotográficas.', acta=0, listado=1, fotos=1, oficio=0, excel=1, word=1),
     dict(codigo='E12_ARTICULACION_INTERINSTITUCIONAL', nombre='Articulación interinstitucional',
          actividad='Oficio de acuerdo a la situación encontrada.',
          evidencias='Oficio físico/digital.', acta=0, listado=0, fotos=0, oficio=1, excel=0, word=1),
@@ -211,6 +229,9 @@ CATALOGO_BASE = [
     dict(codigo='E15_CUALIFICACION_TH', nombre='Acta de cualificación al talento humano',
          actividad='Cualificación en lactancia, almacenamiento de alimentos y control de plagas.',
          evidencias='Acta, listado de asistencia y evidencias fotográficas.', acta=1, listado=1, fotos=1, oficio=0, excel=0, word=1),
+    dict(codigo='E16_NOVEDADES_DNT_ETA', nombre='Novedades, canalización y certificado de no ETA',
+         actividad='Registrar novedades por malnutrición, perímetro braquial menor de 11.5 cm, signos clínicos o enfermedad; activar ruta y elaborar certificado cuando aplique.',
+         evidencias='Formato oficial de novedades, oficio/correo de canalización y certificado de no ETA.', acta=0, listado=0, fotos=0, oficio=1, excel=0, word=1),
 ]
 
 
@@ -258,12 +279,19 @@ class EntregablesSaludNutricionService:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
+    @property
+    def template_folder(self) -> Path:
+        path = self.upload_folder / 'plantillas_oficiales'
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
     def init_schema(self) -> None:
         self.repo.execute_script(ENTREGABLES_SCHEMA_SQL)
         for table in (
             'sn_entregables_catalogo', 'sn_entregables_mes', 'sn_entregables_evidencias',
             'sn_entregables_archivos', 'sn_entregables_validaciones',
             'sn_entregables_observaciones', 'sn_entregables_actividades',
+            'sn_entregables_plantillas_oficiales',
         ):
             if self.repo.table_exists(table):
                 default = 'INTEGER' if table == 'sn_entregables_catalogo' else 'INTEGER DEFAULT 1'
@@ -338,6 +366,61 @@ class EntregablesSaludNutricionService:
     def catalogo(self) -> list[dict[str, Any]]:
         return self.repo.fetch_all('SELECT * FROM sn_entregables_catalogo ORDER BY id ASC')
 
+    def registrar_plantilla(self, codigo: str, tipo: str, archivo, usuario_id: int | None = None) -> dict[str, Any]:
+        codigo = str(codigo or '').strip().upper()
+        tipo = str(tipo or '').strip().lower()
+        if tipo not in {'acta', 'listado', 'formato', 'oficio', 'informe'}:
+            raise ValueError('Tipo de plantilla no permitido.')
+        if not self.repo.fetch_one('SELECT id FROM sn_entregables_catalogo WHERE codigo = ?', (codigo,)):
+            raise ValueError('El entregable indicado no existe en el catálogo.')
+        original = secure_filename(archivo.filename or '')
+        extension = Path(original).suffix.lower()
+        permitidas = {'.docx'} if tipo in {'acta', 'oficio', 'informe'} else {'.xlsx'}
+        if extension not in permitidas:
+            esperado = 'DOCX' if '.docx' in permitidas else 'XLSX'
+            raise ValueError(f'La plantilla {tipo} debe ser {esperado}.')
+        contenido = archivo.read()
+        if not contenido:
+            raise ValueError('La plantilla está vacía.')
+        fundacion_id = int(current_tenant_id(1) or 1)
+        digest = hashlib.sha256(contenido).hexdigest()
+        version_row = self.repo.fetch_one(
+            'SELECT MAX(version) AS version FROM sn_entregables_plantillas_oficiales WHERE codigo_entregable = ? AND tipo = ? AND fundacion_id = ?',
+            (codigo, tipo, fundacion_id),
+        ) or {}
+        version = int(version_row.get('version') or 0) + 1
+        destino = self.template_folder / f'{codigo}_{tipo}_v{version}{extension}'
+        destino.write_bytes(contenido)
+        self.repo.execute(
+            "UPDATE sn_entregables_plantillas_oficiales SET estado = 'INACTIVA' WHERE codigo_entregable = ? AND tipo = ? AND fundacion_id = ?",
+            (codigo, tipo, fundacion_id),
+        )
+        self.repo.execute(
+            '''INSERT INTO sn_entregables_plantillas_oficiales
+               (fundacion_id, codigo_entregable, tipo, nombre_original, ruta_archivo, extension, sha256, version, estado, fecha_registro, usuario_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVA', ?, ?)''',
+            (fundacion_id, codigo, tipo, original, str(destino), extension, digest, version, now_iso(), usuario_id),
+        )
+        return self.repo.fetch_one('SELECT * FROM sn_entregables_plantillas_oficiales WHERE ruta_archivo = ?', (str(destino),)) or {}
+
+    def listar_plantillas(self, codigo: str | None = None) -> list[dict[str, Any]]:
+        fundacion_id = int(current_tenant_id(1) or 1)
+        sql = "SELECT id, codigo_entregable, tipo, nombre_original, extension, sha256, version, estado, fecha_registro FROM sn_entregables_plantillas_oficiales WHERE fundacion_id = ? AND estado = 'ACTIVA'"
+        params: list[Any] = [fundacion_id]
+        if codigo:
+            sql += ' AND codigo_entregable = ?'
+            params.append(str(codigo).upper())
+        return self.repo.fetch_all(sql + ' ORDER BY codigo_entregable, tipo', tuple(params))
+
+    def _plantilla_activa(self, codigo: str, tipo: str) -> dict[str, Any]:
+        row = self.repo.fetch_one(
+            "SELECT * FROM sn_entregables_plantillas_oficiales WHERE codigo_entregable = ? AND tipo = ? AND fundacion_id = ? AND estado = 'ACTIVA' ORDER BY version DESC LIMIT 1",
+            (codigo, tipo, int(current_tenant_id(1) or 1)),
+        )
+        if not row or not Path(str(row.get('ruta_archivo') or '')).is_file():
+            raise ValueError(f'Falta cargar la plantilla oficial de {tipo} para {codigo}. No se generará un formato genérico.')
+        return row
+
     def crear_mes(self, payload: dict[str, Any]) -> dict[str, Any]:
         mes = int(payload.get('mes') or datetime.now().month)
         anio = int(payload.get('anio') or datetime.now().year)
@@ -397,6 +480,9 @@ class EntregablesSaludNutricionService:
             SELECT m.*, c.nombre, c.actividad, c.evidencias_requeridas, c.requiere_acta, c.requiere_listado,
                    c.requiere_fotos, c.minimo_fotos, c.requiere_oficio, c.requiere_formato_excel,
                    c.requiere_word, c.requiere_pdf, c.plantilla_asociada,
+                   (SELECT GROUP_CONCAT(p.tipo, ',') FROM sn_entregables_plantillas_oficiales p
+                     WHERE p.codigo_entregable = m.codigo
+                       AND p.fundacion_id = {fundacion_id} AND p.estado = 'ACTIVA') AS plantillas_cargadas,
                    (SELECT COUNT(*) FROM sn_entregables_evidencias e
                      WHERE e.entregable_id = m.id
                        AND COALESCE(e.fundacion_id, 1) = {fundacion_id}) AS fotos_cargadas,
@@ -627,8 +713,19 @@ class EntregablesSaludNutricionService:
         actividades = [a for a in (ent.get('actividades') or []) if int(a.get('confirmado') or 0) == 1]
         if not actividades:
             raise ValueError('Registre y confirme al menos una actividad antes de generar el acta.')
+        plantilla = self._plantilla_activa(str(ent.get('codigo') or ''), 'acta')
         path = self._document_path(ent, 'ACTA', '.docx')
-        doc = Document()
+        doc = Document(str(plantilla['ruta_archivo']))
+        actividad = actividades[0]
+        self._rellenar_acta_oficial(doc, ent, actividad)
+        self._add_evidence_annex(doc, ent.get('evidencias') or [])
+        doc.save(path)
+        return self._register_file(entregable_id, 'acta', path, usuario_id, {
+            'usuarios': len(usuarios), 'actividades': len(actividades),
+            'plantilla_oficial_id': plantilla['id'], 'plantilla_version': plantilla['version'],
+        })
+
+        doc = Document()  # pragma: no cover - legado retenido temporalmente
         doc.add_heading('ACTA DE REUNIONES', 0)
         self._add_doc_context(doc, ent)
         doc.add_heading(ent.get('nombre') or '', level=1)
@@ -689,8 +786,17 @@ class EntregablesSaludNutricionService:
         if not ent:
             raise ValueError('Entregable no encontrado.')
         usuarios = self.obtener_usuarios_base(ent.get('uds'), limit=500)
+        plantilla = self._plantilla_activa(str(ent.get('codigo') or ''), 'listado')
         path = self._document_path(ent, 'LISTADO_ASISTENCIA', '.xlsx')
-        wb = Workbook()
+        wb = load_workbook(str(plantilla['ruta_archivo']))
+        filas = self._rellenar_excel_oficial(wb, ent, usuarios)
+        wb.save(path)
+        return self._register_file(entregable_id, 'listado', path, usuario_id, {
+            'usuarios': len(usuarios), 'plantilla_oficial_id': plantilla['id'],
+            'plantilla_version': plantilla['version'], 'filas_diligenciadas': filas,
+        })
+
+        wb = Workbook()  # pragma: no cover - legado retenido temporalmente
         ws = wb.active
         ws.title = 'Listado asistencia'
         rows = [
@@ -741,8 +847,17 @@ class EntregablesSaludNutricionService:
         if not ent:
             raise ValueError('Entregable no encontrado.')
         usuarios = self.obtener_usuarios_base(ent.get('uds'), limit=5000)
+        plantilla = self._plantilla_activa(str(ent.get('codigo') or ''), 'formato')
         path = self._document_path(ent, 'FORMATO', '.xlsx')
-        wb = Workbook()
+        wb = load_workbook(str(plantilla['ruta_archivo']))
+        filas = self._rellenar_excel_oficial(wb, ent, usuarios)
+        wb.save(path)
+        return self._register_file(entregable_id, 'formato', path, usuario_id, {
+            'usuarios': len(usuarios), 'plantilla_oficial_id': plantilla['id'],
+            'plantilla_version': plantilla['version'], 'filas_diligenciadas': filas,
+        })
+
+        wb = Workbook()  # pragma: no cover - legado retenido temporalmente
         ws = wb.active
         ws.title = 'Formato entregable'
         ws.append(['Entregable', ent.get('nombre') or ''])
@@ -925,6 +1040,90 @@ class EntregablesSaludNutricionService:
             return parsed if isinstance(parsed, list) else []
         except (TypeError, ValueError, json.JSONDecodeError):
             return []
+
+    @staticmethod
+    def _normalizar_etiqueta(value: Any) -> str:
+        import unicodedata
+        text = unicodedata.normalize('NFKD', str(value or '')).encode('ascii', 'ignore').decode('ascii')
+        return re.sub(r'\s+', ' ', text).strip().lower().rstrip(':')
+
+    def _rellenar_acta_oficial(self, doc: Document, ent: dict[str, Any], actividad: dict[str, Any]) -> None:
+        """Completa celdas rotuladas sin reconstruir tablas, logos ni estilos oficiales."""
+        valores = {
+            'fecha': actividad.get('fecha_actividad'),
+            'hora inicio': actividad.get('hora_inicio'),
+            'hora inicial': actividad.get('hora_inicio'),
+            'hora final': actividad.get('hora_final'),
+            'lugar': actividad.get('lugar') or ent.get('uds'),
+            'nombre del responsable': actividad.get('responsable') or ent.get('responsable'),
+            'responsable': actividad.get('responsable') or ent.get('responsable'),
+            'tipo de actividad': ent.get('nombre'),
+            'actividad': ent.get('nombre'),
+            'dirigido a': actividad.get('dirigido_a'),
+            'tema': ent.get('nombre'),
+            'objetivo': actividad.get('objetivo'),
+            'agenda': '\n'.join(str(x) for x in self._json_list(actividad.get('agenda_json'))),
+            'desarrollo': actividad.get('desarrollo'),
+            'desarrollo de la actividad': actividad.get('desarrollo'),
+            'compromisos': actividad.get('compromisos'),
+        }
+        pendientes = {key: str(value or '').strip() for key, value in valores.items() if str(value or '').strip()}
+        for table in doc.tables:
+            for row_index, row in enumerate(table.rows):
+                for col_index, cell in enumerate(row.cells):
+                    etiqueta = self._normalizar_etiqueta(cell.text)
+                    clave = next((key for key in pendientes if etiqueta == key or etiqueta.startswith(key + ' ')), None)
+                    if not clave:
+                        continue
+                    candidates = list(row.cells[col_index + 1:])
+                    if row_index + 1 < len(table.rows) and col_index < len(table.rows[row_index + 1].cells):
+                        candidates.append(table.rows[row_index + 1].cells[col_index])
+                    target = next((candidate for candidate in candidates if candidate._tc is not cell._tc), None)
+                    if target is not None:
+                        target.text = pendientes.pop(clave)
+
+    def _rellenar_excel_oficial(self, wb, ent: dict[str, Any], usuarios: list[dict[str, Any]]) -> int:
+        """Diligencia columnas reconocibles sin crear hojas ni alterar el diseño del libro oficial."""
+        aliases = {
+            'documento': ('documento', 'numero de documento', 'no documento', 'identificacion'),
+            'nombre_completo': ('nombre completo', 'nombres y apellidos', 'nombre del participante', 'usuario'),
+            'unidad': ('uds', 'uca', 'unidad de servicio', 'nombre de la unidad'),
+            'grupo_etario': ('grupo etario', 'grupo de edad'),
+            'peso': ('peso', 'peso kg', 'peso actual'),
+            'talla': ('talla', 'longitud', 'talla cm'),
+            'perimetro_braquial': ('perimetro braquial', 'pb', 'circunferencia braquial'),
+            'diagnostico_nutricional': ('diagnostico nutricional', 'clasificacion nutricional', 'estado nutricional'),
+            'vacunas': ('vacunas', 'esquema de vacunacion'),
+            'carne_salud': ('carne de salud', 'carne crecimiento y desarrollo', 'crecimiento y desarrollo'),
+        }
+        total = 0
+        for ws in wb.worksheets:
+            header_row = None
+            mapping: dict[int, str] = {}
+            for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 50)):
+                found: dict[int, str] = {}
+                for cell in row:
+                    text = self._normalizar_etiqueta(cell.value)
+                    for field, names in aliases.items():
+                        if any(name == text or name in text for name in names):
+                            found[cell.column] = field
+                            break
+                if len(found) >= 2:
+                    header_row, mapping = row[0].row, found
+                    break
+            if not header_row:
+                continue
+            for offset, usuario in enumerate(usuarios, start=1):
+                target_row = header_row + offset
+                for column, field in mapping.items():
+                    value = usuario.get(field)
+                    if field == 'unidad':
+                        value = value or ent.get('uds')
+                    cell = ws.cell(target_row, column)
+                    if not isinstance(cell, MergedCell):
+                        cell.value = value or ''
+                total += 1
+        return total
 
     def _add_evidence_annex(self, doc: Document, evidencias: list[dict[str, Any]], heading: str = 'Registro fotográfico') -> None:
         imagenes = []

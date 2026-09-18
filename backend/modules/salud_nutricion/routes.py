@@ -386,6 +386,26 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
     # ==============================================================
     # ALPHA51 — Entregables Salud y Nutrición
     # ============================================================== 
+    @bp.route('/entregables/plantillas', methods=['GET'])
+    @require_roles(*ENTREGABLES_READ_ROLES)
+    def entregables_listar_plantillas():
+        return jsonify({'plantillas': entregables_service.listar_plantillas(request.args.get('codigo'))}), 200
+
+    @bp.route('/entregables/plantillas/<codigo>/<tipo>', methods=['POST'])
+    @require_roles(*ENTREGABLES_EDIT_ROLES)
+    def entregables_registrar_plantilla(codigo: str, tipo: str):
+        archivo = request.files.get('file')
+        if not archivo or not archivo.filename:
+            return jsonify({'error': 'Seleccione una plantilla oficial.'}), 400
+        try:
+            plantilla = entregables_service.registrar_plantilla(codigo, tipo, archivo)
+            return jsonify({
+                'message': f'Plantilla oficial {tipo} registrada. Se preservarán su diseño, logos, tablas y hojas.',
+                'plantilla': plantilla,
+            }), 201
+        except Exception as exc:
+            return jsonify({'error': f'No se pudo registrar la plantilla oficial: {exc}'}), 400
+
     @bp.route('/entregables/catalogo', methods=['GET'])
     @require_roles(*ENTREGABLES_READ_ROLES)
     def entregables_catalogo():

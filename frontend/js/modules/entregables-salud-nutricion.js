@@ -61,14 +61,41 @@ function snEntBadge(estado) {
 function snEntAcciones(row) {
     const id = Number(row.id);
     const acciones = [];
+    const plantillas = new Set(String(row.plantillas_cargadas || '').split(',').filter(Boolean));
+    const plantillaBtn = (tipo, extension) => `<button onclick="snEntSubirPlantilla('${escaparHtml(row.codigo)}', '${tipo}', '${extension}')" class="sn-ent-btn ${plantillas.has(tipo) ? 'sn-ent-btn-validar' : ''}" title="${plantillas.has(tipo) ? 'Plantilla oficial registrada' : 'Falta plantilla oficial'}">${plantillas.has(tipo) ? '✓ ' : '+ '}Plantilla ${tipo}</button>`;
     acciones.push(`<button onclick="snEntAbrirActividad(${id})" class="sn-ent-btn sn-ent-btn-validar">Registrar actividad</button>`);
-    if (Number(row.requiere_acta || 0)) acciones.push(`<button onclick="snEntGenerar(${id}, 'acta')" class="sn-ent-btn">Acta</button>`);
-    if (Number(row.requiere_listado || 0)) acciones.push(`<button onclick="snEntGenerar(${id}, 'listado')" class="sn-ent-btn">Listado</button>`);
+    if (Number(row.requiere_acta || 0)) acciones.push(plantillaBtn('acta', '.docx'), `<button onclick="snEntGenerar(${id}, 'acta')" class="sn-ent-btn">Generar acta oficial</button>`);
+    if (Number(row.requiere_listado || 0)) acciones.push(plantillaBtn('listado', '.xlsx'), `<button onclick="snEntGenerar(${id}, 'listado')" class="sn-ent-btn">Listado oficial</button>`);
     if (Number(row.requiere_oficio || 0)) acciones.push(`<button onclick="snEntGenerar(${id}, 'oficio')" class="sn-ent-btn">Oficio</button>`);
-    if (Number(row.requiere_formato_excel || 0)) acciones.push(`<button onclick="snEntGenerar(${id}, 'formato')" class="sn-ent-btn">Formato</button>`);
+    if (Number(row.requiere_formato_excel || 0)) acciones.push(plantillaBtn('formato', '.xlsx'), `<button onclick="snEntGenerar(${id}, 'formato')" class="sn-ent-btn">Formato oficial</button>`);
     if (Number(row.requiere_fotos || 0)) acciones.push(`<button onclick="snEntSubirEvidencia(${id})" class="sn-ent-btn sn-ent-btn-foto">Fotos</button>`);
     acciones.push(`<button onclick="snEntValidar(${id})" class="sn-ent-btn sn-ent-btn-validar">Validar</button>`);
     return `<div class="flex flex-wrap gap-1.5">${acciones.join('')}</div>`;
+}
+
+function snEntSubirPlantilla(codigo, tipo, extension) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = extension;
+    input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        mostrarCargando(`Registrando plantilla oficial de ${tipo}...`);
+        fetch(`${backendUrl}/api/salud-nutricion/entregables/plantillas/${encodeURIComponent(codigo)}/${tipo}`, { method: 'POST', body: fd })
+            .then(manejarRespuestaJson)
+            .then((data) => {
+                ocultarCargando();
+                snEntMsg(data.message || 'Plantilla oficial registrada.', 'success');
+                snEntCargar();
+            })
+            .catch((error) => {
+                ocultarCargando();
+                snEntMsg(error.message || 'No se pudo registrar la plantilla.', 'error');
+            });
+    };
+    input.click();
 }
 
 function snEntAbrirActividad(id) {
@@ -292,6 +319,7 @@ window.snEntCrearMes = snEntCrearMes;
 window.snEntCargar = snEntCargar;
 window.snEntGenerar = snEntGenerar;
 window.snEntSubirEvidencia = snEntSubirEvidencia;
+window.snEntSubirPlantilla = snEntSubirPlantilla;
 window.snEntValidar = snEntValidar;
 window.snEntGenerarMatriz = snEntGenerarMatriz;
 window.snEntGenerarInforme = snEntGenerarInforme;

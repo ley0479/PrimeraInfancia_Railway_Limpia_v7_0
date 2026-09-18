@@ -1,7 +1,9 @@
 from pathlib import Path
+from io import BytesIO
 
 from docx import Document
 from flask import Flask
+from werkzeug.datastructures import FileStorage
 
 from database import database
 from modules.salud_nutricion.entregables import EntregablesSaludNutricionService
@@ -28,7 +30,7 @@ def test_informe_mensual_usa_solo_actividades_confirmadas(tmp_path):
             service.init_schema()
             integral.init_schema()
             result = service.crear_mes({'mes': 8, 'anio': 2026, 'uds': 'Kiphara', 'responsable': 'Profesional SN'})
-            assert result['creados'] == 15
+            assert result['creados'] == 16
             rows = service.listar({'mes': 8, 'anio': 2026, 'uds': 'Kiphara'})['entregables']
             lavado = next(row for row in rows if row['codigo'] == 'E02_LAVADO_MANOS')
 
@@ -54,9 +56,26 @@ def test_informe_mensual_usa_solo_actividades_confirmadas(tmp_path):
                 'confirmado': True,
             })
 
+            template_doc = Document()
+            template_doc.add_paragraph('ENCABEZADO OFICIAL PRESERVADO')
+            template_table = template_doc.add_table(rows=2, cols=2)
+            template_table.cell(0, 0).text = 'Fecha:'
+            template_table.cell(0, 1).text = ''
+            template_table.cell(1, 0).text = 'Desarrollo de la actividad:'
+            template_table.cell(1, 1).text = ''
+            template_buffer = BytesIO()
+            template_doc.save(template_buffer)
+            template_buffer.seek(0)
+            service.registrar_plantilla('E02_LAVADO_MANOS', 'acta', FileStorage(
+                stream=template_buffer, filename='acta_oficial.docx'
+            ))
             acta = service.generar_acta(lavado['id'])
             informe = service.generar_informe({'mes': 8, 'anio': 2026, 'uds': 'Kiphara'})
-            acta_text = '\n'.join(p.text for p in Document(acta['ruta_archivo']).paragraphs)
+            generated_acta = Document(acta['ruta_archivo'])
+            acta_text = '\n'.join(
+                [p.text for p in generated_acta.paragraphs]
+                + [cell.text for table in generated_acta.tables for row in table.rows for cell in row.cells]
+            )
             informe_text = '\n'.join(p.text for p in Document(informe['ruta_archivo']).paragraphs)
             assert 'La actividad fue realizada con demostración práctica.' in acta_text
             assert 'Texto de borrador que no debe publicarse.' not in acta_text
@@ -78,7 +97,7 @@ def test_informe_mensual_usa_solo_actividades_confirmadas(tmp_path):
             service.init_schema()
             migrated = repo.fetch_one("SELECT id,codigo FROM sn_entregables_catalogo WHERE codigo='E02_LAVADO_MANOS'")
             assert migrated['id'] == e02_id
-            assert repo.fetch_one("SELECT COUNT(*) total FROM sn_entregables_catalogo")['total'] == 15
+            assert repo.fetch_one("SELECT COUNT(*) total FROM sn_entregables_catalogo")['total'] == 16
             assert repo.fetch_one("SELECT codigo FROM sn_entregables_mes WHERE catalogo_id=? LIMIT 1", (e02_id,))['codigo'] == 'E02_LAVADO_MANOS'
     finally:
         if database.engine is not None:
