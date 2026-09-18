@@ -1332,12 +1332,14 @@
                                 <h2 class="text-lg font-medium">BOA Nutrición y Talla</h2>
                                 <p class="text-xs text-slate-400">Detalle por niño, unidad, trimestre, estado nutricional y vencimiento de control.</p>
                             </div>
-                            <button onclick="fetchBoaNutricion()" class="rounded-xl bg-cyan-600 hover:bg-cyan-500 px-4 py-2 text-sm font-medium text-white">Actualizar BOA</button>
+                            <div class="flex flex-wrap gap-2"><button onclick="fetchBoaNutricion()" class="rounded-xl bg-cyan-600 hover:bg-cyan-500 px-4 py-2 text-sm font-medium text-white">Actualizar desde Base Maestra</button><button onclick="imprimirInformeNutricion()" class="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium text-white">Imprimir informe</button></div>
                         </div>
+                        <div id="nutricion-base-estado" class="mx-6 mt-5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3 text-sm text-cyan-100">Consultando Base Maestra…</div>
+                        <div class="px-6 pt-4 grid gap-3 md:grid-cols-3"><input id="nutricion-buscar" oninput="filtrarBoaNutricion()" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm" placeholder="Buscar niño, madre o documento"><select id="nutricion-filtro-diagnostico" onchange="filtrarBoaNutricion()" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm"><option value="">Todos los diagnósticos</option><option>DESNUTRICIÓN AGUDA</option><option>DESNUTRICIÓN SEVERA</option><option>SOBREPESO</option><option>RIESGO</option><option>ADECUADO</option></select><select id="nutricion-filtro-unidad" onchange="filtrarBoaNutricion()" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm"><option value="">Todas las unidades</option></select></div>
                         <div id="nutricion-boa-resumen" class="p-6 grid gap-3 md:grid-cols-4 text-sm"></div>
                         <div class="p-6 overflow-x-auto">
                             <table class="w-full text-left text-xs text-slate-400">
-                                <thead class="bg-slate-900 text-slate-300 uppercase"><tr><th class="px-3 py-2">Unidad</th><th class="px-3 py-2">Nombre</th><th class="px-3 py-2">Documento</th><th class="px-3 py-2">Peso</th><th class="px-3 py-2">Talla</th><th class="px-3 py-2">Estado nutricional</th><th class="px-3 py-2">Control</th><th class="px-3 py-2">Trimestre</th><th class="px-3 py-2">Fecha próxima</th></tr></thead>
+                                <thead class="bg-slate-900 text-slate-300 uppercase"><tr><th class="px-3 py-2">Unidad</th><th class="px-3 py-2">Nombre</th><th class="px-3 py-2">Documento</th><th class="px-3 py-2">Peso</th><th class="px-3 py-2">Talla</th><th class="px-3 py-2">PB</th><th class="px-3 py-2">Estado nutricional</th><th class="px-3 py-2">Carné salud</th><th class="px-3 py-2">Crecimiento</th><th class="px-3 py-2">Acción</th></tr></thead>
                                 <tbody id="nutricion-boa-list" class="divide-y divide-slate-800"><tr><td colspan="9" class="px-3 py-8 text-center text-slate-500">Carga una base de nutrición o presiona Actualizar BOA.</td></tr></tbody>
                             </table>
                         </div>
@@ -3939,7 +3941,7 @@
     <script src="./js/print-manager.js?v=2.7.0-encabezado-institucional-1"></script>
     <script src="./js/modules/menu-lateral-institucional.js?v=2.3.0-alpha.51-entregables-sn"></script>
     <script src="./js/modules/workspace-dock-themes.js?v=2.7.5-dock-themes-7"></script>
-    <script src="./js/app.js?v=2.7.5-bienestarina-action-1"></script>
+    <script src="./js/app.js?v=2.7.6-nutricion-base-maestra-1"></script>
     <script src="./js/modules/calendario-inteligente.js?v=2.7.6-ocr-auto-calendar-3"></script>
     <script src="./js/modules/acceso-compartido.js?v=2.4.1-tunnel-fix"></script>
     <script src="./js/modules/cruce-bases.js?v=2.1.14"></script>

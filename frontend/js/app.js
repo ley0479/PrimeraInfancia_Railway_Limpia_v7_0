@@ -869,6 +869,9 @@ function mostrarSeccion(seccion) {
     if (seccion === 'salud-nutricion' && typeof snInit === 'function') {
         snInit();
     }
+    if (seccion === 'nutricion' && typeof fetchBoaNutricion === 'function') {
+        fetchBoaNutricion();
+    }
     if (seccion === 'administracion') {
         cargarAdministracion();
     }
@@ -2408,17 +2411,41 @@ function estadoNutricionClase(valor) {
     return 'text-slate-300';
 }
 
+let nutricionBaseMaestraRows = [];
+let nutricionBoaVisible = [];
+
+function valorSalud(value) {
+    return value === null || value === undefined || value === '' ? 'Sin información' : String(value);
+}
+
+function normalizarFilaNutricionBase(item = {}) {
+    return {
+        unidad: item.Unidad || '', nombre: item.Nombre || '', documento: item.Documento || item.NUI || '',
+        peso: item.Peso, talla: item.Talla, perimetro_braquial: item.PerimetroBraquial,
+        estado_nutricional: item.DiagnosticoNutricional || 'PENDIENTE', carne_salud: item.CarneSalud,
+        crecimiento: item.CrecimientoDesarrollo || item.CarneCrecimiento, carne_crecimiento: item.CarneCrecimiento,
+        vacunas: item.Vacunas, afiliacion_salud: item.AfiliacionSalud, acudiente: item.Acudiente,
+        madre: item.Madre || item.Acudiente, documento_acudiente: item.DocumentoAcudiente,
+        control_prenatal: item.ControlPrenatal, sexo: item.Sexo, edad_meses: item.EdadMeses,
+        tipo_documento: item.TipoDocumento, estado: item.Estado, alertas: item.alertas || [], faltantes: item.faltantes || {}
+    };
+}
+
 function renderBoaNutricion(boa = {}) {
     const resumenBox = document.getElementById('nutricion-boa-resumen');
     const body = document.getElementById('nutricion-boa-list');
     if (!resumenBox || !body) return;
     const resumen = boa.resumen || {};
     const detalles = Array.isArray(boa.detalles) ? boa.detalles : [];
+    nutricionBoaVisible = detalles;
+    const sumar = (...tokens) => Object.entries(resumen).reduce((n, [k,v]) => tokens.some(t => k.includes(t)) ? n + Number(v || 0) : n, 0);
     const cards = [
-        ['Adecuado', resumen.ADECUADO || 0],
-        ['Riesgo', resumen.RIESGO || 0],
-        ['Desnutrición', resumen.DESNUTRICION || 0],
-        ['Pendiente', resumen.PENDIENTE || 0]
+        ['Adecuado', sumar('ADECUADO', 'NORMAL')],
+        ['Riesgo', sumar('RIESGO')],
+        ['Desnutrición aguda', sumar('DESNUTRICION AGUDA')],
+        ['Desnutrición severa', sumar('DESNUTRICION SEVERA')],
+        ['Sobrepeso', sumar('SOBREPESO')],
+        ['Pendiente', sumar('PENDIENTE', 'SIN DIAGNOSTICO')]
     ];
     resumenBox.innerHTML = cards.map(([label, value]) => `
         <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
@@ -2427,7 +2454,7 @@ function renderBoaNutricion(boa = {}) {
         </div>
     `).join('');
     if (!detalles.length) {
-        body.innerHTML = '<tr><td colspan="9" class="px-3 py-8 text-center text-slate-500">No hay registros de peso y talla todavía.</td></tr>';
+        body.innerHTML = '<tr><td colspan="10" class="px-3 py-8 text-center text-slate-500">No hay registros de salud y nutrición para los filtros seleccionados.</td></tr>';
         return;
     }
     body.innerHTML = detalles.slice(0, 250).map(item => `
@@ -2437,19 +2464,71 @@ function renderBoaNutricion(boa = {}) {
             <td class="px-3 py-2">${escaparHtml(item.documento || '')}</td>
             <td class="px-3 py-2">${escaparHtml(item.peso || '')}</td>
             <td class="px-3 py-2">${escaparHtml(item.talla || '')}</td>
+            <td class="px-3 py-2">${escaparHtml(item.perimetro_braquial ?? '')}</td>
             <td class="px-3 py-2 ${estadoNutricionClase(item.estado_nutricional)}">${escaparHtml(item.estado_nutricional || '')}</td>
-            <td class="px-3 py-2 ${estadoNutricionClase(item.estado_control)}">${escaparHtml(item.estado_control || '')}</td>
-            <td class="px-3 py-2">${escaparHtml(item.trimestre || '')}</td>
-            <td class="px-3 py-2">${escaparHtml(item.fecha_proximo_control || '')}</td>
+            <td class="px-3 py-2">${escaparHtml(valorSalud(item.carne_salud))}</td>
+            <td class="px-3 py-2">${escaparHtml(valorSalud(item.crecimiento))}</td>
+            <td class="px-3 py-2"><button onclick="abrirFichaNutricion('${escaparHtml(String(item.documento || '').replace(/'/g, '&#39;'))}')" class="rounded-lg bg-cyan-700 px-2 py-1 text-white">Ver ficha</button></td>
         </tr>
     `).join('');
 }
 
 function fetchBoaNutricion() {
-    fetch(`${backendUrl}/api/nutricion/boa`)
-        .then(manejarRespuestaJson)
-        .then((data) => renderBoaNutricion(data.boa || {}))
+    Promise.all([
+        fetch(`${backendUrl}/api/nutricion/boa`).then(manejarRespuestaJson),
+        fetch(`${backendUrl}/api/base-maestra/resumen-panel`).then(manejarRespuestaJson)
+    ])
+        .then(([legacy, master]) => {
+            const unidades = master.unidades || {};
+            nutricionBaseMaestraRows = Object.values(unidades).flatMap(u => (u.datos_completos || []).map(normalizarFilaNutricionBase));
+            const source = nutricionBaseMaestraRows.length ? nutricionBaseMaestraRows : (legacy.boa?.detalles || []);
+            const estado = document.getElementById('nutricion-base-estado');
+            if (estado) estado.innerHTML = master.fuente_activa
+                ? `<strong>Conectado a Base Maestra.</strong> ${source.length} expedientes activos · versión ${escaparHtml(master.version_activa?.version_numero || master.stats?.base_maestra_version_numero || '')}.`
+                : 'No hay una Base Maestra publicada. Se muestran los registros nutricionales históricos disponibles.';
+            const unitSelect = document.getElementById('nutricion-filtro-unidad');
+            if (unitSelect) unitSelect.innerHTML = '<option value="">Todas las unidades</option>' + [...new Set(source.map(x => x.unidad).filter(Boolean))].sort().map(x => `<option>${escaparHtml(x)}</option>`).join('');
+            filtrarBoaNutricion(source);
+        })
         .catch((error) => console.error('No se pudo cargar BOA nutrición', error));
+}
+
+function filtrarBoaNutricion(source = null) {
+    const rows = Array.isArray(source) ? source : nutricionBaseMaestraRows;
+    const buscar = normalizarFiltro(document.getElementById('nutricion-buscar')?.value || '');
+    const diagnostico = normalizarFiltro(document.getElementById('nutricion-filtro-diagnostico')?.value || '');
+    const unidad = document.getElementById('nutricion-filtro-unidad')?.value || '';
+    const filtradas = rows.filter(r => (!buscar || normalizarFiltro(`${r.nombre} ${r.documento} ${r.madre} ${r.documento_acudiente}`).includes(buscar)) && (!diagnostico || normalizarFiltro(r.estado_nutricional).includes(diagnostico)) && (!unidad || r.unidad === unidad));
+    const resumen = {};
+    filtradas.forEach(r => { const key = normalizarFiltro(r.estado_nutricional || 'PENDIENTE'); resumen[key] = (resumen[key] || 0) + 1; });
+    renderBoaNutricion({ detalles: filtradas, resumen });
+}
+
+function fichaNutricionHtml(item) {
+    const fields = [['Nombre',item.nombre],['Documento',item.documento],['Tipo documento',item.tipo_documento],['Unidad',item.unidad],['Sexo',item.sexo],['Edad (meses)',item.edad_meses],['Peso (kg)',item.peso],['Talla (cm)',item.talla],['Perímetro braquial (cm)',item.perimetro_braquial],['Diagnóstico nutricional',item.estado_nutricional],['Carné de salud',item.carne_salud],['Crecimiento y desarrollo',item.crecimiento],['Carné de crecimiento',item.carne_crecimiento],['Vacunas',item.vacunas],['Afiliación en salud',item.afiliacion_salud],['Madre/acudiente',item.madre],['Documento madre/acudiente',item.documento_acudiente],['Control prenatal',item.control_prenatal],['Estado',item.estado]];
+    return `<div class="grid gap-3 md:grid-cols-2">${fields.map(([k,v])=>`<div class="rounded-xl border border-slate-800 p-3"><small class="text-slate-500">${k}</small><p class="font-medium text-slate-200">${escaparHtml(valorSalud(v))}</p></div>`).join('')}</div><div class="mt-4"><strong>Alertas y faltantes</strong><p class="text-sm text-amber-200">${escaparHtml((item.alertas || []).join(' · ') || 'Sin alertas registradas')}</p></div>`;
+}
+
+function abrirFichaNutricion(documento) {
+    const item = nutricionBaseMaestraRows.find(x => String(x.documento) === String(documento)) || nutricionBoaVisible.find(x => String(x.documento) === String(documento));
+    if (!item) return;
+    openModal(`Ficha de salud y nutrición · ${item.nombre}`, `${fichaNutricionHtml(item)}<button onclick="imprimirFichaNutricion('${escaparHtml(String(documento))}')" class="mt-4 rounded-xl bg-emerald-600 px-4 py-2 text-white">Imprimir ficha</button>`);
+}
+
+function imprimirFichaNutricion(documento) {
+    const item = nutricionBaseMaestraRows.find(x => String(x.documento) === String(documento)) || nutricionBoaVisible.find(x => String(x.documento) === String(documento));
+    if (!item) return;
+    imprimirContenidoNutricion(`Ficha de salud y nutrición - ${item.nombre}`, fichaNutricionHtml(item));
+}
+
+function imprimirInformeNutricion() {
+    const filas = nutricionBoaVisible.map(r => `<tr><td>${escaparHtml(r.unidad||'')}</td><td>${escaparHtml(r.nombre||'')}</td><td>${escaparHtml(r.documento||'')}</td><td>${escaparHtml(r.peso??'')}</td><td>${escaparHtml(r.talla??'')}</td><td>${escaparHtml(r.perimetro_braquial??'')}</td><td>${escaparHtml(r.estado_nutricional||'')}</td></tr>`).join('');
+    imprimirContenidoNutricion('Informe detallado de salud y nutrición', `<table><thead><tr><th>Unidad</th><th>Nombre</th><th>Documento</th><th>Peso</th><th>Talla</th><th>PB</th><th>Diagnóstico</th></tr></thead><tbody>${filas}</tbody></table>`);
+}
+
+function imprimirContenidoNutricion(titulo, contenido) {
+    const w = window.open('', '_blank', 'width=1000,height=750'); if (!w) return;
+    w.document.write(`<html><head><title>${escaparHtml(titulo)}</title><style>body{font-family:Arial;padding:28px;color:#111}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:7px;text-align:left}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.rounded-xl{border:1px solid #ccc;padding:8px}small{color:#555}</style></head><body><h1>${escaparHtml(titulo)}</h1><p>Generado: ${new Date().toLocaleString('es-CO')}</p>${contenido}</body></html>`); w.document.close(); w.focus(); setTimeout(()=>w.print(),250);
 }
 
 function subirTalento() {

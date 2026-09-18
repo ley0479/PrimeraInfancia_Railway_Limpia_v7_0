@@ -1258,6 +1258,8 @@ DOCUMENTAL_ALIASES = {
     'carne_salud': ['carne_salud', 'carnet_salud', 'carné_salud', 'carne_de_salud'],
     'vacunas': ['vacunas', 'esquema_vacunacion', 'esquema_vacunación', 'carnet_vacunas'],
     'crecimiento_desarrollo': ['control_crecimiento', 'crecimiento_desarrollo', 'control_cyd', 'control_de_crecimiento_y_desarrollo'],
+    'control_prenatal': ['control_prenatal', 'controles_prenatales', 'prenatal', 'asistencia_control_prenatal'],
+    'nombre_madre': ['nombre_madre', 'madre', 'nombre_gestante', 'nombre_acudiente'],
 }
 
 
@@ -1395,6 +1397,10 @@ def fila_nino_panel(row: dict[str, Any]) -> dict[str, Any]:
     nombre = row.get('nombre_completo') or clean_text(f"{row.get('nombres') or ''} {row.get('apellidos') or ''}")
     acudiente = raw_pick(raw, ['acudiente', 'nombre_acudiente', 'madre', 'padre', 'cuidador', 'responsable'])
     parentesco = raw_pick(raw, ['parentesco', 'parentesco_acudiente'])
+    documento_acudiente = raw_pick(raw, DOCUMENTAL_ALIASES['documento_acudiente'])
+    afiliacion_salud = raw_pick(raw, DOCUMENTAL_ALIASES['afiliacion_salud'])
+    control_prenatal = raw_pick(raw, DOCUMENTAL_ALIASES['control_prenatal'])
+    nombre_madre = raw_pick(raw, DOCUMENTAL_ALIASES['nombre_madre']) or acudiente
     faltantes = indicadores_faltantes_nino(row)
     alertas = []
     try:
@@ -1425,8 +1431,13 @@ def fila_nino_panel(row: dict[str, Any]) -> dict[str, Any]:
         'Vacunas': row.get('vacunas'),
         'CarneSalud': row.get('carne_salud'),
         'CrecimientoDesarrollo': row.get('control_crecimiento'),
+        'CarneCrecimiento': row.get('carne_crecimiento'),
+        'AfiliacionSalud': afiliacion_salud,
         'Acudiente': acudiente,
         'Parentesco': parentesco,
+        'Madre': nombre_madre,
+        'DocumentoAcudiente': documento_acudiente,
+        'ControlPrenatal': control_prenatal,
         'faltantes': faltantes,
         'alertas': sorted(set(clean_text(a) for a in alertas if clean_text(a))),
     }
