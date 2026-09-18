@@ -1956,20 +1956,16 @@ def listar_coordinadores(database_path: str, ctx: dict[str, Any] | None = None) 
     repo = BaseMaestraRepository(database_path)
     repo.init_schema()
     fundacion_id = ctx.get('fundacion_id') or 1
-    return {'coordinadores': repo.fetch_all(
-        """SELECT DISTINCT coordinador FROM (
-               SELECT coordinador FROM master_ninos
-                WHERE fundacion_id = ? AND activo = 1 AND COALESCE(coordinador, '') <> ''
-               UNION
-               SELECT coordinador FROM master_unidades
-                WHERE fundacion_id = ? AND activo = 1 AND COALESCE(coordinador, '') <> ''
-               UNION
-               SELECT coordinador FROM master_talento_humano
-                WHERE fundacion_id = ? AND activo = 1 AND COALESCE(coordinador, '') <> ''
-           ) coordinadores_maestros
-           ORDER BY coordinador""",
-        (fundacion_id, fundacion_id, fundacion_id),
-    )}
+    # Consultas separadas: el guard de aislamiento multi-tenant rechaza de forma
+    # deliberada UNION entre varias tablas, incluso si cada rama lleva tenant.
+    nombres: set[str] = set()
+    for table in ('master_ninos', 'master_unidades', 'master_talento_humano'):
+        rows = repo.fetch_all(
+            f"SELECT DISTINCT coordinador FROM {table} WHERE fundacion_id = ? AND activo = 1 AND COALESCE(coordinador, '') <> ''",
+            (fundacion_id,),
+        )
+        nombres.update(str(row.get('coordinador') or '').strip() for row in rows if str(row.get('coordinador') or '').strip())
+    return {'coordinadores': [{'coordinador': nombre} for nombre in sorted(nombres, key=str.casefold)]}
 
 
 def listar_inconsistencias(database_path: str, ctx: dict[str, Any] | None = None, limit: int = 500) -> dict[str, Any]:
