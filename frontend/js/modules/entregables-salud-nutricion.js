@@ -9,6 +9,39 @@ let snEntEstado = {
     catalogosCargados: false
 };
 
+const snEntOpcionesComunes = {
+    resultados: ['Las personas participantes comprendieron el tema desarrollado.', 'Se fortalecieron conocimientos y prácticas de cuidado en salud y nutrición.', 'Las familias participaron activamente y resolvieron sus inquietudes.', 'Se identificaron casos que requieren orientación o seguimiento individual.', 'Se verificó el cumplimiento de las recomendaciones socializadas.'],
+    compromisos: ['Aplicar en el hogar las recomendaciones brindadas.', 'Compartir la información con los demás integrantes de la familia.', 'Entregar oportunamente los documentos o soportes pendientes.', 'Asistir al seguimiento programado por el equipo interdisciplinario.', 'Informar inmediatamente cualquier novedad de salud o nutrición.'],
+    dificultades: ['No se presentaron dificultades durante la actividad.', 'Baja asistencia o participación de las familias convocadas.', 'Dificultad para coincidir con los horarios de las familias.', 'Información o documentación incompleta de algunos participantes.', 'Limitaciones de espacio, conectividad o recursos pedagógicos.', 'Se requiere mayor acompañamiento para comprender el tema.'],
+    mejoras: ['Realizar seguimiento individual a los casos identificados.', 'Reprogramar la actividad para las familias que no asistieron.', 'Reforzar el tema mediante material visual y demostraciones prácticas.', 'Solicitar y verificar previamente los documentos pendientes.', 'Coordinar con el equipo interdisciplinario y las entidades competentes.', 'Ajustar horario, espacio y estrategia de convocatoria.']
+};
+
+function snEntDesarrollosPorTema(codigo) {
+    const especificos = {
+        E02_LAVADO_MANOS: ['Se explicó y demostró paso a paso la técnica correcta de lavado de manos.', 'Las familias practicaron la técnica y recibieron retroalimentación.'],
+        E03_LACTANCIA: ['Se orientó sobre beneficios, posiciones, agarre y señales de una lactancia efectiva.', 'Se resolvieron inquietudes de gestantes, madres lactantes y sus familias.'],
+        E05_ANTROPOMETRIA: ['Se realizó la toma de peso, talla y perímetro braquial aplicando el protocolo establecido.', 'Se explicaron los resultados y las recomendaciones de seguimiento.'],
+        E06_SIGNOS_FISICOS: ['Se verificaron signos físicos asociados al estado nutricional y se registraron los hallazgos.', 'Se brindó orientación sobre los signos de alarma identificados.'],
+        E08_CONCERTACION_MINUTA: ['Se presentó la minuta, se escucharon observaciones de las familias y se concertaron acuerdos.', 'Se explicaron porciones, alimentos, preparaciones y recomendaciones de consumo.'],
+        E09_CONTROL_CALIDAD: ['Se verificaron condiciones de calidad, almacenamiento, fechas y características de los alimentos.', 'Se registraron hallazgos y recomendaciones para el manejo seguro de los alimentos.'],
+        E10_LIMPIEZA_DESINFECCION: ['Se inspeccionaron las condiciones de limpieza y desinfección de espacios, superficies y utensilios.', 'Se socializaron prácticas de saneamiento y manejo seguro de residuos.'],
+        E11_ENCUENTROS_HOGAR: ['Se realizó acompañamiento en el hogar de acuerdo con la situación priorizada de la familia.', 'Se brindaron orientaciones personalizadas y se acordaron acciones de seguimiento.'],
+        E15_CUALIFICACION_TH: ['Se desarrolló la cualificación mediante explicación, ejemplos y participación del talento humano.', 'Se verificó la comprensión del tema y se resolvieron inquietudes del equipo.']
+    };
+    return especificos[codigo] || ['Se realizó la bienvenida, presentación del objetivo y socialización participativa del tema.', 'Se desarrolló la actividad con explicación, ejemplos, preguntas y retroalimentación.', 'Se cerró la actividad verificando aprendizajes y acordando compromisos.'];
+}
+
+function snEntLlenarSeleccion(id, opciones) {
+    const select = document.getElementById(id);
+    if (select) select.innerHTML = opciones.map((texto) => snEntOpcion(texto, texto)).join('');
+}
+
+function snEntTextoAsistido(suffix) {
+    const seleccion = Array.from(document.getElementById(`sn-ent-act-${suffix}-opciones`)?.selectedOptions || []).map((option) => option.value.trim());
+    const libre = document.getElementById(`sn-ent-act-${suffix}`)?.value?.trim();
+    return [...seleccion, ...(libre ? [libre] : [])].filter(Boolean).join('\n');
+}
+
 function snEntMsg(texto, tipo = 'success') {
     const box = document.getElementById('sn-ent-message');
     if (!box) return;
@@ -153,7 +186,12 @@ function snEntAbrirActividad(id) {
     document.getElementById('sn-ent-activity-id').value = String(id);
     document.getElementById('sn-ent-activity-title').innerText = `${row.nombre || row.codigo} · ${row.uds || 'TODAS'}`;
     document.getElementById('sn-ent-act-fecha').value = new Date().toISOString().slice(0, 10);
-    document.getElementById('sn-ent-act-lugar').value = row.uds || '';
+    const lugar = document.getElementById('sn-ent-act-lugar');
+    const unidades = document.getElementById('sn-ent-uds');
+    lugar.innerHTML = '<option value="">Seleccione una UCA</option>' + Array.from(unidades?.options || [])
+        .filter((option) => option.value && option.value !== 'TODAS')
+        .map((option) => snEntOpcion(option.value, option.textContent)).join('');
+    lugar.value = row.uds && row.uds !== 'TODAS' ? row.uds : '';
     document.getElementById('sn-ent-act-responsable').value = row.responsable || '';
     document.getElementById('sn-ent-act-objetivo').value = row.actividad || '';
     ['inicio', 'final', 'dirigido', 'desarrollo', 'resultados', 'compromisos', 'dificultades', 'mejoras'].forEach((suffix) => {
@@ -161,6 +199,17 @@ function snEntAbrirActividad(id) {
         if (input) input.value = '';
     });
     document.getElementById('sn-ent-act-agenda').value = 'Saludo y bienvenida\nSocialización del tema\nDesarrollo de la actividad\nCompromisos\nCierre';
+    snEntLlenarSeleccion('sn-ent-act-desarrollo-opciones', snEntDesarrollosPorTema(row.codigo));
+    snEntLlenarSeleccion('sn-ent-act-resultados-opciones', snEntOpcionesComunes.resultados);
+    snEntLlenarSeleccion('sn-ent-act-compromisos-opciones', snEntOpcionesComunes.compromisos);
+    snEntLlenarSeleccion('sn-ent-act-dificultades-opciones', snEntOpcionesComunes.dificultades);
+    snEntLlenarSeleccion('sn-ent-act-mejoras-opciones', snEntOpcionesComunes.mejoras);
+    const dirigido = document.getElementById('sn-ent-act-dirigido');
+    const dirigidoOtro = document.getElementById('sn-ent-act-dirigido-otro');
+    dirigido.value = '';
+    dirigidoOtro.value = '';
+    dirigidoOtro.classList.add('hidden');
+    dirigido.onchange = () => dirigidoOtro.classList.toggle('hidden', dirigido.value !== 'OTRO');
     document.getElementById('sn-ent-act-participantes').value = '0';
     document.getElementById('sn-ent-act-confirmado').checked = false;
     form?.classList.remove('hidden');
@@ -180,18 +229,21 @@ function snEntGuardarActividad(confirmar = false) {
         hora_inicio: value('inicio'),
         hora_final: value('final'),
         lugar: value('lugar'),
-        dirigido_a: value('dirigido'),
+        dirigido_a: value('dirigido') === 'OTRO' ? value('dirigido-otro') : value('dirigido'),
         responsable: value('responsable'),
         objetivo: value('objetivo'),
         agenda: value('agenda'),
-        desarrollo: value('desarrollo'),
-        resultados: value('resultados'),
-        compromisos: value('compromisos'),
-        dificultades: value('dificultades'),
-        acciones_mejora: value('mejoras'),
+        desarrollo: snEntTextoAsistido('desarrollo'),
+        resultados: snEntTextoAsistido('resultados'),
+        compromisos: snEntTextoAsistido('compromisos'),
+        dificultades: snEntTextoAsistido('dificultades'),
+        acciones_mejora: snEntTextoAsistido('mejoras'),
         participantes_total: Number(value('participantes') || 0),
         confirmado: Boolean(confirmar)
     };
+    if (!payload.lugar) return snEntMsg('Seleccione la UCA donde se realizó la actividad.', 'error');
+    if (!payload.dirigido_a) return snEntMsg('Seleccione o escriba a quién estuvo dirigida la actividad.', 'error');
+    if (!payload.desarrollo) return snEntMsg('Seleccione al menos una opción de desarrollo o escriba lo realizado.', 'error');
     if (confirmar && !document.getElementById('sn-ent-act-confirmado')?.checked) {
         return snEntMsg('Marca la confirmación de actividad realizada.', 'error');
     }
