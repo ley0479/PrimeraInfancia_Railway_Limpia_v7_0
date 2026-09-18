@@ -66,13 +66,24 @@ function snEntAcciones(row) {
     const plantillas = new Set(String(row.plantillas_cargadas || '').split(',').filter(Boolean));
     const plantillaBtn = (tipo, extension) => `<button onclick="snEntSubirPlantilla('${escaparHtml(row.codigo)}', '${tipo}', '${extension}')" class="sn-ent-btn ${plantillas.has(tipo) ? 'sn-ent-btn-validar' : ''}" title="${plantillas.has(tipo) ? 'Plantilla oficial registrada' : 'Falta plantilla oficial'}">${plantillas.has(tipo) ? '✓ ' : '+ '}Plantilla ${tipo}</button>`;
     acciones.push(`<button onclick="snEntAbrirActividad(${id})" class="sn-ent-btn sn-ent-btn-validar">Registrar actividad</button>`);
-    if (Number(row.requiere_acta || 0)) acciones.push(plantillaBtn('acta', '.docx'), `<button onclick="snEntGenerar(${id}, 'acta')" class="sn-ent-btn">Generar acta oficial</button>`);
+    if (Number(row.requiere_acta || 0)) acciones.push(plantillaBtn('acta', '.docx'), `<button onclick="snEntPrepararActa(${id})" class="sn-ent-btn">Generar acta oficial</button>`);
     if (Number(row.requiere_listado || 0)) acciones.push(plantillaBtn('listado', '.xlsx'), `<button onclick="snEntGenerar(${id}, 'listado')" class="sn-ent-btn">Listado oficial</button>`);
     if (Number(row.requiere_oficio || 0)) acciones.push(`<button onclick="snEntGenerar(${id}, 'oficio')" class="sn-ent-btn">Oficio</button>`);
     if (Number(row.requiere_formato_excel || 0)) acciones.push(plantillaBtn('formato', '.xlsx'), `<button onclick="snEntGenerar(${id}, 'formato')" class="sn-ent-btn">Formato oficial</button>`);
     if (Number(row.requiere_fotos || 0)) acciones.push(`<button onclick="snEntSubirEvidencia(${id})" class="sn-ent-btn sn-ent-btn-foto">Fotos</button>`);
     acciones.push(`<button onclick="snEntValidar(${id})" class="sn-ent-btn sn-ent-btn-validar">Validar</button>`);
     return `<div class="flex flex-wrap gap-1.5">${acciones.join('')}</div>`;
+}
+
+function snEntPrepararActa(id) {
+    const row = snEntEstado.entregables.find((item) => Number(item.id) === Number(id));
+    if (!row) return snEntMsg('No se encontró el entregable seleccionado.', 'error');
+    if (Number(row.actividades_confirmadas || 0) < 1) {
+        snEntAbrirActividad(id);
+        snEntMsg('Antes de generar el acta, complete la actividad, marque la confirmación y pulse “Confirmar actividad”.', 'error');
+        return;
+    }
+    snEntGenerar(id, 'acta');
 }
 
 function snEntOpcion(valor, etiqueta) {
@@ -366,3 +377,4 @@ window.snEntAbrirActividad = snEntAbrirActividad;
 window.snEntCerrarActividad = snEntCerrarActividad;
 window.snEntGuardarActividad = snEntGuardarActividad;
 window.snEntCargarCatalogosMaestros = snEntCargarCatalogosMaestros;
+window.snEntPrepararActa = snEntPrepararActa;
