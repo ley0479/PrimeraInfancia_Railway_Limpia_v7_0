@@ -428,6 +428,7 @@ def register_salud_nutricion(app, database_path: str, upload_folder: str, output
             'mes': request.args.get('mes') or None,
             'anio': request.args.get('anio') or None,
             'uds': request.args.get('uds') or None,
+            'coordinador': request.args.get('coordinador') or None,
             'estado': request.args.get('estado') or None,
         }
         return jsonify(entregables_service.listar(filtros)), 200

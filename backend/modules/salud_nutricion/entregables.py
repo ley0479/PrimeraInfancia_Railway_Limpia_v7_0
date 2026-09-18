@@ -444,6 +444,10 @@ class EntregablesSaludNutricionService:
                     (cat['id'], mes, anio, uds, fundacion_id),
                 )
                 if found:
+                    self.repo.execute(
+                        'UPDATE sn_entregables_mes SET coordinador = ?, responsable = ?, fecha_actualizacion = ? WHERE id = ?',
+                        (coordinador, responsable, now, found['id']),
+                    )
                     existentes += 1
                     continue
                 self.repo.execute(
@@ -475,6 +479,9 @@ class EntregablesSaludNutricionService:
         if filtros.get('estado'):
             where.append('m.estado = ?')
             params.append(filtros['estado'])
+        if filtros.get('coordinador'):
+            where.append('m.coordinador = ?')
+            params.append(str(filtros['coordinador']).strip())
         rows = self.repo.fetch_all(
             f"""
             SELECT m.*, c.nombre, c.actividad, c.evidencias_requeridas, c.requiere_acta, c.requiere_listado,

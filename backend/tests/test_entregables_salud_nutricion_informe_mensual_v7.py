@@ -29,9 +29,12 @@ def test_informe_mensual_usa_solo_actividades_confirmadas(tmp_path):
         with tenant_context(1, role='SUPERADMIN', username='prueba'):
             service.init_schema()
             integral.init_schema()
-            result = service.crear_mes({'mes': 8, 'anio': 2026, 'uds': 'Kiphara', 'responsable': 'Profesional SN'})
+            result = service.crear_mes({'mes': 8, 'anio': 2026, 'uds': 'Kiphara', 'coordinador': 'Coordinadora Uno', 'responsable': 'Profesional SN'})
             assert result['creados'] == 16
-            rows = service.listar({'mes': 8, 'anio': 2026, 'uds': 'Kiphara'})['entregables']
+            rows = service.listar({'mes': 8, 'anio': 2026, 'uds': 'Kiphara', 'coordinador': 'Coordinadora Uno'})['entregables']
+            assert len(rows) == 16
+            assert all(row['coordinador'] == 'Coordinadora Uno' for row in rows)
+            assert service.listar({'mes': 8, 'anio': 2026, 'uds': 'Kiphara', 'coordinador': 'Otra Coordinadora'})['entregables'] == []
             lavado = next(row for row in rows if row['codigo'] == 'E02_LAVADO_MANOS')
 
             service.guardar_actividad(lavado['id'], {

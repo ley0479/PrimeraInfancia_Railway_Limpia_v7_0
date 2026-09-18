@@ -5,7 +5,8 @@ let snEntEstado = {
     entregables: [],
     resumen: {},
     anio: new Date().getFullYear(),
-    mes: new Date().getMonth() + 1
+    mes: new Date().getMonth() + 1,
+    catalogosCargados: false
 };
 
 function snEntMsg(texto, tipo = 'success') {
@@ -24,6 +25,7 @@ function snEntregablesInit() {
         if (mes) mes.value = String(snEntEstado.mes);
         if (anio) anio.value = String(snEntEstado.anio);
     }
+    snEntCargarCatalogosMaestros();
     snEntCargar();
     if (window.lucide) lucide.createIcons();
 }
@@ -71,6 +73,41 @@ function snEntAcciones(row) {
     if (Number(row.requiere_fotos || 0)) acciones.push(`<button onclick="snEntSubirEvidencia(${id})" class="sn-ent-btn sn-ent-btn-foto">Fotos</button>`);
     acciones.push(`<button onclick="snEntValidar(${id})" class="sn-ent-btn sn-ent-btn-validar">Validar</button>`);
     return `<div class="flex flex-wrap gap-1.5">${acciones.join('')}</div>`;
+}
+
+function snEntOpcion(valor, etiqueta) {
+    return `<option value="${escaparHtml(valor || '')}">${escaparHtml(etiqueta || valor || '')}</option>`;
+}
+
+function snEntCargarCatalogosMaestros() {
+    const udsSelect = document.getElementById('sn-ent-uds');
+    const coordinadorSelect = document.getElementById('sn-ent-coordinador');
+    if (!udsSelect || !coordinadorSelect) return;
+    const udsActual = udsSelect.value;
+    const coordinadorActual = coordinadorSelect.value;
+    Promise.all([
+        fetch(`${backendUrl}/api/base-maestra/unidades`).then(manejarRespuestaJson),
+        fetch(`${backendUrl}/api/base-maestra/coordinadores`).then(manejarRespuestaJson)
+    ])
+        .then(([unidadesData, coordinadoresData]) => {
+            const unidades = (unidadesData.unidades || []).filter((item) => String(item.nombre || '').trim());
+            const coordinadores = (coordinadoresData.coordinadores || []).filter((item) => String(item.coordinador || '').trim());
+            udsSelect.innerHTML = snEntOpcion('TODAS', 'Todas las UDS/UCA') + unidades
+                .map((item) => snEntOpcion(item.nombre, item.codigo_unidad ? `${item.nombre} · ${item.codigo_unidad}` : item.nombre))
+                .join('');
+            coordinadorSelect.innerHTML = snEntOpcion('', 'Seleccione un coordinador') + coordinadores
+                .map((item) => snEntOpcion(item.coordinador, item.coordinador))
+                .join('');
+            udsSelect.value = Array.from(udsSelect.options).some((option) => option.value === udsActual) ? udsActual : 'TODAS';
+            coordinadorSelect.value = Array.from(coordinadorSelect.options).some((option) => option.value === coordinadorActual) ? coordinadorActual : '';
+            snEntEstado.catalogosCargados = true;
+            if (!unidades.length) snEntMsg('La Base Maestra no tiene UDS/UCA activas. Carga y publica la Base Maestra para habilitar la selección.', 'error');
+        })
+        .catch((error) => {
+            udsSelect.innerHTML = snEntOpcion('TODAS', 'Todas las UDS/UCA');
+            coordinadorSelect.innerHTML = snEntOpcion('', 'Sin coordinadores disponibles');
+            snEntMsg(error.message || 'No se pudieron leer las UDS/UCA y coordinadores de la Base Maestra.', 'error');
+        });
 }
 
 function snEntSubirPlantilla(codigo, tipo, extension) {
@@ -207,6 +244,7 @@ function snEntCargar() {
 function snEntCrearMes() {
     const payload = snEntFiltros();
     payload.uds = payload.uds || 'TODAS';
+    if (!payload.coordinador) return snEntMsg('Seleccione el coordinador responsable del informe.', 'error');
     mostrarCargando('Creando entregables de Salud y Nutrición...');
     fetch(`${backendUrl}/api/salud-nutricion/entregables/crear-mes`, {
         method: 'POST',
@@ -327,3 +365,4 @@ window.snEntGenerarZip = snEntGenerarZip;
 window.snEntAbrirActividad = snEntAbrirActividad;
 window.snEntCerrarActividad = snEntCerrarActividad;
 window.snEntGuardarActividad = snEntGuardarActividad;
+window.snEntCargarCatalogosMaestros = snEntCargarCatalogosMaestros;

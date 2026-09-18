@@ -112,7 +112,7 @@ def register_base_maestra(app, database_path: str, upload_folder: str, output_fo
         return jsonify(listar_unidades(database_path)), 200
 
     @bp.route('/coordinadores', methods=['GET'])
-    @require_roles('SUPERADMIN', 'GERENTE', 'COORDINADOR', 'AUXILIAR_ADMINISTRATIVO')
+    @require_roles('SUPERADMIN', 'GERENTE', 'COORDINADOR', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA')
     def coordinadores():
         return jsonify(listar_coordinadores(database_path)), 200
 

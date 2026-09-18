@@ -1955,7 +1955,21 @@ def listar_coordinadores(database_path: str, ctx: dict[str, Any] | None = None) 
     ctx = {**get_user_context(), **(ctx or {})}
     repo = BaseMaestraRepository(database_path)
     repo.init_schema()
-    return {'coordinadores': repo.fetch_all("SELECT DISTINCT coordinador FROM master_ninos WHERE fundacion_id = ? AND activo = 1 AND COALESCE(coordinador,'') <> '' ORDER BY coordinador", (ctx.get('fundacion_id') or 1,))}
+    fundacion_id = ctx.get('fundacion_id') or 1
+    return {'coordinadores': repo.fetch_all(
+        """SELECT DISTINCT coordinador FROM (
+               SELECT coordinador FROM master_ninos
+                WHERE fundacion_id = ? AND activo = 1 AND COALESCE(coordinador, '') <> ''
+               UNION
+               SELECT coordinador FROM master_unidades
+                WHERE fundacion_id = ? AND activo = 1 AND COALESCE(coordinador, '') <> ''
+               UNION
+               SELECT coordinador FROM master_talento_humano
+                WHERE fundacion_id = ? AND activo = 1 AND COALESCE(coordinador, '') <> ''
+           ) coordinadores_maestros
+           ORDER BY coordinador""",
+        (fundacion_id, fundacion_id, fundacion_id),
+    )}
 
 
 def listar_inconsistencias(database_path: str, ctx: dict[str, Any] | None = None, limit: int = 500) -> dict[str, Any]:
