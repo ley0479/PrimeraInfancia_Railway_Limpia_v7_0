@@ -24,6 +24,14 @@ from .services import (
 ALLOWED = {'.xlsx', '.xls', '.xlsm', '.ods', '.csv', '.txt', '.tsv', '.tab', '.dat', '.html', '.htm', '.json', '.docx', '.pdf'}
 
 
+def _filter_rows_by_units(rows: list[dict], units: list[str]) -> list[dict]:
+    """Filtra UDS por nombre canonico, incluidos alias y variantes historicas."""
+    requested = {normalize_unidad(unit) for unit in units if normalize_unidad(unit)}
+    if not requested:
+        return rows
+    return [row for row in rows if normalize_unidad(row.get('unidad')) in requested]
+
+
 def allowed_file(filename: str) -> bool:
     return os.path.splitext((filename or '').lower())[1] in ALLOWED
 
@@ -270,11 +278,9 @@ def register_cruce_bases(app, database_path: str, upload_folder: str, output_fol
         elif 'fundacion_id' in cols and ctx['rol'] != 'SUPERADMIN':
             where.append('(fundacion_id = ? OR fundacion_id IS NULL)')
             params.append(ctx['fundacion_id'])
-        if unidades:
-            placeholders = ','.join(['?'] * len(unidades))
-            campo_unidad = 'unidad_servicio' if fuente == 'master_ninos' else 'unidad'
-            where.append(f'{campo_unidad} IN ({placeholders})')
-            params.extend(unidades)
+        # La Base Maestra puede conservar un alias historico mientras la
+        # interfaz usa el nombre canonico. El filtro textual exacto en SQL
+        # dejaba el informe vacio aun cuando la UDS tenia beneficiarios.
         if fuente == 'master_ninos':
             sql = (
                 'SELECT *, unidad_servicio AS unidad, nombre_completo AS nombre '
@@ -290,6 +296,7 @@ def register_cruce_bases(app, database_path: str, upload_folder: str, output_fol
             ' ORDER BY unidad, nombre'
         )
         rows = repo.fetch_all(sql, params)
+        rows = _filter_rows_by_units(rows, unidades)
         for r in rows:
             docente = docente_por_unidad(database_path, r.get('unidad'), ctx['fundacion_id'])
             r['docente_asignado'] = r.get('docente') or docente.get('nombre') or 'Sin docente asignado'
@@ -505,25 +512,84 @@ def register_cruce_bases(app, database_path: str, upload_folder: str, output_fol
         return path
 
     def exportar_usuarios_pdf(rows: list[dict], output_folder: str, unidad_label: str) -> str:
-        from reportlab.lib.pagesizes import landscape, letter
+        from collections import Counter
+        from reportlab.lib.pagesizes import A3, landscape
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
         from reportlab.lib.styles import getSampleStyleSheet
         from reportlab.lib import colors
         path = os.path.join(output_folder, f"USUARIOS_{secure_filename(unidad_label or 'UNIDADES')}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf")
-        doc = SimpleDocTemplate(path, pagesize=landscape(letter), rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
+        doc = SimpleDocTemplate(path, pagesize=landscape(A3), rightMargin=18, leftMargin=18, topMargin=18, bottomMargin=18)
         styles = getSampleStyleSheet()
-        story = [Paragraph(f'Usuarios por unidad: {unidad_label}', styles['Title']), Spacer(1, 8)]
-        headers = ['Unidad', 'Docente', 'Documento', 'Nombre', 'Acudiente', 'Teléfono', 'Estado']
+
+        def value(row, *keys):
+            for key in keys:
+                val = row.get(key)
+                if val not in (None, ''):
+                    return val
+            return ''
+
+        def age_group(row):
+            raw = str(value(row, 'grupo_etario', 'grupo_edad', 'GrupoEdad', 'tipo_beneficiario')).lower()
+            try:
+                months = int(float(value(row, 'edad_meses', 'EdadMeses') or 0))
+            except Exception:
+                months = 0
+            if 'gestante' in raw or (months and months <= 6):
+                return '0 a 6 meses y gestantes'
+            if ('6' in raw and '11' in raw) or 7 <= months <= 11:
+                return '6 a 11 meses'
+            if ('1' in raw and '2' in raw) or 12 <= months <= 35:
+                return '1 a 2 años'
+            if ('3' in raw and '5' in raw) or 36 <= months <= 71:
+                return '3 a 5 años'
+            return 'SIN GRUPO'
+
+        unique_rows = []
+        seen = set()
+        for row in rows:
+            document = str(value(row, 'documento', 'Documento', 'nui', 'NUI')).strip()
+            full_name = str(value(row, 'nombre_completo', 'nombre', 'Nombre')).strip()
+            key = document or f"{full_name}|{value(row, 'unidad', 'Unidad')}"
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_rows.append(row)
+
+        month = request.args.get('mes') or datetime.now().month
+        year = request.args.get('anio') or request.args.get('año') or datetime.now().year
+        counts = Counter(age_group(row) for row in unique_rows)
+        summary = ' | '.join(f'{group}: {total}' for group, total in sorted(counts.items()))
+        story = [
+            Paragraph(f'Usuarios por unidad: {unidad_label}', styles['Title']),
+            Paragraph(f'Mes: {month} &nbsp;&nbsp; Año: {year} &nbsp;&nbsp; Total usuarios únicos: <b>{len(unique_rows)}</b>', styles['Normal']),
+            Paragraph(summary or 'Sin usuarios para los filtros solicitados.', styles['Normal']),
+            Spacer(1, 8),
+        ]
+        headers = ['Documento', 'Tipo documento', 'Nombres', 'Apellidos', 'Nombre completo', 'Edad', 'Edad meses', 'Grupo etario', 'UDS', 'Docente', 'Coordinador', 'Estado', 'Observaciones']
         data = [headers]
-        for r in rows[:500]:
-            data.append([r.get('unidad',''), r.get('docente_asignado',''), r.get('documento',''), r.get('nombre',''), r.get('nombre_acudiente',''), r.get('telefono',''), r.get('estado','')])
-        table = Table(data, repeatRows=1)
+        for row in unique_rows:
+            names = value(row, 'nombres', 'Nombres', 'nombre', 'Nombre', 'nombre_completo')
+            surnames = value(row, 'apellidos', 'Apellidos')
+            full_name = value(row, 'nombre_completo', 'nombre', 'Nombre')
+            if surnames and str(surnames).lower() not in str(full_name).lower():
+                full_name = f'{full_name} {surnames}'.strip()
+            data.append([
+                value(row, 'documento', 'Documento', 'nui', 'NUI'),
+                value(row, 'tipo_documento', 'TipoDocumento', 'tipo_doc'), names, surnames, full_name,
+                value(row, 'edad', 'Edad', 'edad_completa', 'EdadCompleta'),
+                value(row, 'edad_meses', 'EdadMeses'), age_group(row),
+                value(row, 'unidad', 'Unidad') or unidad_label,
+                value(row, 'docente_asignado', 'docente', 'Docente', 'agente_educativo'),
+                value(row, 'coordinador', 'Coordinador'), value(row, 'estado', 'Estado'),
+                value(row, 'observaciones', 'observacion', 'Observaciones'),
+            ])
+        table = Table(data, repeatRows=1, colWidths=[58,48,70,70,94,55,40,72,72,80,75,48,100])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F4E78')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
             ('GRID', (0,0), (-1,-1), .25, colors.grey),
-            ('FONTSIZE', (0,0), (-1,-1), 7),
+            ('FONTSIZE', (0,0), (-1,-1), 5.5),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ]))
         story.append(table)
