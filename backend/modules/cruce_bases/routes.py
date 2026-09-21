@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+from datetime import date, datetime
 
 from flask import Blueprint, Response, g, jsonify, request, send_from_directory
 from modules.seguridad.tenant_context import tenant_path
@@ -30,6 +30,31 @@ def _filter_rows_by_units(rows: list[dict], units: list[str]) -> list[dict]:
     if not requested:
         return rows
     return [row for row in rows if normalize_unidad(row.get('unidad')) in requested]
+
+
+def _age_months_at_period(row: dict, year: int, month: int) -> int | None:
+    """Edad cumplida al primer dia del periodo; usa edad guardada solo sin fecha."""
+    raw = str(row.get('fecha_nacimiento') or '').strip().split('T', 1)[0]
+    birth = None
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%Y/%m/%d'):
+        try:
+            birth = datetime.strptime(raw[:10], fmt).date()
+            break
+        except (TypeError, ValueError):
+            continue
+    if birth:
+        cutoff = date(int(year), int(month), 1)
+        if birth > cutoff:
+            return None
+        months = (cutoff.year - birth.year) * 12 + cutoff.month - birth.month
+        if cutoff.day < birth.day:
+            months -= 1
+        return max(0, months)
+    try:
+        stored = row.get('edad_meses')
+        return max(0, int(float(stored))) if stored not in (None, '') else None
+    except (TypeError, ValueError):
+        return None
 
 
 def allowed_file(filename: str) -> bool:
@@ -297,14 +322,22 @@ def register_cruce_bases(app, database_path: str, upload_folder: str, output_fol
         )
         rows = repo.fetch_all(sql, params)
         rows = _filter_rows_by_units(rows, unidades)
+        try:
+            report_month = int(request.args.get('mes') or datetime.now().month)
+            report_year = int(request.args.get('anio') or request.args.get('año') or datetime.now().year)
+            if not 1 <= report_month <= 12:
+                raise ValueError
+        except (TypeError, ValueError):
+            report_month, report_year = datetime.now().month, datetime.now().year
         for r in rows:
             docente = docente_por_unidad(database_path, r.get('unidad'), ctx['fundacion_id'])
             r['docente_asignado'] = r.get('docente') or docente.get('nombre') or 'Sin docente asignado'
             r['coordinador'] = r.get('coordinador') or docente.get('coordinador') or ''
-            try:
-                meses = int(r.get('edad_meses') or 0)
-                r['edad'] = f"{meses // 12} años {meses % 12} meses" if meses else ''
-            except Exception:
+            meses = _age_months_at_period(r, report_year, report_month)
+            if meses is not None:
+                r['edad_meses'] = meses
+                r['edad'] = f"{meses // 12} años {meses % 12} meses"
+            else:
                 r['edad'] = r.get('edad_completa') or ''
         return rows
 
@@ -334,13 +367,7 @@ def register_cruce_bases(app, database_path: str, upload_folder: str, output_fol
             raw_norm = (raw or '').lower()
             if 'gestante' in raw_norm:
                 return '0 a 6 meses y gestantes'
-            if '6' in raw_norm and '11' in raw_norm:
-                return '6 a 11 meses'
-            if '1' in raw_norm and '2' in raw_norm:
-                return '1 a 2 años'
-            if '3' in raw_norm and '5' in raw_norm:
-                return '3 a 5 años'
-            if edad_meses:
+            if valor(row, 'edad_meses', 'EdadMeses') not in (None, ''):
                 if edad_meses <= 6:
                     return '0 a 6 meses y gestantes'
                 if edad_meses <= 11:
@@ -349,6 +376,13 @@ def register_cruce_bases(app, database_path: str, upload_folder: str, output_fol
                     return '1 a 2 años'
                 if edad_meses <= 71:
                     return '3 a 5 años'
+                return 'SIN GRUPO'
+            if '6' in raw_norm and '11' in raw_norm:
+                return '6 a 11 meses'
+            if '1' in raw_norm and '2' in raw_norm:
+                return '1 a 2 años'
+            if '3' in raw_norm and '5' in raw_norm:
+                return '3 a 5 años'
             return 'SIN GRUPO'
 
         def nombre_completo(row):
@@ -536,11 +570,21 @@ def register_cruce_bases(app, database_path: str, upload_folder: str, output_fol
                 months = 0
             if 'gestante' in raw or (months and months <= 6):
                 return '0 a 6 meses y gestantes'
-            if ('6' in raw and '11' in raw) or 7 <= months <= 11:
+            if value(row, 'edad_meses', 'EdadMeses') not in (None, '') and months <= 6:
+                return '0 a 6 meses y gestantes'
+            if 7 <= months <= 11:
                 return '6 a 11 meses'
-            if ('1' in raw and '2' in raw) or 12 <= months <= 35:
+            if 12 <= months <= 35:
                 return '1 a 2 años'
-            if ('3' in raw and '5' in raw) or 36 <= months <= 71:
+            if 36 <= months <= 71:
+                return '3 a 5 años'
+            if value(row, 'edad_meses', 'EdadMeses') not in (None, ''):
+                return 'SIN GRUPO'
+            if '6' in raw and '11' in raw:
+                return '6 a 11 meses'
+            if '1' in raw and '2' in raw:
+                return '1 a 2 años'
+            if '3' in raw and '5' in raw:
                 return '3 a 5 años'
             return 'SIN GRUPO'
 

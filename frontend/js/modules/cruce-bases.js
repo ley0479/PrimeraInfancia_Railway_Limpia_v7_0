@@ -285,11 +285,17 @@
     }
 
     function descargarUsuariosUnidad(unidad, formato = 'excel') {
-        window.descargarArchivoAutenticado(`${window.backendUrl}/api/cruce-bases/usuarios-unidad/${encodeURIComponent(unidad)}/${encodeURIComponent(formato)}`).catch((error) => setMessage(error.message, 'error'));
+        const mes = document.getElementById('cb-mes')?.value || new Date().getMonth() + 1;
+        const anio = document.getElementById('cb-anio')?.value || new Date().getFullYear();
+        const query = new URLSearchParams({ mes: String(mes), anio: String(anio) });
+        window.descargarArchivoAutenticado(`${window.backendUrl}/api/cruce-bases/usuarios-unidad/${encodeURIComponent(unidad)}/${encodeURIComponent(formato)}?${query}`).catch((error) => setMessage(error.message, 'error'));
     }
 
     function imprimirUsuariosUnidad(unidad) {
-        window.abrirArchivoAutenticado(`${window.backendUrl}/api/cruce-bases/usuarios-unidad/${encodeURIComponent(unidad)}/imprimir`).catch((error) => setMessage(error.message, 'error'));
+        const mes = document.getElementById('cb-mes')?.value || new Date().getMonth() + 1;
+        const anio = document.getElementById('cb-anio')?.value || new Date().getFullYear();
+        const query = new URLSearchParams({ mes: String(mes), anio: String(anio) });
+        window.abrirArchivoAutenticado(`${window.backendUrl}/api/cruce-bases/usuarios-unidad/${encodeURIComponent(unidad)}/imprimir?${query}`).catch((error) => setMessage(error.message, 'error'));
     }
 
     function docentePorUnidad(unidad) {
