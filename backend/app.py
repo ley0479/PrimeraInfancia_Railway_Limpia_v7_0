@@ -2740,7 +2740,7 @@ def obtener_unidades_registradas():
 
 
 def sincronizar_unidades_desde_dataframe(df):
-    """Actualiza el catálogo de unidades con los nombres detectados en la base."""
+    """Activa solo las UDS de la base actual y conserva las anteriores sin conteo."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -2750,6 +2750,15 @@ def sincronizar_unidades_desde_dataframe(df):
         gestantes = {}
         if 'tipo_beneficiario' in df.columns:
             gestantes = df[df['tipo_beneficiario'].astype(str).str.upper().str.contains('GESTANTE', na=False)].groupby('unidad').size().to_dict()
+
+        # Una carga de otro programa reemplaza el alcance operativo anterior.
+        # Las UDS históricas se conservan para auditoría, pero con conteo cero
+        # para que no vuelvan a aparecer en selectores ni formatos actuales.
+        cursor.execute(
+            "UPDATE unidades SET total_usuarios = 0, total_gestantes = 0, fecha_actualizacion = ? "
+            "WHERE COALESCE(fundacion_id, 1) = ?",
+            (ahora, fundacion_actual_id()),
+        )
 
         for unidad, total in conteos.items():
             unidad_norm = normalize_unidad(unidad)
@@ -3337,9 +3346,13 @@ def guardar_beneficiarios_actuales(df, archivo_origen=''):
         duplicados_consolidados=len(duplicados_archivo),
     )
 
-    unidades_detectadas = {normalize_unidad(u) for u in df['unidad'].dropna().unique()}
-    unidades_catalogo = sorted({u for u in set(ConfiguracionSistema.UNIDADES) | unidades_detectadas if u})
-    for unidad in unidades_catalogo:
+    unidades_detectadas = sorted({normalize_unidad(u) for u in df['unidad'].dropna().unique() if normalize_unidad(u)})
+    cursor.execute(
+        "UPDATE unidades SET total_usuarios = 0, total_gestantes = 0, fecha_actualizacion = ? "
+        "WHERE COALESCE(fundacion_id, 1) = ?",
+        (ahora, fundacion_id),
+    )
+    for unidad in unidades_detectadas:
         cursor.execute("""
             INSERT INTO unidades (nombre, total_usuarios, total_gestantes, fecha_actualizacion, fundacion_id)
             VALUES (?, (

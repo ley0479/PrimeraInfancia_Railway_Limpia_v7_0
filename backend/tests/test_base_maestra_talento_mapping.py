@@ -1,6 +1,12 @@
 import json
 
-from modules.base_maestra.services import asignaciones_talento_por_unidad, latest_rows_for_type, map_staging_row
+from modules.base_maestra.services import (
+    _resumen_unidades_staging,
+    asignaciones_talento_por_unidad,
+    latest_rows_for_type,
+    limitar_talento_a_unidades_cuentame,
+    map_staging_row,
+)
 
 
 def test_mapea_denominacion_cargo_y_coordinador_a_cargo():
@@ -69,9 +75,38 @@ def test_resuelve_asignaciones_unicas_por_unidad_sin_inventar_ambiguas():
     assert asignaciones['UCA TALENTO']['total_talento'] == 1
 
 
+def test_no_mezcla_unidades_de_talento_de_otro_programa():
+    rows = [
+        {'documento': '1', 'unidad_servicio': 'UDS PROGRAMA NUEVO'},
+        {'documento': '2', 'unidad_servicio': 'UDS PROGRAMA ANTERIOR'},
+    ]
+    scoped = limitar_talento_a_unidades_cuentame(rows, {'UDS PROGRAMA NUEVO'})
+    assert [row['documento'] for row in scoped] == ['1']
+
+
+def test_detecta_unidades_desconocidas_del_programa_cargado():
+    rows = [
+        {'unidad_servicio': 'ALFONSA MILENA MORENO'},
+        {'unidad_servicio': 'AURA ELENA BEDOYA'},
+        {'unidad_servicio': 'ALFONSA MILENA MORENO'},
+    ]
+    summary = _resumen_unidades_staging(
+        rows,
+        ['nombre_de_la_unidad_de_servicio'],
+        'cuentame',
+        {'hoja_seleccionada': 'BENEFICIARIOS'},
+    )
+    assert summary['total_unidades_detectadas'] == 2
+    assert [item['unidad_normalizada'] for item in summary['unidades_detectadas']] == [
+        'ALFONSA MILENA MORENO', 'AURA ELENA BEDOYA'
+    ]
+
+
 if __name__ == '__main__':
     test_mapea_denominacion_cargo_y_coordinador_a_cargo()
     test_recupera_cargo_de_una_carga_anterior()
     test_no_confunde_componente_con_cargo()
     test_resuelve_asignaciones_unicas_por_unidad_sin_inventar_ambiguas()
+    test_no_mezcla_unidades_de_talento_de_otro_programa()
+    test_detecta_unidades_desconocidas_del_programa_cargado()
     print('BASE_MAESTRA_TALENTO_MAPPING_PASS')

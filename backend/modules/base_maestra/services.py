@@ -489,6 +489,17 @@ def asignaciones_talento_por_unidad(talento_rows: list[dict[str, Any]]) -> dict[
     return resultado
 
 
+def limitar_talento_a_unidades_cuentame(
+    talento_rows: list[dict[str, Any]], unidades_cuentame: set[str]
+) -> list[dict[str, Any]]:
+    """Evita mezclar talento y UDS de otro programa en la versión operativa."""
+    permitidas = {normalize_name(unidad) for unidad in unidades_cuentame if normalize_name(unidad)}
+    return [
+        item for item in talento_rows
+        if normalize_name(item.get('unidad_servicio')) in permitidas
+    ]
+
+
 def get_user_context() -> dict[str, Any]:
     try:
         from flask import g
@@ -976,7 +987,15 @@ def consolidar_base_maestra(database_path: str, ctx: dict[str, Any] | None = Non
 
     ninos = consolidate_by_document(cuentame_rows, repo, version_id, carga_cuentame, 'cuentame', fundacion_id, corporacion_id)
     salud = consolidate_by_document(salud_rows, repo, version_id, carga_salud, 'salud_nutricion', fundacion_id, corporacion_id)
+    unidades_cuentame = {
+        normalize_name(nino.get('unidad_servicio'))
+        for nino in ninos.values()
+        if normalize_name(nino.get('unidad_servicio'))
+    }
+    talento_rows = limitar_talento_a_unidades_cuentame(talento_rows, unidades_cuentame)
     asignaciones_talento = asignaciones_talento_por_unidad(talento_rows)
+    # Una fuente de talento de otro programa no puede introducir UDS ajenas a
+    # la base Cuéntame que define esta versión. El histórico no se elimina.
 
     now = now_iso()
     for doc, nino in list(ninos.items()):
@@ -1106,15 +1125,8 @@ def consolidar_base_maestra(database_path: str, ctx: dict[str, Any] | None = Non
             entry['total_ninos'] += 1
             if not entry.get('coordinador') and n.get('coordinador'):
                 entry['coordinador'] = n.get('coordinador')
-        # El catálogo canónico es la unión Cuéntame + Talento Humano.
-        for unidad, asignacion in asignaciones_talento.items():
-            entry = unidades.setdefault(unidad, {
-                'nombre': unidad, 'codigo_unidad': None,
-                'coordinador': asignacion.get('coordinador'),
-                'modalidad': None, 'total_ninos': 0,
-            })
-            if not entry.get('coordinador') and asignacion.get('coordinador'):
-                entry['coordinador'] = asignacion['coordinador']
+        # La lista operativa de UDS pertenece exclusivamente a Cuéntame. El
+        # talento complementa esas unidades, pero nunca crea unidades nuevas.
         for unidad, entry in unidades.items():
             entry['total_talento'] = int((asignaciones_talento.get(unidad) or {}).get('total_talento') or 0)
             cur.execute(
