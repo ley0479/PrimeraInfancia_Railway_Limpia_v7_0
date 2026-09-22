@@ -10020,6 +10020,18 @@ def _alpha59_metadata_formato(unidad, usuarios, mes=None, anio=None):
         talento = {}
     mes_val = int(mes or request.args.get('mes') or datetime.now().month) if has_request_context() else int(mes or datetime.now().month)
     anio_val = int(anio or request.args.get('anio') or request.args.get('año') or datetime.now().year) if has_request_context() else int(anio or datetime.now().year)
+    fecha_entrega = ''
+    lote = ''
+    cantidad = 1
+    if has_request_context():
+        fecha_entrega = request.args.get('fecha_entrega') or request.args.get('fecha_entrega_bienestarina') or ''
+        lote = request.args.get('lote') or request.args.get('lote_bienestarina') or ''
+        cantidad = request.args.get('cantidad') or request.args.get('cantidad_bienestarina') or 1
+    if fecha_entrega:
+        try:
+            fecha_entrega = datetime.strptime(str(fecha_entrega).strip()[:10], '%Y-%m-%d').strftime('%d/%m/%Y')
+        except (TypeError, ValueError):
+            fecha_entrega = str(fecha_entrega).strip()
     return {
         'unidad': unidad,
         'Unidad': unidad,
@@ -10043,9 +10055,9 @@ def _alpha59_metadata_formato(unidad, usuarios, mes=None, anio=None):
         'telefono_docente': talento.get('telefono') or unidad_db.get('telefono') or '',
         'contrato': base.get('contrato') or unidad_db.get('contrato') or talento.get('contrato') or '',
         'eas': base.get('nombre_eas') or '',
-        'fecha_entrega': request.args.get('fecha_entrega') if has_request_context() else '',
-        'lote': request.args.get('lote') if has_request_context() else '',
-        'cantidad': request.args.get('cantidad') if has_request_context() else 1,
+        'fecha_entrega': fecha_entrega,
+        'lote': lote,
+        'cantidad': cantidad,
     }
 
 
@@ -11111,8 +11123,29 @@ def _alpha75_aplicar_encabezado_bienestarina(ws, metadata):
     return {'rangos': dict(BIENESTARINA_HEADER_LAYOUT), 'campos': valores}
 
 
+def _alpha75_aplicar_datos_entrega_bienestarina(ws, metadata):
+    """Actualiza fecha, lote y cantidad también en archivos históricos reutilizados."""
+    fecha = metadata.get('fecha_entrega') or ''
+    lote = metadata.get('lote') or ''
+    cantidad = metadata.get('cantidad')
+    if cantidad in (None, ''):
+        cantidad = 1
+
+    actualizadas = 0
+    for row in list(range(10, 24)) + list(range(31, 47)):
+        # B:G contienen nombres y documento. No escribir datos de entrega en
+        # renglones vacíos que la plantilla conserva para diligenciamiento manual.
+        if not any(ws.cell(row, col).value not in (None, '') for col in range(2, 8)):
+            continue
+        ws[f'H{row}'] = fecha
+        ws[f'I{row}'] = lote
+        ws[f'J{row}'] = cantidad
+        actualizadas += 1
+    return actualizadas
+
+
 def _alpha75_actualizar_archivo_bienestarina(ruta, unidad, mes=None, anio=None):
-    """Aplica el encabezado permanente a archivos nuevos o ya existentes."""
+    """Aplica encabezado y datos de entrega a archivos nuevos o ya existentes."""
     if not ruta or not os.path.exists(ruta):
         return False
     wb = load_workbook(ruta, data_only=False, keep_vba=str(ruta).lower().endswith('.xlsm'))
@@ -11121,6 +11154,7 @@ def _alpha75_actualizar_archivo_bienestarina(ruta, unidad, mes=None, anio=None):
         metadata = _alpha59_metadata_formato(unidad, usuarios, mes=mes, anio=anio)
         ws = wb['plantilla de bienestarina '] if 'plantilla de bienestarina ' in wb.sheetnames else wb.active
         _alpha75_aplicar_encabezado_bienestarina(ws, metadata)
+        _alpha75_aplicar_datos_entrega_bienestarina(ws, metadata)
         wb.save(ruta)
         return True
     finally:
