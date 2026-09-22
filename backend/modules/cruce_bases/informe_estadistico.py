@@ -132,11 +132,12 @@ def _read_table(conn: sqlite3.Connection, table: str, fundacion_id: int | None, 
     if fundacion_id and not superadmin and 'fundacion_id' in cols:
         sql += " WHERE COALESCE(fundacion_id, 1) = ?"
         params.append(fundacion_id)
-    try:
-        return pd.read_sql_query(sql, conn, params=params)
-    except Exception:
-        rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
-        return pd.DataFrame(rows)
+    # La conexión PostgreSQL compatible implementa la interfaz histórica de
+    # sqlite, pero pandas no reconoce ese adaptador como DBAPI soportado y puede
+    # interpretar los nombres de columnas como una fila de datos. Construir el
+    # DataFrame desde RowMapping preserva valores y funciona en ambos motores.
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    return pd.DataFrame(rows)
 
 
 
@@ -484,10 +485,7 @@ def _cargar_base_maestra(conn: sqlite3.Connection, fundacion_id: int | None, sup
         if fundacion_id and not superadmin and 'fundacion_id' in cols:
             sql += " AND COALESCE(fundacion_id, 1) = ?"
             params.append(fundacion_id)
-        try:
-            df_master = pd.read_sql_query(sql, conn, params=params)
-        except Exception:
-            df_master = pd.DataFrame([dict(r) for r in conn.execute(sql, params).fetchall()])
+        df_master = pd.DataFrame([dict(r) for r in conn.execute(sql, params).fetchall()])
         if not df_master.empty:
             return _preparar_df_maestro(df_master, 'master_ninos')
 

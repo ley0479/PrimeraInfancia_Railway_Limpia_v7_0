@@ -2,7 +2,11 @@ import sqlite3
 
 import pandas as pd
 
-from modules.cruce_bases.informe_estadistico import _movimientos_version_maestra, _preparar_df_maestro
+from modules.cruce_bases.informe_estadistico import (
+    _cargar_base_maestra,
+    _movimientos_version_maestra,
+    _preparar_df_maestro,
+)
 
 
 def test_report_rejects_header_row_as_child():
@@ -36,7 +40,28 @@ def test_report_uses_movements_from_same_master_version_and_tenant():
     assert movements['retirados'] == []
 
 
+def test_report_reads_real_rows_from_active_master_version():
+    conn = sqlite3.connect(':memory:')
+    conn.row_factory = sqlite3.Row
+    conn.execute('''CREATE TABLE master_versiones(
+        id INTEGER, fundacion_id INTEGER, activa INTEGER, fecha_publicacion TEXT)''')
+    conn.execute('''CREATE TABLE master_ninos(
+        id INTEGER, version_id INTEGER, fundacion_id INTEGER, activo INTEGER,
+        documento TEXT, nombres TEXT, apellidos TEXT, unidad_servicio TEXT)''')
+    conn.execute("INSERT INTO master_versiones VALUES(25,2,1,'2026-09-21T19:59:25')")
+    conn.executemany('INSERT INTO master_ninos VALUES(?,?,?,?,?,?,?,?)', [
+        (1, 25, 2, 1, '1022172262', 'EMANUEL', 'RODRIGUEZ', 'BAJO PACURITA'),
+        (2, 25, 2, 1, '1077487980', 'KYLIAN', 'FIGUEROA', 'BENDICION 1'),
+    ])
+    frame, duplicados, fuente = _cargar_base_maestra(conn, 2, False)
+    assert fuente == 'master_ninos'
+    assert duplicados == []
+    assert frame['documento'].tolist() == ['1022172262', '1077487980']
+    assert frame['unidad'].tolist() == ['BAJO PACURITA', 'BENDICION 1']
+
+
 if __name__ == '__main__':
     test_report_rejects_header_row_as_child()
     test_report_uses_movements_from_same_master_version_and_tenant()
-    print('2 master report consistency tests passed')
+    test_report_reads_real_rows_from_active_master_version()
+    print('3 master report consistency tests passed')
