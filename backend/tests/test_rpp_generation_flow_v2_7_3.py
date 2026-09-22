@@ -90,6 +90,21 @@ def main():
                 "RPP alteró el área de impresión oficial")
         generated.close()
 
+        # El encabezado usa el nombre del mes; el selector de plantilla debe
+        # aceptar ese valor sin intentar convertir "SEPTIEMBRE" con int().
+        output_named_month = base / "RPP_PRUEBA_2026_09.xlsx"
+        generar_desde_plantilla_oficial(
+            "rpp",
+            {
+                "metadata": {"unidad": "UCA PRUEBA", "mes": "SEPTIEMBRE", "anio": 2026},
+                "usuarios": [{"NUI": "PRUEBA-2", "Nombre": "Usuario Prueba", "EdadMeses": 24}],
+            },
+            output_named_month,
+            templates,
+        )
+        require(output_named_month.is_file() and output_named_month.stat().st_size > 0,
+                "RPP no acepta el nombre visible del mes")
+
     print("RPP_GENERATION_FLOW_V2_7_3_PASS")
 
 

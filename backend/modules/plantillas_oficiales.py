@@ -655,7 +655,19 @@ def generar_desde_plantilla_oficial(
     tipo = tipo_normalizado(tipo_formato)
     metadata = dict(datos.get("metadata") or {})
     report_year = int(metadata.get("anio") or metadata.get("año") or datetime.now().year)
-    report_month = int(metadata.get("mes_numero") or metadata.get("mes") or datetime.now().month)
+    raw_month = metadata.get("mes_numero") or metadata.get("mes") or datetime.now().month
+    try:
+        report_month = int(raw_month)
+    except (TypeError, ValueError):
+        month_names = {
+            "enero": 1, "febrero": 2, "marzo": 3, "abril": 4,
+            "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
+            "septiembre": 9, "setiembre": 9, "octubre": 10,
+            "noviembre": 11, "diciembre": 12,
+        }
+        report_month = month_names.get(normalizar_texto(raw_month))
+        if report_month is None:
+            raise ValueError(f"Mes de reporte inválido: {raw_month}")
     candidates = iter_plantillas_oficiales_para_generacion(
         templates_folder, mes=report_month, anio=report_year
     )
