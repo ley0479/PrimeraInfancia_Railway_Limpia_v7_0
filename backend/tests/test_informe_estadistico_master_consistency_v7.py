@@ -1,9 +1,12 @@
 import sqlite3
+import tempfile
+from pathlib import Path
 
 import pandas as pd
 
 from modules.cruce_bases.informe_estadistico import (
     _cargar_base_maestra,
+    _cargar_base_actual_cruce,
     _movimientos_version_maestra,
     _preparar_df_maestro,
 )
@@ -60,8 +63,26 @@ def test_report_reads_real_rows_from_active_master_version():
     assert frame['unidad'].tolist() == ['BAJO PACURITA', 'BENDICION 1']
 
 
+def test_report_scopes_units_to_current_cross_file():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / 'base_actual.csv'
+        path.write_text(
+            'Documento del beneficiario;Nombre;Nombre de la unidad de servicio\n'
+            '10001;NIÑO UNO;PROGRAMA NUEVO A\n'
+            '10002;NIÑO DOS;PROGRAMA NUEVO B\n',
+            encoding='utf-8',
+        )
+        loaded = _cargar_base_actual_cruce({'ruta_actual': str(path)})
+        assert loaded is not None
+        frame, _, fuente = loaded
+        assert fuente == 'base_actual_cruce'
+        assert set(frame['unidad']) == {'PROGRAMA NUEVO A', 'PROGRAMA NUEVO B'}
+        assert 'UCA ALTO NECORA' not in set(frame['unidad'])
+
+
 if __name__ == '__main__':
     test_report_rejects_header_row_as_child()
     test_report_uses_movements_from_same_master_version_and_tenant()
     test_report_reads_real_rows_from_active_master_version()
-    print('3 master report consistency tests passed')
+    test_report_scopes_units_to_current_cross_file()
+    print('4 master report consistency tests passed')

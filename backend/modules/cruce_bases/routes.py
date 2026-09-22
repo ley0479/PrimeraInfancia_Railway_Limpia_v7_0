@@ -210,10 +210,12 @@ def register_cruce_bases(app, database_path: str, upload_folder: str, output_fol
         ctx = user_ctx()
         try:
             from .informe_estadistico import obtener_opciones_informe
+            ultimo_cruce = repo.ultimo_cruce(ctx['fundacion_id'], superadmin=ctx['rol'] == 'SUPERADMIN')
             opciones = obtener_opciones_informe(
                 database_path,
                 fundacion_id=ctx['fundacion_id'],
                 superadmin=ctx['rol'] == 'SUPERADMIN',
+                row_cruce=ultimo_cruce,
             )
             return jsonify(opciones), 200
         except Exception as exc:

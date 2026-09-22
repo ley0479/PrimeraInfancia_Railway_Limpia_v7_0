@@ -497,6 +497,26 @@ def _cargar_base_maestra(conn: sqlite3.Connection, fundacion_id: int | None, sup
         df = _read_table(conn, 'usuarios', fundacion_id, superadmin)
     return _preparar_df_maestro(df, fuente)
 
+
+def _cargar_base_actual_cruce(row_cruce: dict[str, Any] | None) -> tuple[pd.DataFrame, list[dict[str, Any]], str] | None:
+    """Lee la base actual del cruce para que el informe no mezcle UDS maestras ajenas."""
+    row_cruce = dict(row_cruce or {})
+    ruta = _safe_text(row_cruce.get('ruta_actual'))
+    if not ruta or not os.path.isfile(ruta):
+        return None
+    try:
+        from .services import normalizar_base, read_tabular_file
+
+        registros, errores = normalizar_base(read_tabular_file(ruta))
+        if not registros:
+            return None
+        frame, duplicados, _ = _preparar_df_maestro(pd.DataFrame(registros), 'base_actual_cruce')
+        # Los errores de lectura siguen disponibles en el resultado del cruce;
+        # aquí solo se reportan duplicados documentales del archivo actual.
+        return frame, duplicados, 'base_actual_cruce'
+    except Exception:
+        return None
+
 def _mapa_coordinadores(conn: sqlite3.Connection, fundacion_id: int | None, superadmin: bool) -> dict[str, str]:
     mapa: dict[str, str] = {}
 
@@ -1229,7 +1249,11 @@ def construir_contexto_informe(database_path: str, row_cruce: dict[str, Any], re
 
     conn = _connect(database_path)
     try:
-        df_master, duplicados, fuente_maestra = _cargar_base_maestra(conn, fundacion_id, superadmin)
+        base_cruce = _cargar_base_actual_cruce(row_cruce)
+        if base_cruce is not None:
+            df_master, duplicados, fuente_maestra = base_cruce
+        else:
+            df_master, duplicados, fuente_maestra = _cargar_base_maestra(conn, fundacion_id, superadmin)
         version_maestra = None
         if fuente_maestra == 'master_ninos' and not df_master.empty and 'version_id' in df_master.columns:
             versiones = pd.to_numeric(df_master['version_id'], errors='coerce').dropna()
@@ -1825,10 +1849,14 @@ def crear_informe_estadistico(database_path: str, output_folder: str, row_cruce:
     raise ValueError('Formato de informe no soportado. Usa docx o pdf.')
 
 
-def obtener_opciones_informe(database_path: str, fundacion_id: int | None = None, superadmin: bool = False) -> dict[str, list[str]]:
+def obtener_opciones_informe(database_path: str, fundacion_id: int | None = None, superadmin: bool = False, row_cruce: dict[str, Any] | None = None) -> dict[str, list[str]]:
     conn = _connect(database_path)
     try:
-        df, _, _ = _cargar_base_maestra(conn, fundacion_id, superadmin)
+        base_cruce = _cargar_base_actual_cruce(row_cruce)
+        if base_cruce is not None:
+            df, _, _ = base_cruce
+        else:
+            df, _, _ = _cargar_base_maestra(conn, fundacion_id, superadmin)
         df, _ = _enriquecer_coordinador(df, conn, fundacion_id, superadmin)
         df, _, _ = _enriquecer_salud_nutricion(df, conn, fundacion_id, superadmin)
     finally:
