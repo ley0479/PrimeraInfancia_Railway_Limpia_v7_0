@@ -2643,19 +2643,27 @@ def detectar_columna_unidad(df):
     Detecta la columna real de unidad por encabezado y por el contenido de las filas.
     Evita tomar columnas de estado con valores como ACTIVO.
     """
-    preferida = buscar_columna(df, [
-        'Nombre de la unidad de servicio',
-        'Unidad de servicio',
-        'Nombre unidad de servicio',
-        'Unidad de atención',
-        'Unidad de Atencion',
-        'UDS',
-        'UCA'
-    ])
+    # Una coincidencia exacta siempre gana. No usar buscar_columna aquí porque
+    # su respaldo por substring puede elegir antes "Regional de la Unidad de
+    # servicio", que en archivos ICBF contiene CHOCÓ en todas las filas.
+    columnas_normalizadas = [(normalizar_texto_clave(col), col) for col in df.columns]
+    for objetivo in (
+        'nombre de la unidad de servicio', 'nombre unidad de servicio',
+        'unidad de servicio', 'unidad de atencion', 'uds', 'uca', 'unidad',
+    ):
+        for encabezado, original in columnas_normalizadas:
+            if encabezado == objetivo:
+                return original
 
     mejores = []
     for col in df.columns:
         encabezado = normalizar_texto_clave(col)
+        contextos_no_uds = (
+            'regional', 'municipio', 'centro zonal', 'codigo', 'tipo de unidad',
+            'direccion', 'contrato', 'departamento', 'zona de ubicacion',
+        )
+        if any(contexto in encabezado for contexto in contextos_no_uds):
+            continue
         score = 0
 
         if encabezado == 'nombre de la unidad de servicio':
@@ -2667,7 +2675,7 @@ def detectar_columna_unidad(df):
         elif encabezado in {'unidad', 'uds', 'uca', 'unidad de atencion', 'unidad de atención'}:
             score += 250
 
-        if 'estado' in encabezado or encabezado == 'tipo de unidad':
+        if 'estado' in encabezado:
             score -= 700
 
         serie = df[col].dropna().astype(str).head(150)
