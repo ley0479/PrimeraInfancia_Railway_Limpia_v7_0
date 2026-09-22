@@ -80,9 +80,32 @@ def test_report_scopes_units_to_current_cross_file():
         assert 'UCA ALTO NECORA' not in set(frame['unidad'])
 
 
+def test_report_recovers_current_cross_from_matching_staging():
+    conn = sqlite3.connect(':memory:')
+    conn.row_factory = sqlite3.Row
+    conn.execute('''CREATE TABLE cargas_archivos(
+        id INTEGER, fundacion_id INTEGER, nombre_archivo_original TEXT)''')
+    conn.execute('''CREATE TABLE staging_cuentame(
+        id INTEGER, carga_id INTEGER, documento TEXT, nombres TEXT,
+        apellidos TEXT, unidad_servicio TEXT)''')
+    conn.execute("INSERT INTO cargas_archivos VALUES(68,2,'PROGRAMA_DISTINTO.xlsx')")
+    conn.executemany('INSERT INTO staging_cuentame VALUES(?,?,?,?,?,?)', [
+        (1, 68, '20001', 'ANA', 'UNO', 'NUEVA UDS 1'),
+        (2, 68, '20002', 'LUIS', 'DOS', 'NUEVA UDS 2'),
+    ])
+    loaded = _cargar_base_actual_cruce(
+        {'archivo_actual': 'PROGRAMA_DISTINTO.xlsx', 'ruta_actual': '/archivo/ya/no/existe.xlsx'},
+        conn=conn,
+        fundacion_id=2,
+    )
+    assert loaded is not None
+    assert set(loaded[0]['unidad']) == {'NUEVA UDS 1', 'NUEVA UDS 2'}
+
+
 if __name__ == '__main__':
     test_report_rejects_header_row_as_child()
     test_report_uses_movements_from_same_master_version_and_tenant()
     test_report_reads_real_rows_from_active_master_version()
     test_report_scopes_units_to_current_cross_file()
-    print('4 master report consistency tests passed')
+    test_report_recovers_current_cross_from_matching_staging()
+    print('5 master report consistency tests passed')

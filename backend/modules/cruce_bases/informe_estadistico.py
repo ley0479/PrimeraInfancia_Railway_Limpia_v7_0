@@ -498,24 +498,41 @@ def _cargar_base_maestra(conn: sqlite3.Connection, fundacion_id: int | None, sup
     return _preparar_df_maestro(df, fuente)
 
 
-def _cargar_base_actual_cruce(row_cruce: dict[str, Any] | None) -> tuple[pd.DataFrame, list[dict[str, Any]], str] | None:
+def _cargar_base_actual_cruce(row_cruce: dict[str, Any] | None, conn: Any = None, fundacion_id: int | None = None) -> tuple[pd.DataFrame, list[dict[str, Any]], str] | None:
     """Lee la base actual del cruce para que el informe no mezcle UDS maestras ajenas."""
     row_cruce = dict(row_cruce or {})
     ruta = _safe_text(row_cruce.get('ruta_actual'))
-    if not ruta or not os.path.isfile(ruta):
-        return None
-    try:
-        from .services import normalizar_base, read_tabular_file
+    if ruta and os.path.isfile(ruta):
+        try:
+            from .services import normalizar_base, read_tabular_file
 
-        registros, errores = normalizar_base(read_tabular_file(ruta))
-        if not registros:
-            return None
-        frame, duplicados, _ = _preparar_df_maestro(pd.DataFrame(registros), 'base_actual_cruce')
-        # Los errores de lectura siguen disponibles en el resultado del cruce;
-        # aquí solo se reportan duplicados documentales del archivo actual.
-        return frame, duplicados, 'base_actual_cruce'
-    except Exception:
-        return None
+            registros, errores = normalizar_base(read_tabular_file(ruta))
+            if registros:
+                frame, duplicados, _ = _preparar_df_maestro(pd.DataFrame(registros), 'base_actual_cruce')
+                return frame, duplicados, 'base_actual_cruce'
+        except Exception:
+            pass
+
+    # Los archivos temporales de cruces anteriores pueden desaparecer tras un
+    # despliegue. Si esa misma base fue cargada al módulo maestro, recuperar su
+    # staging exacto por nombre + fundación, nunca el catálogo histórico entero.
+    archivo = _safe_text(row_cruce.get('archivo_actual'))
+    if conn is not None and archivo and fundacion_id and _table_exists(conn, 'cargas_archivos') and _table_exists(conn, 'staging_cuentame'):
+        carga = conn.execute(
+            """SELECT id FROM cargas_archivos
+               WHERE COALESCE(fundacion_id, 1) = ? AND nombre_archivo_original = ?
+               ORDER BY id DESC LIMIT 1""",
+            (fundacion_id, archivo),
+        ).fetchone()
+        if carga:
+            rows = [dict(r) for r in conn.execute(
+                "SELECT * FROM staging_cuentame WHERE carga_id = ? ORDER BY id",
+                (carga['id'],),
+            ).fetchall()]
+            if rows:
+                frame, duplicados, _ = _preparar_df_maestro(pd.DataFrame(rows), 'base_actual_cruce')
+                return frame, duplicados, 'base_actual_cruce'
+    return None
 
 def _mapa_coordinadores(conn: sqlite3.Connection, fundacion_id: int | None, superadmin: bool) -> dict[str, str]:
     mapa: dict[str, str] = {}
@@ -1249,7 +1266,7 @@ def construir_contexto_informe(database_path: str, row_cruce: dict[str, Any], re
 
     conn = _connect(database_path)
     try:
-        base_cruce = _cargar_base_actual_cruce(row_cruce)
+        base_cruce = _cargar_base_actual_cruce(row_cruce, conn=conn, fundacion_id=fundacion_id)
         if base_cruce is not None:
             df_master, duplicados, fuente_maestra = base_cruce
         else:
@@ -1852,7 +1869,7 @@ def crear_informe_estadistico(database_path: str, output_folder: str, row_cruce:
 def obtener_opciones_informe(database_path: str, fundacion_id: int | None = None, superadmin: bool = False, row_cruce: dict[str, Any] | None = None) -> dict[str, list[str]]:
     conn = _connect(database_path)
     try:
-        base_cruce = _cargar_base_actual_cruce(row_cruce)
+        base_cruce = _cargar_base_actual_cruce(row_cruce, conn=conn, fundacion_id=fundacion_id)
         if base_cruce is not None:
             df, _, _ = base_cruce
         else:
