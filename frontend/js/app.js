@@ -1665,8 +1665,10 @@ function inicializarPeriodoFormatos() {
     const ahora = new Date();
     const mesInput = document.getElementById('periodo-formatos-mes');
     const anioInput = document.getElementById('periodo-formatos-anio');
-    if (mesInput && !mesInput.value) mesInput.value = String(ahora.getMonth() + 1);
-    if (mesInput) mesInput.value = mesInput.value || String(ahora.getMonth() + 1);
+    // Un <select> nunca está vacío: sin una opción marcada toma "1" (enero).
+    // Al iniciar la pantalla debe representar el periodo actual; de lo
+    // contrario RPP consulta una plantilla histórica que puede no existir.
+    if (mesInput) mesInput.value = String(ahora.getMonth() + 1);
     if (anioInput && !anioInput.value) anioInput.value = String(ahora.getFullYear());
 }
 document.addEventListener('DOMContentLoaded', inicializarPeriodoFormatos);
