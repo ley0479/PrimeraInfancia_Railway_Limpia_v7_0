@@ -27,6 +27,7 @@ def main() -> int:
         Path(config.CUENTAS_COBRO_FOLDER),
         Path(config.LOCAL_STORAGE_PATH),
         Path(config.LOG_FOLDER),
+        data_dir / "tenants",
         data_dir / "integrity",
         data_dir / "migration_reports",
     )

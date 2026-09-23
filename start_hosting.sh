@@ -10,12 +10,13 @@ export PORT="${PORT:-5000}"
 # preparar sus permisos como root, pero Flask/Gunicorn nunca queda ejecutándose
 # con privilegios de root.
 if [[ "$(id -u)" -eq 0 ]]; then
-  mkdir -p "$DATA_DIR"
+  mkdir -p "$DATA_DIR/tenants"
   chown -R appuser:appuser "$DATA_DIR"
+  chmod 0750 "$DATA_DIR" "$DATA_DIR/tenants"
   exec gosu appuser "$0" "$@"
 fi
 
-mkdir -p "$DATA_DIR" "$DATA_DIR/integrity" "$DATA_DIR/migration_reports"
+mkdir -p "$DATA_DIR" "$DATA_DIR/tenants" "$DATA_DIR/integrity" "$DATA_DIR/migration_reports"
 
 if [[ "${APP_ENV}" == "production" ]]; then
   # Railway recomienda DATABASE_URL como referencia al servicio PostgreSQL.

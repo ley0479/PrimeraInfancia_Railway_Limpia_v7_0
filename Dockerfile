@@ -40,7 +40,10 @@ RUN python -m pip install --upgrade pip \
     && python -m pip install -r /tmp/requirements-production.txt
 
 COPY --chown=appuser:appuser . /app
-RUN chmod 0755 /app/predeploy_hosting.sh /app/start_hosting.sh \
+RUN mkdir -p /data/tenants \
+    && chown -R appuser:appuser /data \
+    && chmod 0750 /data /data/tenants \
+    && chmod 0755 /app/predeploy_hosting.sh /app/start_hosting.sh \
     /app/backend/start_gunicorn.sh /app/backend/init_hosting.py \
     /app/backend/runtime_prepare.py /app/backend/start_idp_worker.sh
 
