@@ -167,6 +167,7 @@ CREATE TABLE IF NOT EXISTS master_versiones (
     activa INTEGER DEFAULT 0,
     fecha_creacion TEXT NOT NULL,
     fecha_publicacion TEXT,
+    fecha_archivada TEXT,
     usuario_id INTEGER,
     usuario TEXT,
     cargas_json TEXT,
@@ -404,4 +405,19 @@ CREATE TABLE IF NOT EXISTS master_projection_status (
 
 CREATE INDEX IF NOT EXISTS idx_master_projection_status_version
 ON master_projection_status(fundacion_id, version_id, estado);
+
+CREATE TABLE IF NOT EXISTS master_retention_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fundacion_id INTEGER NOT NULL,
+    version_activa_id INTEGER,
+    version_anterior_id INTEGER,
+    versiones_eliminadas_json TEXT,
+    cargas_depuradas INTEGER DEFAULT 0,
+    registros_eliminados_json TEXT,
+    politica_json TEXT,
+    fecha_ejecucion TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_master_retention_runs_fundacion
+ON master_retention_runs(fundacion_id, fecha_ejecucion);
 """

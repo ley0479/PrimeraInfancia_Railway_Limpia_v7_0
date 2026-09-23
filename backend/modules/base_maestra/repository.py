@@ -4,7 +4,7 @@ import json
 import os
 from modules.dbapi_compat import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -47,9 +47,21 @@ class BaseMaestraRepository:
             return
         with self.connect() as conn:
             conn.executescript(SCHEMA_SQL)
+            self._ensure_retention_schema(conn)
             self._repair_active_version_index(conn)
             self._seed_corporaciones(conn)
             conn.commit()
+
+    @staticmethod
+    def _ensure_retention_schema(conn) -> None:
+        """Migra de forma aditiva bases existentes para la retención mensual."""
+        columns = {row['name'] for row in conn.execute('PRAGMA table_info(master_versiones)').fetchall()}
+        if 'fecha_archivada' not in columns:
+            conn.execute('ALTER TABLE master_versiones ADD COLUMN fecha_archivada TEXT')
+        conn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_master_versiones_retencion '
+            'ON master_versiones(fundacion_id, activa, fecha_archivada)'
+        )
 
     @staticmethod
     def _repair_active_version_index(conn) -> None:
@@ -428,7 +440,10 @@ class BaseMaestraRepository:
             ).fetchone()
             anterior_id = int(anterior['id']) if anterior else None
             if anterior_id:
-                conn.execute("UPDATE master_versiones SET activa = 0, estado = 'ARCHIVADA' WHERE id = ?", (anterior_id,))
+                conn.execute(
+                    "UPDATE master_versiones SET activa = 0, estado = 'ARCHIVADA', fecha_archivada = ? WHERE id = ?",
+                    (now, anterior_id),
+                )
             conn.execute("UPDATE master_versiones SET activa = 1, estado = 'ACTIVA', fecha_publicacion = ? WHERE id = ?", (now, version_id))
             for table in ['master_ninos', 'master_salud_nutricion', 'master_talento_humano', 'master_unidades']:
                 conn.execute(f"UPDATE {table} SET activo = 0 WHERE fundacion_id = ?", (fundacion_id,))
@@ -447,3 +462,126 @@ class BaseMaestraRepository:
             )
             conn.commit()
             return {'publicacion_id': int(cur.lastrowid), 'version_id': version_id, 'version_anterior_id': anterior_id, 'fecha_publicacion': now}
+
+    def aplicar_retencion(
+        self,
+        fundacion_id: int,
+        dias_versiones: int = 30,
+        horas_temporales: int = 48,
+        ahora: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Conserva la activa y, como máximo, una anterior durante 30 días.
+
+        La operación está aislada por fundación. Nunca elimina la versión activa.
+        Los staging y borradores vencidos se limpian a las 48 horas.
+        """
+        fid = int(fundacion_id or 1)
+        current = ahora or datetime.now()
+        cutoff_versions = (current - timedelta(days=max(1, int(dias_versiones)))).isoformat(timespec='seconds')
+        cutoff_temp = (current - timedelta(hours=max(1, int(horas_temporales)))).isoformat(timespec='seconds')
+        deleted: dict[str, int] = {}
+
+        with self.connect() as conn:
+            active = conn.execute(
+                'SELECT id FROM master_versiones WHERE fundacion_id=? AND activa=1 ORDER BY id DESC LIMIT 1',
+                (fid,),
+            ).fetchone()
+            active_id = int(active['id']) if active else None
+            archived = conn.execute(
+                """
+                SELECT id, COALESCE(fecha_archivada, fecha_publicacion, fecha_creacion) AS fecha_retencion
+                FROM master_versiones
+                WHERE fundacion_id=? AND activa=0 AND estado='ARCHIVADA'
+                ORDER BY COALESCE(fecha_archivada, fecha_publicacion, fecha_creacion) DESC, id DESC
+                """,
+                (fid,),
+            ).fetchall()
+            keep_previous = None
+            if archived and str(archived[0]['fecha_retencion'] or '') >= cutoff_versions:
+                keep_previous = int(archived[0]['id'])
+
+            purge_ids = [int(row['id']) for row in archived if int(row['id']) != keep_previous]
+            stale_drafts = conn.execute(
+                """
+                SELECT id FROM master_versiones
+                WHERE fundacion_id=? AND activa=0 AND estado='BORRADOR' AND fecha_creacion < ?
+                """,
+                (fid, cutoff_temp),
+            ).fetchall()
+            purge_ids.extend(int(row['id']) for row in stale_drafts)
+            purge_ids = sorted({vid for vid in purge_ids if vid != active_id})
+
+            if purge_ids:
+                marks = ','.join('?' for _ in purge_ids)
+                conn.execute(
+                    f'UPDATE master_publicaciones SET version_anterior_id=NULL '
+                    f'WHERE fundacion_id=? AND version_anterior_id IN ({marks})',
+                    (fid, *purge_ids),
+                )
+                for table in (
+                    'master_projection_status', 'master_publicaciones', 'master_historial_cambios',
+                    'master_movimientos', 'master_inconsistencias', 'master_salud_nutricion',
+                    'master_talento_humano', 'master_unidades', 'master_ninos',
+                ):
+                    cursor = conn.execute(
+                        f'DELETE FROM {table} WHERE fundacion_id=? AND version_id IN ({marks})',
+                        (fid, *purge_ids),
+                    )
+                    deleted[table] = max(0, int(cursor.rowcount or 0))
+                cursor = conn.execute(
+                    f'DELETE FROM master_versiones WHERE fundacion_id=? AND activa=0 AND id IN ({marks})',
+                    (fid, *purge_ids),
+                )
+                deleted['master_versiones'] = max(0, int(cursor.rowcount or 0))
+
+            old_loads = conn.execute(
+                """
+                SELECT c.id FROM cargas_archivos c
+                WHERE c.fundacion_id=? AND c.fecha_carga < ? AND (
+                    EXISTS (SELECT 1 FROM staging_cuentame s WHERE s.fundacion_id=? AND s.carga_id=c.id)
+                    OR EXISTS (SELECT 1 FROM staging_talento_humano s WHERE s.fundacion_id=? AND s.carga_id=c.id)
+                    OR EXISTS (SELECT 1 FROM staging_salud_nutricion s WHERE s.fundacion_id=? AND s.carga_id=c.id)
+                    OR EXISTS (SELECT 1 FROM validaciones_cargas v WHERE v.fundacion_id=? AND v.carga_id=c.id)
+                )
+                """,
+                (fid, cutoff_temp, fid, fid, fid, fid),
+            ).fetchall()
+            load_ids = [int(row['id']) for row in old_loads]
+            if load_ids:
+                marks = ','.join('?' for _ in load_ids)
+                for table in ('staging_cuentame', 'staging_talento_humano', 'staging_salud_nutricion'):
+                    cursor = conn.execute(
+                        f'DELETE FROM {table} WHERE fundacion_id=? AND carga_id IN ({marks})',
+                        (fid, *load_ids),
+                    )
+                    deleted[table] = max(0, int(cursor.rowcount or 0))
+                cursor = conn.execute(
+                    f'DELETE FROM validaciones_cargas WHERE fundacion_id=? AND carga_id IN ({marks})',
+                    (fid, *load_ids),
+                )
+                deleted['validaciones_cargas'] = max(0, int(cursor.rowcount or 0))
+            if purge_ids or load_ids:
+                policy = {'dias_versiones': dias_versiones, 'horas_temporales': horas_temporales, 'max_versiones': 2}
+                conn.execute(
+                    """
+                    INSERT INTO master_retention_runs
+                    (fundacion_id,version_activa_id,version_anterior_id,versiones_eliminadas_json,
+                     cargas_depuradas,registros_eliminados_json,politica_json,fecha_ejecucion)
+                    VALUES (?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        fid, active_id, keep_previous, self.json_dumps(purge_ids), len(load_ids),
+                        self.json_dumps(deleted), self.json_dumps(policy), current.isoformat(timespec='seconds'),
+                    ),
+                )
+            conn.commit()
+
+        return {
+            'fundacion_id': fid,
+            'version_activa_protegida': active_id,
+            'version_anterior_conservada': keep_previous,
+            'versiones_eliminadas': purge_ids,
+            'cargas_temporales_depuradas': len(load_ids),
+            'registros_eliminados': deleted,
+            'politica': {'dias_versiones': dias_versiones, 'horas_temporales': horas_temporales, 'max_versiones': 2},
+        }

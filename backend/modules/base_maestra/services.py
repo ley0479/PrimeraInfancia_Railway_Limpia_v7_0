@@ -1767,6 +1767,11 @@ def publicar_base_maestra(database_path: str, version_id: int, ctx: dict[str, An
                  json.dumps(detalle, ensure_ascii=False), now),
             )
         conn.commit()
+    result['retencion'] = repo.aplicar_retencion(
+        fundacion_id,
+        dias_versiones=30,
+        horas_temporales=48,
+    )
     result['propagacion'] = propagacion
     result['alimentacion_modulos'] = [
         {'modulo': modulo, 'estado': 'COMPLETADA', 'total_registros': total_directo,
@@ -1786,6 +1791,7 @@ def dashboard_base_maestra(database_path: str, ctx: dict[str, Any] | None = None
     fundacion_id = int(ctx.get('fundacion_id') or 1)
     repo = BaseMaestraRepository(database_path)
     repo.init_schema()
+    repo.aplicar_retencion(fundacion_id, dias_versiones=30, horas_temporales=48)
     version = repo.version_activa(fundacion_id)
     if version:
         resumen = resumen_de_version(repo, int(version['id']), fundacion_id)
