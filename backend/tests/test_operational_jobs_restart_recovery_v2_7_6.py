@@ -57,3 +57,11 @@ def test_liam_announces_operational_errors_automatically():
     assert 'addEventListener("liam:operational-error"' in source
     assert 'open();' in source
     assert 'window.LIA_SPEECH?.speak(message)' in source
+
+
+def test_missing_job_is_terminal_for_legacy_cached_frontend():
+    source = (BACKEND_DIR / "app.py").read_text(encoding="utf-8")
+    route = source[source.index("def api_jobs_detail(job_id):"):source.index("def _procesamiento_async_explicito", source.index("def api_jobs_detail(job_id):"))]
+    assert "'estado': 'error'" in route
+    assert "}}), 200" in route
+    assert "Vuelve a pulsar Procesar unidades seleccionadas" in route

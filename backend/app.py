@@ -4882,7 +4882,21 @@ def api_jobs_list():
 def api_jobs_detail(job_id):
     job = get_job(job_id)
     if not job:
-        return jsonify({'error': 'Trabajo operativo no encontrado o expirado.'}), 404
+        # Compatibilidad con pantallas que aún conservan una versión anterior
+        # en caché: esas versiones reintentaban indefinidamente cualquier 404.
+        # Un estado terminal válido obliga a todos los clientes a detener el
+        # sondeo y permite iniciar nuevamente la generación.
+        return jsonify({'job': {
+            'id': str(job_id),
+            'estado': 'error',
+            'progreso': 0,
+            'etapa': 'Proceso expirado',
+            'error': (
+                'El proceso anterior expiró o fue interrumpido por un reinicio del servicio. '
+                'Vuelve a pulsar Procesar unidades seleccionadas.'
+            ),
+            'resultado': None,
+        }}), 200
     return jsonify({'job': job}), 200
 
 
