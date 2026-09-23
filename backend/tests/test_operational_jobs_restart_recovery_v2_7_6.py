@@ -49,3 +49,11 @@ def test_frontend_stops_polling_missing_jobs_immediately():
     source = (BACKEND_DIR.parent / "frontend" / "js" / "app.js").read_text(encoding="utf-8")
     assert "Number(error?.status || 0) === 404" in source
     assert "Vuelve a pulsar Procesar unidades seleccionadas" in source
+    assert "liam:operational-error" in source
+
+
+def test_liam_announces_operational_errors_automatically():
+    source = (BACKEND_DIR.parent / "frontend" / "js" / "liam" / "liam-controller.js").read_text(encoding="utf-8")
+    assert 'addEventListener("liam:operational-error"' in source
+    assert 'open();' in source
+    assert 'window.LIA_SPEECH?.speak(message)' in source

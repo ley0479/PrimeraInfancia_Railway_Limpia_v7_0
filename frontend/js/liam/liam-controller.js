@@ -1489,6 +1489,23 @@
     if (state.flags.voice_enabled && !state.muted)
       window.LIA_SPEECH?.speak(message);
   });
+  document.addEventListener("liam:operational-error", (event) => {
+    const detail = event.detail || {};
+    const title = detail.title || "Problema operativo";
+    const cause = detail.message || "La operación no terminó correctamente.";
+    const solution = detail.solution || "Vuelve a intentar la operación.";
+    const message = `Detecté un problema. ${cause} Solución: ${solution}`;
+    document
+      .getElementById("liam-shell")
+      ?.setAttribute("data-has-incident", "true");
+    add("liam", message);
+    remember("assistant", message);
+    window.LIAM_STATE?.set("warning");
+    window.LIAM_TABLET?.show({ type: "warning", title, value: solution });
+    open();
+    if (state.flags.voice_enabled && !state.muted)
+      window.LIA_SPEECH?.speak(message);
+  });
   document.addEventListener("liam:realtime-connecting", () => {
     document
       .querySelector('[data-action="realtime"]')

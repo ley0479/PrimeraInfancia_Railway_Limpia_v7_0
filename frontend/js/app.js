@@ -943,6 +943,16 @@ function mostrarMensaje(id, texto, tipo = 'success') {
     box.classList.remove('hidden');
 }
 
+function notificarLiamErrorOperativo(mensaje, solucion = 'Vuelve a intentar la operación.') {
+    document.dispatchEvent(new CustomEvent('liam:operational-error', {
+        detail: {
+            title: 'Problema al generar formatos',
+            message: String(mensaje || 'El proceso no terminó correctamente.'),
+            solution: String(solucion || 'Vuelve a intentar la operación.')
+        }
+    }));
+}
+
 function validarArchivo(file, allowedExtensions, tamanoMaxMB) {
     if (!file) {
         return 'No se seleccionó ningún archivo.';
@@ -1515,6 +1525,10 @@ function esperarJobOperativo(jobId, onComplete, messageTarget = 'message-box') {
                     ocultarCargando();
                     const detalle = job.error || 'El proceso en segundo plano falló.';
                     mostrarMensaje(messageTarget, `Error procesando en segundo plano: ${detalle}`, 'error');
+                    notificarLiamErrorOperativo(
+                        detalle,
+                        'Pulsa nuevamente Procesar unidades seleccionadas. Si vuelve a fallar, conserva el mensaje mostrado.'
+                    );
                     console.error('Job operativo fallido', job);
                     return;
                 }
@@ -1522,7 +1536,9 @@ function esperarJobOperativo(jobId, onComplete, messageTarget = 'message-box') {
                 if (intentos >= maxIntentos) {
                     ocultarProgreso();
                     ocultarCargando();
-                    mostrarMensaje(messageTarget, 'El proceso sigue tardando demasiado. Revisa los logs del backend o intenta con una base más liviana.', 'error');
+                    const mensajeDemora = 'El proceso sigue tardando demasiado. Revisa los logs del backend o intenta con una base más liviana.';
+                    mostrarMensaje(messageTarget, mensajeDemora, 'error');
+                    notificarLiamErrorOperativo(mensajeDemora, 'Verifica la conexión y vuelve a procesar las unidades seleccionadas.');
                     return;
                 }
 
@@ -1532,11 +1548,13 @@ function esperarJobOperativo(jobId, onComplete, messageTarget = 'message-box') {
                 if (Number(error?.status || 0) === 404) {
                     ocultarProgreso();
                     ocultarCargando();
+                    const mensajeExpirado = 'El proceso anterior expiró o fue interrumpido por un reinicio.';
                     mostrarMensaje(
                         messageTarget,
-                        'El proceso anterior expiró o fue interrumpido por un reinicio. Vuelve a pulsar Procesar unidades seleccionadas.',
+                        `${mensajeExpirado} Vuelve a pulsar Procesar unidades seleccionadas.`,
                         'error'
                     );
+                    notificarLiamErrorOperativo(mensajeExpirado, 'Vuelve a pulsar Procesar unidades seleccionadas.');
                     return;
                 }
                 if (intentos >= maxIntentos) {
