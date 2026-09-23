@@ -9827,19 +9827,10 @@ def _alpha59_obtener_usuarios_unidad(unidad):
         # Cuando existe una versión publicada, su población es definitiva.
         # El fallback legado solo aplica a instalaciones que todavía no han
         # publicado ninguna Base Maestra, nunca a una UDS vacía de una versión.
-        try:
-            version_activa = conn.execute(
-                'SELECT id FROM master_versiones '
-                'WHERE fundacion_id=? AND activa=1 ORDER BY id DESC LIMIT 1',
-                (tenant_id,),
-            ).fetchone()
-        except Exception:
-            version_activa = None
-        grupos_fuente = (
-            (('master_ninos',),)
-            if version_activa else
-            (('master_ninos',), ('usuarios', 'beneficiarios'))
-        )
+        # La importación Cuéntame recién procesada debe alimentar de inmediato
+        # RPP/RAM/Bienestarina. Una publicación anterior no puede ocultarla.
+        # Cada fuente se consulta por separado para no mezclar versiones.
+        grupos_fuente = (('usuarios',), ('master_ninos',), ('beneficiarios',))
         for fuentes in grupos_fuente:
             usuarios = []
             for tabla in fuentes:
