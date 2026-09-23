@@ -70,6 +70,41 @@ def _write_job_log(job: dict[str, Any], include_result: bool = False) -> None:
         pass
 
 
+def _read_job_log(job_id: str) -> dict[str, Any] | None:
+    """Recupera el estado persistido cuando el proceso web fue reiniciado."""
+    if not _LOG_DIR or not str(job_id).isalnum():
+        return None
+    try:
+        path = os.path.join(os.fspath(_LOG_DIR), f"job_{job_id}.json")
+        with open(path, "r", encoding="utf-8") as fh:
+            job = json.load(fh)
+        if not isinstance(job, dict) or str(job.get("id")) != str(job_id):
+            return None
+
+        if job.get("estado") in {"pendiente", "procesando"}:
+            job["estado"] = "error"
+            job["etapa"] = "Interrumpido por reinicio del servicio"
+            job["error"] = (
+                "El servicio se reinició mientras generaba los formatos. "
+                "Vuelve a pulsar Procesar unidades seleccionadas."
+            )
+            job["fecha_fin"] = _now()
+            job["fecha_actualizacion"] = _now()
+            _write_job_log(job, include_result=False)
+        elif job.get("estado") == "completado" and not job.get("resultado"):
+            # Los resultados grandes solo viven en memoria. Después de reiniciar
+            # no se puede reconstruir con seguridad el archivo de descarga.
+            job["estado"] = "error"
+            job["etapa"] = "Resultado expirado"
+            job["error"] = (
+                "El resultado expiró después de reiniciar el servicio. "
+                "Vuelve a procesar la selección."
+            )
+        return job
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return None
+
+
 def _append_log(job: dict[str, Any], message: str) -> None:
     logs = job.setdefault("logs", [])
     logs.append({"fecha": _now(), "mensaje": str(message)[:1000]})
@@ -95,6 +130,10 @@ def _job_visible(job: dict[str, Any]) -> bool:
 def get_job(job_id: str) -> dict[str, Any] | None:
     with _LOCK:
         job = _JOBS.get(str(job_id))
+        if not job:
+            job = _read_job_log(str(job_id))
+            if job:
+                _JOBS[str(job_id)] = job
         return _public_job(job) if job and _job_visible(job) else None
 
 

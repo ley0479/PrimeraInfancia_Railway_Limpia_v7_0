@@ -1529,6 +1529,16 @@ function esperarJobOperativo(jobId, onComplete, messageTarget = 'message-box') {
                 setTimeout(tick, 3000);
             })
             .catch((error) => {
+                if (Number(error?.status || 0) === 404) {
+                    ocultarProgreso();
+                    ocultarCargando();
+                    mostrarMensaje(
+                        messageTarget,
+                        'El proceso anterior expiró o fue interrumpido por un reinicio. Vuelve a pulsar Procesar unidades seleccionadas.',
+                        'error'
+                    );
+                    return;
+                }
                 if (intentos >= maxIntentos) {
                     ocultarProgreso();
                     ocultarCargando();
