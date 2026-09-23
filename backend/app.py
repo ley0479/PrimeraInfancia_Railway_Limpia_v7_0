@@ -6290,6 +6290,37 @@ def estadisticas():
         'peso_talla_vencido': vencido
     })
 
+def _deduplicar_usuarios_para_formatos(usuarios):
+    """Regla de oro: una persona solo puede aparecer una vez por formato/UDS."""
+    salida = []
+    vistos = set()
+    for usuario in usuarios or []:
+        documento = limpiar_valor(
+            usuario.get('Documento') or usuario.get('documento') or
+            usuario.get('NUI') or usuario.get('numero_documento')
+        )
+        documento = re.sub(r'[^0-9A-Za-z]+', '', documento).upper()
+        if documento:
+            clave = ('documento', documento)
+        else:
+            nombre = unir_partes(
+                usuario.get('PrimerNombre'), usuario.get('SegundoNombre'),
+                usuario.get('PrimerApellido'), usuario.get('SegundoApellido')
+            ) or usuario.get('Nombre') or usuario.get('nombre') or ''
+            nacimiento = limpiar_valor(
+                usuario.get('FechaNacimiento') or usuario.get('fecha_nacimiento') or
+                usuario.get('fecha_de_nacimiento_del_beneficiario')
+            )
+            nombre = normalizar_texto_clave(nombre)
+            clave = ('nombre_fecha', nombre, nacimiento) if nombre else None
+        if clave and clave in vistos:
+            continue
+        if clave:
+            vistos.add(clave)
+        salida.append(usuario)
+    return salida
+
+
 def inyectar_datos_en_plantillas(unidad_nombre, lista_usuarios, options=None):
     """
     Actualiza plantillas oficiales sin modificar su estructura.
@@ -6346,7 +6377,7 @@ def inyectar_datos_en_plantillas(unidad_nombre, lista_usuarios, options=None):
     # Se conserva la lista completa y el límite se aplica por formato después
     # de ordenar/filtrar. Así RAM/RAN no pierde gestantes o grupos etarios
     # porque hayan quedado después de los primeros registros de la base.
-    usuarios_base = list(lista_usuarios or [])
+    usuarios_base = _deduplicar_usuarios_para_formatos(lista_usuarios)
 
     # ALPHA53 — Minutas RPP versionadas, RAM automático y encabezados.
     # Importación local para no afectar arranque si el módulo no está disponible en versiones antiguas.

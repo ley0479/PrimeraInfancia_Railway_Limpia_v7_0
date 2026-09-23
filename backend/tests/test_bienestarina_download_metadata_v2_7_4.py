@@ -21,6 +21,20 @@ for contract in (
 ):
     assert contract in helper, f"Falta enviar {contract} en descarga de Bienestarina"
 
+generic_start = frontend.index("function descargar(unidad, formato)")
+generic_end = frontend.index("async function descargarArchivoFormatoAlpha63", generic_start)
+generic_download = frontend[generic_start:generic_end]
+assert "return descargarBienestarinaAlpha62(unidad)" in generic_download
+assert "/api/bienestarina/descargar?unidad=" not in generic_download
+
+index_html = (ROOT / "frontend/index.html").read_text(encoding="utf-8")
+guard_start = index_html.index("// ALPHA73: guardia final")
+guard_end = index_html.index("</script>", guard_start)
+guard = index_html[guard_start:guard_end]
+assert "return window.descargarBienestarinaAlpha62(unidad)" in guard
+for contract in ("fecha_entrega:", "lote:", "cantidad:", "mes:", "anio:"):
+    assert contract in guard, f"La guardia final pierde {contract}"
+
 endpoint_start = backend.index("def descargar_bienestarina_alpha57")
 endpoint_end = backend.index("def descargar_rpp_por_categoria", endpoint_start)
 endpoint = backend[endpoint_start:endpoint_end]
@@ -46,5 +60,12 @@ delivery_end = updater_start
 delivery = backend[delivery_start:delivery_end]
 for contract in ("ws[f'H{row}'] = fecha", "ws[f'I{row}'] = lote", "ws[f'J{row}'] = cantidad"):
     assert contract in delivery
+
+inject_start = backend.index("def _deduplicar_usuarios_para_formatos")
+inject_end = backend.index("def inyectar_datos_en_plantillas", inject_start)
+dedupe = backend[inject_start:inject_end]
+assert "('documento', documento)" in dedupe
+assert "('nombre_fecha', nombre, nacimiento)" in dedupe
+assert "usuarios_base = _deduplicar_usuarios_para_formatos(lista_usuarios)" in backend
 
 print("Bienestarina descarga con fecha/lote/cantidad/periodo: PASS")

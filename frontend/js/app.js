@@ -2103,16 +2103,8 @@ function descargar(unidad, formato) {
     const fmtOriginal = String(formato || '').trim();
     const fmt = fmtOriginal.toLowerCase();
     if (fmt.includes('bienestarina')) {
-        // ALPHA73: fix mínimo diferencial. Bienestarina solo usa su endpoint específico por UDS.
-        const urlBienestarina = `${backendUrl}/api/bienestarina/descargar?unidad=${encodeURIComponent(unidad)}`;
-        console.info('[ALPHA73] Descarga Bienestarina por endpoint específico:', { unidad, url: urlBienestarina });
-        descargarArchivoFormatoAlpha63({
-            url: urlBienestarina,
-            unidad,
-            formato: 'Bienestarina',
-            nombreBase: `BIENESTARINA_${String(unidad).replace(/[^A-Za-z0-9]+/g, '_')}.xlsx`
-        });
-        return;
+        // Regla de oro: conservar todos los datos diligenciados de Bienestarina.
+        return descargarBienestarinaAlpha62(unidad);
     }
     if (esGrupoRppDescargaAlpha61(fmtOriginal)) {
         const periodo = periodoFormatosSeleccionado();

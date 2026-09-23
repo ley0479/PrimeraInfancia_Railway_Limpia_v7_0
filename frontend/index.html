@@ -3941,7 +3941,7 @@
     <script src="./js/print-manager.js?v=2.7.0-encabezado-institucional-1"></script>
     <script src="./js/modules/menu-lateral-institucional.js?v=2.3.0-alpha.51-entregables-sn"></script>
     <script src="./js/modules/workspace-dock-themes.js?v=2.7.5-dock-themes-7"></script>
-    <script src="./js/app.js?v=2.7.6-liam-job-alerts-1"></script>
+    <script src="./js/app.js?v=2.7.6-bienestarina-metadata-1"></script>
     <script src="./js/modules/calendario-inteligente.js?v=2.7.6-ocr-auto-calendar-3"></script>
     <script src="./js/modules/acceso-compartido.js?v=2.4.1-tunnel-fix"></script>
     <script src="./js/modules/cruce-bases.js?v=2.1.14"></script>
@@ -4000,8 +4000,20 @@
         window.descargar = function (unidad, formato) {
             const fmt = String(formato || '').toLowerCase();
             if (fmt.includes('bienestarina')) {
+                if (typeof window.descargarBienestarinaAlpha62 === 'function') {
+                    return window.descargarBienestarinaAlpha62(unidad);
+                }
                 const base = window.backendUrl || window.getBackendUrl?.() || window.getConfiguredBackendUrl?.() || window.location.origin;
-                const url = `${base}/api/bienestarina/descargar?unidad=${encodeURIComponent(unidad)}`;
+                const periodo = window.periodoFormatosSeleccionado?.() || {};
+                const params = new URLSearchParams({
+                    unidad: String(unidad || ''),
+                    mes: String(periodo.mes || ''),
+                    anio: String(periodo.anio || ''),
+                    fecha_entrega: document.getElementById('fecha-entrega-bienestarina')?.value || '',
+                    lote: document.getElementById('lote-bienestarina')?.value || '',
+                    cantidad: document.getElementById('cantidad-bienestarina')?.value || ''
+                });
+                const url = `${base}/api/bienestarina/descargar?${params.toString()}`;
                 console.info('[ALPHA74] Override descarga Bienestarina:', { unidad, url });
                 if (typeof window.descargarArchivoFormatoAlpha63 === 'function') {
                     return window.descargarArchivoFormatoAlpha63({
