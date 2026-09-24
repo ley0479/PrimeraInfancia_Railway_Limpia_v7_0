@@ -5880,14 +5880,16 @@ def relacion_mes_generar():
     ensure_runtime_schema(cursor)
     filas = cursor.execute("""
         SELECT unidad_servicio AS unidad, grupo_etario, edad_meses, fecha_nacimiento,
-               estado, docente, datos_json
+               estado, docente, datos_json, documento, nui, nombre_completo
         FROM master_ninos
         WHERE activo = 1 AND COALESCE(fundacion_id,1) = ?
     """, (fundacion_actual_id(),)).fetchall()
     conn.close()
 
-    from services.relacion_mes_service import consolidar_por_unidad, docente_mas_frecuente
-    resumen = consolidar_por_unidad((dict(fila) for fila in filas), anio, mes)
+    from services.relacion_mes_service import consolidar_por_unidad, detallar_por_unidad, docente_mas_frecuente
+    filas_dict = [dict(fila) for fila in filas]
+    resumen = consolidar_por_unidad(filas_dict, anio, mes)
+    detalle = detallar_por_unidad(filas_dict, anio, mes)
 
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -5922,6 +5924,64 @@ def relacion_mes_generar():
     fill_6_11 = PatternFill('solid', fgColor='CFE2F3')       # azul
     fill_1_2 = PatternFill('solid', fgColor='D9EAD3')        # verde
     fill_3_5 = PatternFill('solid', fgColor='F4CCCC')        # rojo
+    detalle_ws = wb.create_sheet('DETALLE PARTICIPANTES')
+    detalle_ws.sheet_view.showGridLines = False
+    etiquetas_grupo = {
+        'gestantes': 'GESTANTES', 'menores_6': 'MENORES 6 MESES',
+        'seis_11': '6 A 11 MESES', 'uno_2': '1 A 2 AÑOS 11 MESES',
+        'tres_5': '3 A 5 AÑOS 11 MESES', 'sin_clasificar': 'SIN CLASIFICAR / REVISAR',
+    }
+    columnas_grupo = {
+        3: 'gestantes', 4: 'menores_6', 5: 'seis_11', 6: 'uno_2',
+        7: 'tres_5', 8: 'sin_clasificar',
+    }
+    anclas_detalle = {}
+    detalle_row = 1
+    for unidad_detalle in sorted(detalle):
+        anclas_detalle[(unidad_detalle, 'todos')] = detalle_row
+        detalle_ws.cell(detalle_row, 1).value = f'UNIDAD DE ATENCIÓN: {unidad_detalle}'
+        detalle_ws.cell(detalle_row, 1).font = Font(bold=True, size=13, color='FFFFFF')
+        detalle_ws.cell(detalle_row, 1).fill = PatternFill('solid', fgColor='1F4E78')
+        detalle_ws.merge_cells(start_row=detalle_row, start_column=1, end_row=detalle_row, end_column=6)
+        detalle_row += 1
+        for grupo_detalle, etiqueta_detalle in etiquetas_grupo.items():
+            participantes = detalle[unidad_detalle].get(grupo_detalle) or []
+            anclas_detalle[(unidad_detalle, grupo_detalle)] = detalle_row
+            detalle_ws.cell(detalle_row, 1).value = f'{etiqueta_detalle} ({len(participantes)})'
+            detalle_ws.cell(detalle_row, 1).font = Font(bold=True, color='1F1F1F')
+            detalle_ws.cell(detalle_row, 1).fill = PatternFill('solid', fgColor='D9EAF7')
+            detalle_ws.merge_cells(start_row=detalle_row, start_column=1, end_row=detalle_row, end_column=7)
+            detalle_row += 1
+            for col_detalle, titulo_detalle in enumerate(
+                ('NOMBRE COMPLETO', 'DOCUMENTO/NUI', 'FECHA DE NACIMIENTO', 'EDAD (MESES)', 'GRUPO REGISTRADO', 'ESTADO', 'DOCENTE'),
+                start=1,
+            ):
+                celda_titulo = detalle_ws.cell(detalle_row, col_detalle)
+                celda_titulo.value = titulo_detalle
+                celda_titulo.font = Font(bold=True)
+                celda_titulo.fill = PatternFill('solid', fgColor='E2F0D9')
+            detalle_row += 1
+            if participantes:
+                for participante in participantes:
+                    valores_detalle = (
+                        participante['nombre'] or 'SIN NOMBRE', participante['documento'],
+                        participante['fecha_nacimiento'], participante['edad_meses'],
+                        participante['grupo_etario'], participante['estado'], participante['docente'],
+                    )
+                    for col_detalle, valor_detalle in enumerate(valores_detalle, start=1):
+                        celda_detalle = detalle_ws.cell(detalle_row, col_detalle)
+                        celda_detalle.value = valor_detalle
+                        celda_detalle.border = Border(left=thin, right=thin, top=thin, bottom=thin)
+                    detalle_row += 1
+            else:
+                detalle_ws.cell(detalle_row, 1).value = 'Sin participantes en esta categoría.'
+                detalle_ws.merge_cells(start_row=detalle_row, start_column=1, end_row=detalle_row, end_column=7)
+                detalle_row += 1
+            detalle_row += 1
+        detalle_row += 1
+    detalle_ws.freeze_panes = 'A2'
+    for col_detalle, ancho in enumerate((34, 20, 20, 15, 28, 16, 30), start=1):
+        detalle_ws.column_dimensions[get_column_letter(col_detalle)].width = ancho
     row = 4
     for unidad in sorted(resumen):
         d = resumen[unidad]
@@ -5948,6 +6008,13 @@ def relacion_mes_generar():
                 c.fill = fill_1_2
             elif col == 7:
                 c.fill = fill_3_5
+            grupo_enlace = columnas_grupo.get(col)
+            if grupo_enlace and int(d.get(grupo_enlace) or 0) > 0:
+                c.hyperlink = f"#'DETALLE PARTICIPANTES'!A{anclas_detalle[(unidad, grupo_enlace)]}"
+                c.font = Font(color='0563C1', underline='single', bold=True)
+            elif col == 9 and sum(int(d.get(grupo) or 0) for grupo in etiquetas_grupo) > 0:
+                c.hyperlink = f"#'DETALLE PARTICIPANTES'!A{anclas_detalle[(unidad, 'todos')]}"
+                c.font = Font(color='0563C1', underline='single', bold=True)
         row += 1
     total_row = row
     ws.cell(total_row, 1).value = 'TOTAL GENERAL'
@@ -5960,6 +6027,10 @@ def relacion_mes_generar():
         cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
     ws.auto_filter.ref = f'A3:{get_column_letter(len(headers))}{total_row - 1}'
     ws.freeze_panes = 'C4'
+    ws.cell(2, 1).value += ' Las cantidades azules y subrayadas abren el detalle nominal de cada unidad y categoría.'
+    detalle_ws.cell(1, 7).hyperlink = f"#'{ws.title}'!A1"
+    detalle_ws.cell(1, 7).value = 'VOLVER AL RESUMEN'
+    detalle_ws.cell(1, 7).font = Font(color='FFFFFF', underline='single', bold=True)
     for col in range(1, len(headers) + 1):
         ws.column_dimensions[get_column_letter(col)].width = 20 if col > 2 else 30
     try:

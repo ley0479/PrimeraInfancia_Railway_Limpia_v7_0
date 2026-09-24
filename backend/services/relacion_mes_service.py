@@ -12,6 +12,7 @@ from typing import Any, Iterable
 
 
 GRUPOS = ('gestantes', 'menores_6', 'seis_11', 'uno_2', 'tres_5')
+GRUPOS_DETALLE = (*GRUPOS, 'sin_clasificar')
 
 
 def _texto(value: Any) -> str:
@@ -149,6 +150,37 @@ def consolidar_por_unidad(rows: Iterable[dict[str, Any]], anio: int | None = Non
         if docente:
             item['_docentes'][docente] += 1
     return resumen
+
+
+def detallar_por_unidad(rows: Iterable[dict[str, Any]], anio: int, mes: int) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    """Agrupa los participantes con la misma regla usada por el consolidado."""
+    detalle: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for raw in rows:
+        row = dict(raw)
+        estado = _texto(row.get('estado'))
+        if estado and estado not in {'activo', 'activa'}:
+            continue
+        extra = _datos_json(row.get('datos_json'))
+        unidad = str(row.get('unidad') or row.get('unidad_servicio') or '').strip() or 'SIN UNIDAD'
+        grupo = clasificar_participante(row, anio, mes) or 'sin_clasificar'
+        grupos = detalle.setdefault(unidad, {clave: [] for clave in GRUPOS_DETALLE})
+        grupos[grupo].append({
+            'nombre': str(row.get('nombre_completo') or _buscar_dato(extra, ('nombre completo', 'nombres y apellidos', 'nombre')) or '').strip(),
+            'documento': str(row.get('documento') or row.get('nui') or _buscar_dato(extra, ('documento', 'numero documento', 'nui')) or '').strip(),
+            'fecha_nacimiento': str(row.get('fecha_nacimiento') or _buscar_dato(extra, ('fecha nacimiento', 'fecha de nacimiento')) or '').strip(),
+            'edad_meses': edad_meses_en_periodo(
+                row.get('fecha_nacimiento') or _buscar_dato(extra, ('fecha nacimiento', 'fecha de nacimiento')),
+                anio,
+                mes,
+            ),
+            'grupo_etario': str(row.get('grupo_etario') or _buscar_dato(extra, ('grupo etario', 'tipo beneficiario', 'poblacion')) or '').strip(),
+            'estado': str(row.get('estado') or 'ACTIVO').strip(),
+            'docente': str(row.get('docente') or '').strip(),
+        })
+    for grupos in detalle.values():
+        for participantes in grupos.values():
+            participantes.sort(key=lambda item: (_texto(item.get('nombre')), _texto(item.get('documento'))))
+    return detalle
 
 
 def docente_mas_frecuente(item: dict[str, Any]) -> str:
