@@ -1958,12 +1958,8 @@ function enviarFormularioProcesamientoCuentame(formData, textoCargando) {
 
         if (xhr.status >= 400) {
             const mensaje524 = xhr.status === 524
-                ? 'El procesamiento síncrono superó el tiempo disponible. Reduce la cantidad de UDS o formatos y vuelve a intentar.'
-                : [
-                    resultado.error || `Error técnico del servidor (${xhr.status}).`,
-                    resultado.detalle || '',
-                    resultado.trace_id ? `Referencia: ${resultado.trace_id}` : '',
-                ].filter(Boolean).join(' ');
+                ? 'Qué ocurrió: el procesamiento superó el tiempo disponible. Qué debe hacer: no lo inicies varias veces; revisa si el resultado apareció y, si no, procesa menos unidades o formatos.'
+                : construirMensajeErrorClaro(resultado, xhr.status, xhr.getResponseHeader('X-Trace-Id') || '');
             mostrarMensaje('message-box', mensaje524, 'error');
             return;
         }
@@ -1979,7 +1975,10 @@ function enviarFormularioProcesamientoCuentame(formData, textoCargando) {
     xhr.onerror = function () {
         ocultarProgreso();
         ocultarCargando();
-        mostrarMensaje('message-box', 'Ocurrió un error de conexión con el backend de Python.', 'error');
+        mostrarMensaje('message-box', construirMensajeErrorClaro({ diagnostic: {
+            cause: 'Se interrumpió la comunicación con la plataforma.',
+            solution: 'Comprueba tu conexión, espera unos segundos y vuelve a intentarlo una sola vez.'
+        } }, 0), 'error');
     };
 
     xhr.send(formData);
@@ -2054,7 +2053,10 @@ function detectarUnidadesBase() {
     xhr.onerror = function () {
         ocultarProgreso();
         ocultarCargando();
-        mostrarMensaje('message-box', 'Ocurrió un error de conexión con el backend de Python.', 'error');
+        mostrarMensaje('message-box', construirMensajeErrorClaro({ diagnostic: {
+            cause: 'Se interrumpió la comunicación con la plataforma.',
+            solution: 'Comprueba tu conexión, espera unos segundos y vuelve a intentarlo una sola vez.'
+        } }, 0), 'error');
     };
 
     xhr.send(formData);
