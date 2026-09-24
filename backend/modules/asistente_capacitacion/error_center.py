@@ -9,6 +9,70 @@ from .privacy_service import redact
 
 TYPE_BY_STATUS = {400:'error_usuario',401:'error_permisos',403:'error_permisos',404:'error_datos',409:'error_integridad',413:'error_archivo',415:'error_archivo',422:'error_datos',429:'error_configuracion',502:'error_integracion',503:'error_backend',504:'error_red'}
 
+ACTION_LABELS = {
+    'review_detected_columns': 'Revisa las columnas detectadas en el archivo.',
+    'open_mapping': 'Abre el mapeo, relaciona los campos obligatorios y vuelve a validar.',
+    'retry': 'Comprueba la conexión y vuelve a intentarlo una sola vez.',
+    'check_status': 'Consulta el estado del proceso antes de generar nuevamente.',
+}
+
+
+def _plain_server_diagnosis(text: str, kind: str) -> tuple[str, str, bool]:
+    """Traduce fallos técnicos frecuentes sin exponer rutas, SQL ni excepciones."""
+    if any(token in text for token in ('permission denied', 'read-only file system', 'access is denied', 'acceso denegado')):
+        return (
+            'La plataforma no pudo guardar el archivo o crear la carpeta que necesitaba.',
+            'No vuelvas a cargar la información todavía. Conserva la referencia y solicita que revisen el almacenamiento de la plataforma.',
+            False,
+        )
+    if any(token in text for token in ('no space left', 'disk full', 'espacio insuficiente')):
+        return (
+            'El espacio disponible para guardar archivos se agotó.',
+            'Libera espacio o solicita ampliar el almacenamiento y luego repite la operación.',
+            True,
+        )
+    if any(token in text for token in ('no such table', 'undefined table', 'relation ', 'database is not initialized')):
+        return (
+            'La base de datos necesaria para esta función todavía no está preparada.',
+            'Carga o publica la Base Maestra correspondiente. Si ya lo hiciste, conserva la referencia y solicita revisar la actualización de la base.',
+            False,
+        )
+    if any(token in text for token in ('no such column', 'undefined column', 'column ') ):
+        return (
+            'La información cargada no contiene una columna que esta función necesita.',
+            'Revisa el mapeo y confirma que estén relacionados los campos obligatorios antes de procesar nuevamente.',
+            True,
+        )
+    if any(token in text for token in ('template', 'plantilla', 'no such file', 'file not found')):
+        return (
+            'No se encontró la plantilla o el archivo necesario para completar la operación.',
+            'Carga la plantilla oficial del módulo o selecciona nuevamente el archivo correcto y vuelve a intentarlo.',
+            True,
+        )
+    if any(token in text for token in ('timeout', 'timed out', 'demasiado tiempo', 'worker timeout')):
+        return (
+            'El proceso no alcanzó a terminar dentro del tiempo disponible.',
+            'No lo inicies varias veces. Revisa primero si el resultado ya apareció; si no, usa una base más liviana o procesa menos unidades.',
+            True,
+        )
+    if any(token in text for token in ('connection', 'network', 'failed to fetch', 'conexión', 'conexion')):
+        return (
+            'Se interrumpió la comunicación con el servidor o con la base de datos.',
+            'Comprueba tu conexión, espera unos segundos y vuelve a intentarlo una sola vez.',
+            True,
+        )
+    if kind == 'error_base_datos':
+        return (
+            'La plataforma no pudo consultar o guardar la información en la base de datos.',
+            'No repitas cambios hasta verificar el resultado. Conserva la referencia y solicita revisión de la base de datos.',
+            False,
+        )
+    return (
+        'La plataforma encontró un problema inesperado y no pudo terminar esta acción.',
+        'No repitas la operación varias veces. Conserva la referencia mostrada para que soporte pueda identificar la causa exacta.',
+        False,
+    )
+
 def classify(*,code='',message='',status=500):
     key=str(code or '').strip().upper().replace(' ','_') or f'HTTP_{status}'
     text=(str(message or '')+' '+key).casefold()
@@ -20,12 +84,16 @@ def classify(*,code='',message='',status=500):
     elif any(x in text for x in ('archivo','excel','pdf','csv')): kind='error_archivo'
     known=explain(key)
     if known.get('confidence')=='confirmed':
-        cause=known['message'];solution='; '.join(known.get('actions') or []) or 'Revisa los datos indicados e intenta nuevamente.'
+        cause=known['message'];solution=' '.join(ACTION_LABELS.get(action, action) for action in (known.get('actions') or [])) or 'Revisa los datos indicados e intenta nuevamente.'
     else:
-        cause=redact(message)[:500] or 'La plataforma no recibió información suficiente para confirmar la causa.'
-        solutions={'error_permisos':'Verifica tu sesión, rol y UDS autorizadas.','error_usuario':'Corrige los campos señalados y vuelve a intentar.','error_datos':'Comprueba los datos obligatorios y el periodo seleccionado.','error_archivo':'Usa el archivo y la plantilla correspondientes a este módulo.','error_plantilla':'Verifica que exista una plantilla oficial vigente y con la estructura esperada.','error_red':'Comprueba la conexión y reintenta; la solicitud no debe asumirse como completada.','error_base_datos':'Conserva el incidente y solicita revisión técnica antes de repetir cambios.','error_integridad':'Revisa si el registro ya existe o entra en conflicto con información publicada.','error_backend':'Conserva el incidente para revisión técnica; no repitas una modificación sin verificar el resultado.'}
-        solution=solutions.get(kind,'Conserva el incidente y solicita revisión con el contexto mostrado.')
-    return {'code':key,'type':kind,'cause':cause,'solution':solution,'severity':'high' if int(status or 500)>=500 else 'medium','safe_retry':kind in {'error_red','error_usuario','error_datos'},'auto_correctable':False}
+        if int(status or 500) >= 500:
+            cause, solution, safe_retry = _plain_server_diagnosis(text, kind)
+        else:
+            cause=redact(message)[:500] or 'Falta información para completar la acción.'
+            solutions={'error_permisos':'Inicia sesión nuevamente y verifica que tu rol tenga permiso para esta unidad.','error_usuario':'Corrige los campos señalados y vuelve a intentarlo.','error_datos':'Comprueba los datos obligatorios, la unidad y el periodo seleccionado.','error_archivo':'Selecciona el archivo correspondiente a este módulo y verifica su formato.','error_plantilla':'Carga una plantilla oficial vigente con la estructura esperada.','error_red':'Comprueba la conexión y vuelve a intentarlo una sola vez.','error_integridad':'Revisa si el registro ya existe o entra en conflicto con información publicada.'}
+            solution=solutions.get(kind,'Revisa los datos mostrados y vuelve a intentarlo.')
+            safe_retry=kind in {'error_red','error_usuario','error_datos','error_archivo','error_plantilla'}
+    return {'code':key,'type':kind,'cause':cause,'solution':solution,'severity':'high' if int(status or 500)>=500 else 'medium','safe_retry':safe_retry if known.get('confidence')!='confirmed' else bool(known.get('retryable')),'auto_correctable':False}
 
 def record(database_path,*,tenant_id,user_id,module,action,status,code,message,request_id=None,context=None):
     diagnosis=classify(code=code,message=message,status=status)

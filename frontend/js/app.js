@@ -376,11 +376,7 @@ function mensajeErrorLogin(response, data, requestId) {
             : (data?.error || 'Demasiados intentos. Intenta nuevamente más tarde.');
     }
     if (response.status >= 500) {
-        const parts = [data?.error || 'Error técnico del servidor.'];
-        if (traceId) parts.push(`Código: ${traceId}.`);
-        if (logFile) parts.push(`Registro: ${logFile}.`);
-        else parts.push('Ejecuta DIAGNOSTICAR_LOGIN_TUNEL.bat y revisa data/logs.');
-        return parts.join(' ');
+        return construirMensajeErrorClaro(data, response.status, traceId || requestId);
     }
     return data?.error || `No se pudo iniciar sesión (HTTP ${response.status}; solicitud ${requestId}).`;
 }
@@ -943,6 +939,28 @@ function mostrarMensaje(id, texto, tipo = 'success') {
     box.classList.remove('hidden');
 }
 
+function construirMensajeErrorClaro(data = {}, status = 0, traceId = '') {
+    const diagnostic = data?.diagnostic && typeof data.diagnostic === 'object' ? data.diagnostic : {};
+    const cause = String(diagnostic.cause || data.error || data.mensaje || data.message || '').trim();
+    const solution = String(diagnostic.solution || '').trim();
+    const reference = String(data.incident_id || traceId || data.trace_id || '').trim();
+    const parts = [];
+
+    if (cause) parts.push(`Qué ocurrió: ${cause}`);
+    else if (Number(status) === 0) parts.push('Qué ocurrió: no fue posible comunicarse con la plataforma.');
+    else parts.push('Qué ocurrió: la plataforma no pudo completar esta acción.');
+
+    if (solution) parts.push(`Qué debe hacer: ${solution}`);
+    else if (Number(status) === 401) parts.push('Qué debe hacer: inicia sesión nuevamente.');
+    else if (Number(status) === 403) parts.push('Qué debe hacer: verifica que tu usuario tenga permiso para esta unidad o módulo.');
+    else if (Number(status) === 404) parts.push('Qué debe hacer: confirma que el registro o archivo todavía exista.');
+    else if (Number(status) >= 500) parts.push('Qué debe hacer: no repitas la operación varias veces y conserva la referencia para soporte.');
+    else parts.push('Qué debe hacer: revisa la información indicada y vuelve a intentarlo.');
+
+    if (reference) parts.push(`Referencia para soporte: ${reference}.`);
+    return parts.join(' ');
+}
+
 function notificarLiamErrorOperativo(mensaje, solucion = 'Vuelve a intentar la operación.') {
     document.dispatchEvent(new CustomEvent('liam:operational-error', {
         detail: {
@@ -1003,8 +1021,9 @@ function manejarRespuestaJson(respuesta) {
             limpiarAuth();
             mostrarLogin('Sesión vencida. Ingrese nuevamente.');
         }
-        return respuesta.json().then(json => {
-            const error = new Error(json.error || 'Error en el servidor');
+        return leerRespuestaJsonSegura(respuesta).then(json => {
+            const traceId = respuesta.headers.get('X-Trace-Id') || '';
+            const error = new Error(construirMensajeErrorClaro(json, respuesta.status, traceId));
             error.status = respuesta.status;
             error.data = json;
             throw error;

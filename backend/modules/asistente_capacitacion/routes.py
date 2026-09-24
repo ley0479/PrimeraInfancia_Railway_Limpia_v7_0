@@ -1033,7 +1033,10 @@ def register_asistente_capacitacion(app, database_path: str) -> None:
             code=str(payload.get('code') or payload.get('codigo') or f'HTTP_{response.status_code}')
             module=request.path.split('/')[2] if len(request.path.split('/'))>2 else 'plataforma'
             incident=record_incident(database_path,tenant_id=user.get('fundacion_id'),user_id=user.get('id'),module=module,action=request.endpoint or request.path,status=response.status_code,code=code,message=message,request_id=payload.get('request_id') or payload.get('trace_id'),context={'method':request.method})
-            payload['incident_id']=incident['incident_id'];payload['diagnostic']={k:incident[k] for k in ('type','cause','solution','severity','safe_retry','auto_correctable')}
+            existing_diagnostic=payload.get('diagnostic') if isinstance(payload.get('diagnostic'),dict) else None
+            payload['incident_id']=incident['incident_id']
+            if not existing_diagnostic:
+                payload['diagnostic']={k:incident[k] for k in ('type','cause','solution','severity','safe_retry','auto_correctable')}
             response.set_data(json.dumps(payload,ensure_ascii=False));response.headers['Content-Type']='application/json; charset=utf-8';response.headers['X-Liam-Incident-ID']=incident['incident_id']
         except Exception as exc:
             app.logger.warning('Centro de errores LIAM continuó sin registrar: %s',type(exc).__name__)

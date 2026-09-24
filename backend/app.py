@@ -12405,11 +12405,24 @@ def manejar_error_global(exc):
         pass
 
     if has_request_context() and str(request.path or '').startswith('/api/'):
+        try:
+            from modules.asistente_capacitacion.error_center import classify as clasificar_error_lia
+            diagnostico = clasificar_error_lia(
+                code='INTERNAL_SERVER_ERROR', message=str(exc), status=500,
+            )
+        except Exception:
+            diagnostico = {
+                'type': 'error_backend',
+                'cause': 'La plataforma encontró un problema inesperado y no pudo terminar esta acción.',
+                'solution': 'No repitas la operación varias veces. Conserva la referencia para solicitar revisión.',
+                'severity': 'high', 'safe_retry': False, 'auto_correctable': False,
+            }
         payload = {
-            'error': 'Error técnico del servidor.',
+            'error': f"No pudimos completar esta acción. {diagnostico['cause']}",
             'code': 'INTERNAL_SERVER_ERROR',
             'trace_id': trace_id,
             'instance_id': report.get('instance_id'),
+            'diagnostic': diagnostico,
         }
         # En desarrollo local/túnel se muestra únicamente una referencia
         # relativa; nunca la ruta absoluta del computador o del volumen.
