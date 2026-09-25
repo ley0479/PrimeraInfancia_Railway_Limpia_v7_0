@@ -5880,7 +5880,7 @@ def relacion_mes_generar():
     ensure_runtime_schema(cursor)
     filas = cursor.execute("""
         SELECT unidad_servicio AS unidad, grupo_etario, edad_meses, fecha_nacimiento,
-               estado, docente, datos_json, documento, nui, nombre_completo
+               estado, docente, datos_json, documento, documento AS nui, nombre_completo
         FROM master_ninos
         WHERE activo = 1 AND COALESCE(fundacion_id,1) = ?
     """, (fundacion_actual_id(),)).fetchall()

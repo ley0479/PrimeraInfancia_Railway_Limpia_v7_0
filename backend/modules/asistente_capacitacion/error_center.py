@@ -39,9 +39,9 @@ def _plain_server_diagnosis(text: str, kind: str) -> tuple[str, str, bool]:
         )
     if any(token in text for token in ('no such column', 'undefined column', 'column ') ):
         return (
-            'La información cargada no contiene una columna que esta función necesita.',
-            'Revisa el mapeo y confirma que estén relacionados los campos obligatorios antes de procesar nuevamente.',
-            True,
+            'La estructura interna de la base de datos no coincide con la versión que necesita esta función.',
+            'No necesitas cambiar el archivo ni el mapeo. Conserva la referencia y solicita a soporte actualizar la estructura de la base de datos.',
+            False,
         )
     if any(token in text for token in ('template', 'plantilla', 'no such file', 'file not found')):
         return (

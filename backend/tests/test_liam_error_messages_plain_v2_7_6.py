@@ -30,3 +30,15 @@ def test_timeout_avoids_repeated_submissions():
     assert 'tiempo' in result['cause']
     assert 'varias veces' in result['solution']
     assert result['safe_retry'] is True
+
+
+def test_server_missing_column_is_explained_as_internal_schema_problem():
+    result = classify(
+        code='INTERNAL_SERVER_ERROR',
+        message='psycopg.errors.UndefinedColumn: column nui does not exist',
+        status=500,
+    )
+
+    assert 'estructura interna' in result['cause'].lower()
+    assert 'no necesitas cambiar el archivo ni el mapeo' in result['solution'].lower()
+    assert result['safe_retry'] is False
