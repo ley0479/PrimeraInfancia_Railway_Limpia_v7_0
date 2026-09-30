@@ -31,5 +31,14 @@ Los archivos suministrados en Descargas no se modifican. Las copias versionadas 
 - Intenciones y política de acciones Liam: `PASS`.
 - Prueba visual contextual previa en diez viewports: `PASS`; no se modificó UI en esta activación.
 - `git diff --check`: `PASS`.
-- Verificación productiva autenticada: pendiente.
+- Revisión productiva con plantillas: `8067b70`.
+- Despliegue de activación Railway: `981caed4-1b96-4e6e-af8a-ccfb90745150`, estado `Online`.
+- Las cuatro variables previstas se comprobaron en producción con sus valores exactos.
+- Existencia de RFPP y F2 dentro del contenedor: `PASS` (`True, True`).
+- Healthcheck y controlador frontend: `200 PASS`.
+- API sin sesión: `401 PASS`; conserva autenticación obligatoria.
+- Logs de inicio: PostgreSQL, archivos, módulos, rutas, roles, formatos, plantillas, migraciones y baseline funcional `PASS`.
+- Datos preexistentes: el inicializador reportó 1588 beneficiarios y 109 UDS sin modificar ni borrar.
+- Perfiles aislados creados y activados: fundaciones 1, 2 y 3; código `SERVICIO_INTEGRADO_DESNUTRICION_EXTRAMURAL`; estado `ACTIVO`; orden `PRIMER_NOMBRE`.
+- Verificación productiva mediante navegador con sesión humana: `NO EJECUTADO`; requiere que un usuario autorizado inicie sesión.
 - Reversión funcional: establecer ambas banderas `ENABLE_ICBF_MULTIPROGRAM*` en `false`. Esto no borra datos ni requiere restaurar la plataforma.
