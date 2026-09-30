@@ -3701,6 +3701,21 @@
                         <div class="mt-5 grid gap-3 sm:grid-cols-3"><input id="ps-unit" class="ps-input" placeholder="Filtrar por UCA"><select id="ps-view" class="ps-input"><option value="coordinacion">Vista coordinación</option><option value="rol">Mi intervención</option></select><div id="ps-coordination-note" class="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3 text-xs text-violet-200">Coordinación puede validar y cerrar; el profesional registra y sustenta.</div></div>
                         <div id="ps-stats" class="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5"></div>
                     </div>
+                    <div class="ps-card p-5 space-y-4" id="ps-f23-panel">
+                        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+                            <div><p class="text-xs uppercase tracking-[.18em] text-violet-300">Ficha oficial F23.MO12.PP · versión 2</p><h3 class="mt-1 font-semibold text-white">Caracterización por unidad de servicio</h3><p class="mt-1 text-xs text-slate-400">Precarga la Base Maestra, conserva pendientes y genera XLSM sin inventar respuestas.</p></div>
+                            <span id="ps-f23-template-status" class="ps-badge ps-yellow">Comprobando plantilla</span>
+                        </div>
+                        <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+                            <select id="ps-f23-unit" class="ps-input"><option value="">Seleccione una UDS/UCA</option></select>
+                            <input id="ps-f23-date" type="date" class="ps-input">
+                            <button id="ps-f23-prepare" type="button" class="ps-btn primary">Preparar fichas</button>
+                        </div>
+                        <div class="grid gap-3 lg:grid-cols-[minmax(260px,.7fr)_minmax(0,1.3fr)]">
+                            <div class="space-y-3"><select id="ps-f23-session" class="ps-input"><option value="">Sesiones preparadas</option></select><div id="ps-f23-participants" class="space-y-2 max-h-96 overflow-y-auto"><div class="ps-empty">Selecciona o prepara una sesión.</div></div><button id="ps-f23-generate-all" type="button" class="ps-btn secondary w-full" disabled>Generar consolidado de la unidad</button></div>
+                            <form id="ps-f23-form" class="hidden space-y-3"><div class="flex flex-wrap items-center justify-between gap-2"><div><h4 id="ps-f23-person-name" class="font-semibold text-white"></h4><p id="ps-f23-person-summary" class="text-xs text-slate-400"></p></div><select id="ps-f23-person-type" class="ps-input w-auto"><option value="NN">Niña o niño</option><option value="MG">Mujer gestante</option></select></div><div class="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px]"><input id="ps-f23-field-search" class="ps-input" placeholder="Buscar pregunta pendiente"><select id="ps-f23-field-filter" class="ps-input"><option value="PENDIENTES">Pendientes</option><option value="TODOS">Todos los campos</option></select></div><div id="ps-f23-fields" class="space-y-3 max-h-[34rem] overflow-y-auto pr-1"></div><div class="flex flex-wrap gap-2"><button type="submit" class="ps-btn primary">Guardar respuestas</button><button id="ps-f23-generate-person" type="button" class="ps-btn secondary">Generar ficha individual</button></div></form>
+                        </div>
+                    </div>
                     <div class="grid gap-5 xl:grid-cols-[minmax(310px,.65fr)_minmax(0,1.35fr)]">
                         <div class="space-y-5">
                             <div class="ps-card p-5"><h3 class="font-semibold text-white">Resumen por UCA</h3><div id="ps-units" class="mt-4 space-y-3"></div></div>
@@ -4014,7 +4029,7 @@
     <script src="./js/modules/ambientes-protectores.js?v=2.7.0"></script>
     <script src="./js/modules/familias-redes.js?v=2.6.0"></script>
     <script src="./js/modules/centro-planeacion.js?v=2.7.0"></script>
-    <script src="./js/modules/componente-psicosocial.js?v=2.7.0"></script>
+    <script src="./js/modules/componente-psicosocial.js?v=2.7.0-f23-1"></script>
     <script src="./js/modules/integrity-stability.js?v=2.6.1"></script>
     <script src="./js/modules/idp-documental.js?v=2.7.3-liam-events-1"></script>
     <script src="./js/modules/centro-documental.js?v=2.7.2-doc-center-3"></script>

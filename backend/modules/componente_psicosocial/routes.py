@@ -1,12 +1,15 @@
 """API del componente psicosocial especializado."""
 from __future__ import annotations
 
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, g, jsonify, request, send_file
 
 from modules.seguridad.services import require_roles
 from .repository import ComponentePsicosocialRepository
+from .f23_service import F23Service
 from .services import COORDINATION_ROLES, READ_ROLES, normalize, parse_json, unit_key
 
 
@@ -35,6 +38,7 @@ def _can_access_unit(unit:str|None,user:dict[str,Any])->bool:
 
 def register_componente_psicosocial(app,database_path:str,data_dir:str,output_folder:str)->None:
     repo=ComponentePsicosocialRepository(database_path,data_dir,output_folder);repo.init_schema()
+    f23=F23Service(database_path,output_folder);f23.init_schema()
     bp=Blueprint("componente_psicosocial",__name__,url_prefix="/api/psicosocial")
 
     def _require_case(case_id:int,user:dict[str,Any])->dict[str,Any]:
@@ -45,6 +49,90 @@ def register_componente_psicosocial(app,database_path:str,data_dir:str,output_fo
 
     @bp.route("/salud",methods=["GET"])
     def health():return jsonify({"status":"ok","module":"componente_psicosocial","schema_version":1,"version":"2.7.0"}),200
+
+    @bp.route("/f23/configuracion",methods=["GET"])
+    @require_roles(*READ_ROLES)
+    def f23_configuration():
+        user=_user();data=f23.configuration(user["fundacion_id"])
+        allowed=_allowed_units(user)
+        if allowed is not None:data["unidades"]=[item for item in data["unidades"] if _can_access_unit(item.get("unidad"),user)]
+        return jsonify(data),200
+
+    @bp.route("/f23/campos",methods=["GET"])
+    @require_roles(*READ_ROLES)
+    def f23_fields():return jsonify({"campos":f23.field_catalog()}),200
+
+    @bp.route("/f23/sesiones",methods=["GET","POST"])
+    @require_roles(*READ_ROLES)
+    def f23_sessions():
+        user=_user()
+        if request.method=="GET":
+            rows=[item for item in f23.list_sessions(user["fundacion_id"]) if _can_access_unit(item.get("unidad"),user)]
+            return jsonify({"sesiones":rows}),200
+        data=_payload();unit=str(data.get("unidad") or "").strip()
+        if not _can_access_unit(unit,user):return jsonify({"error":"No tienes permiso sobre esta UCA."}),403
+        try:return jsonify({"message":"Caracterización preparada desde la Base Maestra publicada.","sesion":f23.create_session(user["fundacion_id"],unit,str(data.get("fecha_referencia") or ""),user.get("id"))}),201
+        except ValueError as exc:return jsonify({"error":str(exc)}),400
+
+    @bp.route("/f23/sesiones/<int:session_id>",methods=["GET"])
+    @require_roles(*READ_ROLES)
+    def f23_session(session_id:int):
+        user=_user()
+        try:
+            data=f23.session(user["fundacion_id"],session_id)
+            if not _can_access_unit(data.get("unidad"),user):return jsonify({"error":"No tienes permiso sobre esta UCA."}),403
+            return jsonify({"sesion":data}),200
+        except LookupError as exc:return jsonify({"error":str(exc)}),404
+
+    @bp.route("/f23/participantes/<int:record_id>",methods=["PATCH"])
+    @require_roles(*READ_ROLES)
+    def f23_participant_update(record_id:int):
+        user=_user()
+        try:
+            context=f23.participant_context(user["fundacion_id"],record_id)
+            if not _can_access_unit(context.get("unidad"),user):return jsonify({"error":"No tienes permiso sobre esta UCA."}),403
+            item=f23.update_participant(user["fundacion_id"],record_id,_payload(),user.get("id"))
+            return jsonify({"message":"Respuestas guardadas sin convertir vacíos en respuestas negativas.","participante":item}),200
+        except LookupError as exc:return jsonify({"error":str(exc)}),404
+        except ValueError as exc:return jsonify({"error":str(exc)}),400
+
+    @bp.route("/f23/sesiones/<int:session_id>/revisar",methods=["POST"])
+    @require_roles(*COORDINATION_ROLES)
+    def f23_review(session_id:int):
+        user=_user()
+        try:
+            data=f23.session(user["fundacion_id"],session_id)
+            pending=sum(item["pendientes_total"] for item in data["participantes"])
+            if pending:return jsonify({"error":f"No se puede validar: permanecen {pending} campos pendientes o por confirmar."}),409
+            now=datetime.now().isoformat(timespec='seconds')
+            with f23.connect() as conn:
+                conn.execute("UPDATE f23_sesiones SET estado='VALIDADA',revisado_por=?,fecha_revision=?,fecha_actualizacion=? WHERE id=? AND fundacion_id=?",(user.get("id"),now,now,session_id,user["fundacion_id"]));conn.commit()
+            return jsonify({"message":"Caracterización validada mediante revisión humana."}),200
+        except LookupError as exc:return jsonify({"error":str(exc)}),404
+
+    @bp.route("/f23/sesiones/<int:session_id>/generar",methods=["POST"])
+    @require_roles(*READ_ROLES)
+    def f23_generate(session_id:int):
+        user=_user();data=_payload()
+        try:
+            session=f23.session(user["fundacion_id"],session_id)
+            if not _can_access_unit(session.get("unidad"),user):return jsonify({"error":"No tienes permiso sobre esta UCA."}),403
+            result=f23.generate(user["fundacion_id"],session_id,user.get("id"),int(data.get("participante_registro_id") or 0) or None)
+            return jsonify({"message":"Archivo generado. Si contiene pendientes queda identificado como borrador.","generacion":result}),201
+        except LookupError as exc:return jsonify({"error":str(exc)}),404
+        except ValueError as exc:return jsonify({"error":str(exc)}),409
+
+    @bp.route("/f23/generaciones/<int:generation_id>/descargar",methods=["GET"])
+    @require_roles(*READ_ROLES)
+    def f23_download(generation_id:int):
+        user=_user()
+        try:
+            item=f23.generation(user["fundacion_id"],generation_id);path=Path(item["ruta_archivo"]).resolve()
+            if not _can_access_unit(item.get("unidad"),user):return jsonify({"error":"No tienes permiso sobre esta UCA."}),403
+            allowed=Path(output_folder).resolve()
+            if allowed not in path.parents or not path.is_file():raise LookupError("El archivo generado ya no está disponible.")
+            return send_file(path,as_attachment=True,download_name=item["nombre_archivo"])
+        except LookupError as exc:return jsonify({"error":str(exc)}),404
 
     @bp.route("/sincronizar",methods=["POST"])
     @require_roles(*READ_ROLES)
