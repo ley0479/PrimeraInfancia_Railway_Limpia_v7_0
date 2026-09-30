@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /frontend/
+Disallow: /login
+Disallow: /docs/
+Disallow: /uploads/
+Disallow: /outputs/
+
+Sitemap: https://primerainfancia.pro/sitemap.xml

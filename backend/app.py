@@ -11929,6 +11929,20 @@ def _project_path(*parts):
     return os.path.abspath(os.path.join(base, *parts))
 
 
+@app.route('/robots.txt')
+def servir_robots_publico():
+    response = send_from_directory(_project_path('frontend'), 'robots.txt', mimetype='text/plain')
+    response.headers['Cache-Control'] = 'public, max-age=3600'
+    return response
+
+
+@app.route('/sitemap.xml')
+def servir_sitemap_publico():
+    response = send_from_directory(_project_path('frontend'), 'sitemap.xml', mimetype='application/xml')
+    response.headers['Cache-Control'] = 'public, max-age=3600'
+    return response
+
+
 @app.route('/')
 @app.route('/frontend')
 @app.route('/frontend/')
