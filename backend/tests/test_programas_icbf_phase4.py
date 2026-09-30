@@ -13,6 +13,10 @@ def require(condition, message):
 
 
 def main():
+    routes_source = (Path(__file__).parents[1] / "modules" / "programas_icbf" / "routes.py").read_text(encoding="utf-8")
+    frontend_source = (Path(__file__).parents[2] / "frontend" / "js" / "modules" / "programas-icbf.js").read_text(encoding="utf-8")
+    require('generaciones/{generation_id}/paquete' in routes_source and 'zipfile.ZipFile' in routes_source, "Falta la descarga empaquetada para generaciones multipágina")
+    require('result.paquete_descarga' in frontend_source, "El frontend todavía intenta descargar cada página por separado")
     for role in ("SUPERADMIN", "GERENTE", "COORDINADOR", "AUXILIAR_ADMINISTRATIVO", "NUTRICIONISTA"):
         require(role_allowed_for_path("/api/programas-icbf/perfiles", role), f"La barrera central bloquea el programa para {role}")
     for role in ("DOCENTE", "PSICOSOCIAL"):

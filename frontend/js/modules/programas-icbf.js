@@ -51,8 +51,10 @@
     try {
       byId('sn-icbf-generate').disabled = true; status('Preparando copias verificables…');
       const result = await request(`/api/programas-icbf/cargas/${loadId}/generar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      status(`Generación ${result.id}: ${result.archivos?.length || 0} archivo(s). Los hechos pendientes permanecen vacíos.`);
-      for (const file of result.archivos || []) await window.descargarArchivoAutenticado(`${base()}${file.descarga}`);
+      const files = result.archivos || [];
+      status(`Generación ${result.id}: ${files.length} archivo(s). Los hechos pendientes permanecen vacíos.`);
+      if (result.paquete_descarga) await window.descargarArchivoAutenticado(`${base()}${result.paquete_descarga}`);
+      else if (files[0]) await window.descargarArchivoAutenticado(`${base()}${files[0].descarga}`);
       return { ok: true, generation: result };
     } catch (error) { status(error.message, true); return { ok: false, error: error.message }; }
     finally { byId('sn-icbf-generate').disabled = false; }

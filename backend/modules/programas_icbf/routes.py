@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import zipfile
 from pathlib import Path
 
 from flask import Blueprint, g, jsonify, request, send_file
@@ -38,6 +39,7 @@ def register_programas_icbf(app, database_path: str, output_folder: str | None =
             {**{key: value for key, value in file.items() if key != "path"}, "descarga": f"/api/programas-icbf/generaciones/{generation_id}/archivos/{index}"}
             for index, file in enumerate(data.get("archivos") or [])
         ]
+        data["paquete_descarga"] = f"/api/programas-icbf/generaciones/{generation_id}/paquete" if len(data["archivos"]) > 1 else None
         return data
 
     @bp.get("/perfiles")
@@ -186,6 +188,32 @@ def register_programas_icbf(app, database_path: str, output_folder: str | None =
             if allowed not in path.parents or not path.is_file():
                 raise ValueError("Archivo no disponible en el almacenamiento autorizado.")
             return send_file(path, as_attachment=True, download_name=files[file_index]["filename"])
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @bp.get("/generaciones/<int:generation_id>/paquete")
+    @require_roles(*ROLES)
+    def download_generation_package(generation_id):
+        tenant, _ = context()
+        try:
+            generation = repo.get_generation(tenant, generation_id)
+            files = generation["archivos"]
+            if len(files) < 2:
+                raise ValueError("Esta generación no requiere un paquete de archivos.")
+            allowed = Path(os.fspath(tenant_path(output_folder or app.config.get("OUTPUT_FOLDER") or "outputs", "programas_icbf"))).resolve()
+            resolved = []
+            for item in files:
+                path = Path(item["path"]).resolve()
+                if allowed not in path.parents or not path.is_file():
+                    raise ValueError("Uno o más archivos del paquete ya no están disponibles.")
+                resolved.append((path, str(item.get("filename") or path.name)))
+            package = resolved[0][0].parent / f"paquete_{generation_id}_{generation['formato']}.zip"
+            temporary = package.with_suffix(".zip.tmp")
+            with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                for path, filename in resolved:
+                    archive.write(path, arcname=filename)
+            temporary.replace(package)
+            return send_file(package, as_attachment=True, download_name=f"{generation['formato']}_generacion_{generation_id}.zip")
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
 
