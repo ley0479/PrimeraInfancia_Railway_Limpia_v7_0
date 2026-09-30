@@ -26,4 +26,11 @@ La portada declara título, descripción, canonical, Open Graph y datos estructu
 - Sintaxis del controlador Liam: `PASS`; el archivo no fue modificado.
 - `git diff --check`: `PASS` con avisos informativos de finales de línea.
 - Prueba heredada `test_responsive_device_stability.py`: `FAIL` preexistente porque exige el marcador `2.3.4-responsive-stability`, mientras la revisión de partida ya utiliza `2.3.5-responsive-conservation`. No se modificó ni debilitó esa prueba dentro de este alcance.
-- Respuesta productiva de portada, robots y sitemap: pendiente de despliegue.
+- Revisión funcional publicada: `1ce6fc9`.
+- Despliegue Railway: `1f7b7248-7557-4f1a-8f29-e2db7ae71fcc`, estado `Online`.
+- Healthcheck, portada, favicon, `robots.txt` y `sitemap.xml`: `200 PASS`.
+- Tipos públicos: robots `text/plain`, sitemap `application/xml`, favicon `image/vnd.microsoft.icon`.
+- Sitemap analizado como XML: raíz `urlset`, una URL canónica, `https://primerainfancia.pro/`.
+- Solicitud con agente `Googlebot` a la portada: `200 PASS`.
+- Metadatos productivos: título, descripción, robots, canonical, Open Graph y JSON-LD presentes.
+- Registro y envío en Google Search Console: `NO EJECUTADO`; requiere acceso del propietario a una cuenta Google y no puede acreditarse desde el servidor.
