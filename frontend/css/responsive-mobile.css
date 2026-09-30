@@ -1,6 +1,6 @@
 /*
  * Primera Infancia — Capa responsiva para celulares y tabletas.
- * Versión 2.3.4-responsive-stability.
+ * Versión 2.3.5-responsive-conservation.
  *
  * Alcance: presentación y navegación móvil.
  * No modifica rutas, permisos, formularios, IDs, lógica de negocio ni formatos.
@@ -23,14 +23,12 @@
 
 html {
     max-width: 100%;
-    overflow-x: hidden;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
 }
 
 body {
     max-width: 100%;
-    overflow-x: hidden;
 }
 
 #app-shell {
@@ -168,7 +166,8 @@ table.pi-responsive-wide-table {
 
 /* Controles creados por la capa móvil. */
 #pi-mobile-menu-toggle,
-#pi-mobile-menu-overlay {
+#pi-mobile-menu-overlay,
+#pi-mobile-menu-close {
     display: none;
 }
 
@@ -240,6 +239,26 @@ body.pi-mobile-menu-open #pi-mobile-menu-toggle .pi-mobile-menu-icon::after {
     transition: opacity 180ms ease;
 }
 
+#pi-mobile-menu-close {
+    width: 100%;
+    min-height: var(--pi-responsive-touch-target);
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 0.75rem;
+    background: rgba(15, 23, 42, 0.82);
+    color: rgb(226 232 240);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+#pi-mobile-menu-close:focus-visible {
+    outline: 3px solid rgba(34, 211, 238, 0.55);
+    outline-offset: 2px;
+}
+
 /* Celulares pequeños */
 @media (max-width: 480px) {
     #login-screen {
@@ -271,10 +290,17 @@ body.pi-mobile-menu-open #pi-mobile-menu-toggle .pi-mobile-menu-icon::after {
         gap: 0.25rem !important;
     }
 
-    /* En 320–480 px se conservan solo navegación, título y salida. */
+    /* Los controles del encabezado se conservan y pasan a una segunda fila. */
+    #app-shell > main > header > div:last-child {
+        grid-column: 1 / -1;
+        width: 100%;
+        display: flex !important;
+        justify-content: space-between;
+    }
+
     #app-shell > main > header > div:last-child > div:first-child,
     #app-shell > main > header > div:last-child > div:last-child {
-        display: none !important;
+        display: flex !important;
     }
 
     #app-shell > main > header > div:last-child > button {
@@ -486,6 +512,10 @@ body.pi-mobile-menu-open #pi-mobile-menu-toggle .pi-mobile-menu-icon::after {
         display: block;
     }
 
+    #pi-mobile-menu-close {
+        display: inline-flex;
+    }
+
     body.pi-mobile-menu-open #pi-mobile-menu-overlay {
         opacity: 1;
         pointer-events: auto;
@@ -512,6 +542,8 @@ body.pi-mobile-menu-open #pi-mobile-menu-toggle .pi-mobile-menu-icon::after {
         visibility: hidden;
         transition: transform 220ms ease, visibility 220ms step-end;
         will-change: transform;
+        overflow-y: auto;
+        overscroll-behavior: contain;
     }
 
     body.pi-mobile-menu-open #sidebar-institucional {
@@ -548,9 +580,38 @@ body.pi-mobile-menu-open #pi-mobile-menu-toggle .pi-mobile-menu-icon::after {
         flex: 0 0 auto;
     }
 
-    .pi-menu-item span,
-    .pi-menu-placeholder span {
+    /* El modo compacto pertenece a PC: el panel móvil siempre muestra nombres. */
+    #sidebar-institucional .pi-menu-group-toggle {
+        justify-content: space-between !important;
+        padding: 0.62rem 0.7rem !important;
+        font-size: 0.72rem !important;
+    }
+
+    #sidebar-institucional .pi-menu-item,
+    #sidebar-institucional .pi-menu-placeholder {
+        justify-content: flex-start !important;
+        min-height: var(--pi-responsive-touch-target);
+        padding: 0.48rem 0.62rem !important;
+        font-size: 0.82rem !important;
+    }
+
+    #sidebar-institucional .pi-menu-group-toggle span,
+    #sidebar-institucional .pi-menu-item span,
+    #sidebar-institucional .pi-menu-placeholder span {
+        display: flex;
+        font-size: inherit !important;
         white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        line-height: 1.25;
+    }
+
+    #sidebar-institucional .pi-menu-item small,
+    #sidebar-institucional .pi-menu-placeholder small {
+        max-width: 42%;
+        white-space: normal;
+        text-align: center;
+        overflow-wrap: anywhere;
     }
 }
 

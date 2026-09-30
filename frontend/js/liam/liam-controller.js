@@ -612,6 +612,24 @@
       );
       return true;
     }
+    if (action.type === "review_icbf_program") {
+      if (typeof window.mostrarSeccion !== "function" || !window.ICBFProgramas)
+        throw new Error("El contexto multiprograma no está disponible.");
+      window.mostrarSeccion("salud-nutricion");
+      await window.ICBFProgramas.load();
+      window.LIAM_ANIMATION?.highlight("salud-nutricion.icbf.context", "Contexto del Servicio Integrado");
+      auditClientAction("review_icbf_program", "completed", requestId, "salud-nutricion");
+      return "El contexto del Servicio Integrado fue actualizado.";
+    }
+    if (action.type === "prepare_icbf_formats") {
+      if (typeof window.mostrarSeccion !== "function" || !window.ICBFProgramas)
+        throw new Error("El generador multiprograma no está disponible.");
+      window.mostrarSeccion("salud-nutricion");
+      const generated = await window.ICBFProgramas.generate();
+      if (!generated?.ok) throw new Error(generated?.error || "No se confirmó la preparación del formato.");
+      auditClientAction("prepare_icbf_formats", "completed", requestId, "salud-nutricion");
+      return "La preparación fue solicitada con el contexto visible y validado.";
+    }
     if (action.type === "download_bienestarina") {
       if (typeof window.descargarBienestarinaAlpha62 !== "function")
         throw new Error("El generador de Bienestarina no está disponible.");

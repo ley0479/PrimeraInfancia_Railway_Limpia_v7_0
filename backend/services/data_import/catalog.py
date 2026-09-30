@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-CATALOG_VERSION = "2026.08.1"
+CATALOG_VERSION = "2026.08.2"
 
 CANONICAL_FIELDS = {
     "tenant.id": {"aliases": ["tenant id", "fundacion id", "corporacion id"]},
@@ -11,6 +11,8 @@ CANONICAL_FIELDS = {
     "contrato.numero": {"aliases": ["numero contrato", "contrato numero", "contrato"]},
     "contrato.regional": {"aliases": ["regional contrato", "contrato regional"]},
     "contrato.modalidad": {"aliases": ["modalidad contrato", "modalidad del contrato"]},
+    "programa.modalidad": {"aliases": ["modalidad programa", "modalidad del programa", "modalidad del servicio"]},
+    "programa.comunidad": {"aliases": ["comunidad del programa", "comunidad asignada", "comunidad"]},
     "regional.nombre": {"aliases": ["nombre regional", "regional", "nombre de la regional de la unidad de servicio"]},
     "departamento.codigo": {"aliases": ["codigo departamento", "codigo dane departamento"]},
     "departamento.nombre": {"aliases": ["nombre departamento", "departamento"]},
@@ -46,6 +48,7 @@ CANONICAL_FIELDS = {
     "acudiente.telefono": {"aliases": ["telefono acudiente", "celular acudiente", "contacto acudiente"]},
     "acudiente.direccion": {"aliases": ["direccion acudiente", "direccion familia"]},
     "acudiente.parentesco": {"aliases": ["parentesco acudiente", "parentesco"]},
+    "acudiente.tipo_responsable": {"aliases": ["tipo de responsable", "tipo responsable", "clase de responsable"]},
     "nutricion.fecha_medicion": {"aliases": ["fecha medicion", "fecha toma", "fecha valoracion"]},
     "nutricion.peso_kg": {"aliases": ["peso kg", "peso"]},
     "nutricion.talla_cm": {"aliases": ["talla cm", "talla", "estatura"]},

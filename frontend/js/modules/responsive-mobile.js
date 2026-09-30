@@ -7,12 +7,15 @@
     const media = window.matchMedia(MOBILE_QUERY);
     let menuToggle = null;
     let menuOverlay = null;
+    let menuClose = null;
     let sidebar = null;
+    let mainContent = null;
     let ultimoFoco = null;
     let enhancementScheduled = false;
 
     function crearControlesMenu() {
         const header = document.querySelector('#app-shell > main > header');
+        mainContent = document.querySelector('#app-shell > main');
         sidebar = document.getElementById('sidebar-institucional');
         if (!header || !sidebar) return;
 
@@ -36,6 +39,16 @@
             document.body.appendChild(menuOverlay);
         }
 
+        menuClose = document.getElementById('pi-mobile-menu-close');
+        if (!menuClose) {
+            menuClose = document.createElement('button');
+            menuClose.type = 'button';
+            menuClose.id = 'pi-mobile-menu-close';
+            menuClose.setAttribute('aria-label', 'Cerrar menú principal');
+            menuClose.textContent = 'Cerrar menú';
+            sidebar.insertBefore(menuClose, sidebar.firstChild);
+        }
+
         if (menuToggle.dataset.piResponsiveBound !== '1') {
             menuToggle.dataset.piResponsiveBound = '1';
             menuToggle.addEventListener('click', function () {
@@ -49,12 +62,20 @@
             menuOverlay.addEventListener('click', function () { cerrarMenu(true); });
         }
 
+        if (menuClose.dataset.piResponsiveBound !== '1') {
+            menuClose.dataset.piResponsiveBound = '1';
+            menuClose.addEventListener('click', function () { cerrarMenu(true); });
+        }
+
         if (sidebar.dataset.piResponsiveBound !== '1') {
             sidebar.dataset.piResponsiveBound = '1';
             sidebar.addEventListener('click', function (event) {
                 if (!media.matches) return;
                 const opcion = event.target.closest('.pi-menu-item, [data-menu-item]');
-                if (opcion) cerrarMenu(true);
+                if (opcion) {
+                    cerrarMenu(false);
+                    window.setTimeout(enfocarContenidoActivo, 0);
+                }
             });
         }
 
@@ -69,8 +90,9 @@
         menuToggle?.setAttribute('aria-label', 'Cerrar menú principal');
         menuOverlay?.setAttribute('aria-hidden', 'false');
         sidebar.setAttribute('aria-hidden', 'false');
+        mainContent?.setAttribute('inert', '');
         window.setTimeout(function () {
-            const primerControl = sidebar.querySelector('.pi-menu-item:not(.hidden), .pi-menu-group-toggle');
+            const primerControl = menuClose || sidebar.querySelector('.pi-menu-item:not(.hidden), .pi-menu-group-toggle');
             primerControl?.focus({ preventScroll: true });
         }, 230);
     }
@@ -81,8 +103,33 @@
         menuToggle?.setAttribute('aria-label', 'Abrir menú principal');
         menuOverlay?.setAttribute('aria-hidden', 'true');
         if (sidebar && media.matches) sidebar.setAttribute('aria-hidden', 'true');
+        mainContent?.removeAttribute('inert');
         if (restaurarFoco && ultimoFoco && typeof ultimoFoco.focus === 'function') {
             ultimoFoco.focus({ preventScroll: true });
+        }
+    }
+
+    function enfocarContenidoActivo() {
+        const section = document.querySelector('#app-shell > main section:not(.hidden)');
+        const heading = section?.querySelector('h1, h2, h3');
+        if (!heading) return;
+        heading.setAttribute('tabindex', '-1');
+        heading.focus({ preventScroll: true });
+    }
+
+    function contenerFocoMenu(event) {
+        if (event.key !== 'Tab' || !media.matches || !document.body.classList.contains('pi-mobile-menu-open') || !sidebar) return;
+        const controls = Array.from(sidebar.querySelectorAll('button:not([disabled]):not(.hidden), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+            .filter(function (control) { return control.getClientRects().length > 0; });
+        if (!controls.length) return;
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
         }
     }
 
@@ -212,6 +259,7 @@
             if (event.key === 'Escape' && document.body.classList.contains('pi-mobile-menu-open')) {
                 cerrarMenu(true);
             }
+            contenerFocoMenu(event);
         });
 
         if (typeof media.addEventListener === 'function') media.addEventListener('change', actualizarModoMenu);

@@ -36,6 +36,8 @@ RULES = {
     'get_health_themes': ActionRule('get_health_themes','read',ALL_AUTHENTICATED),
     'get_health_activity_gaps': ActionRule('get_health_activity_gaps','read',ALL_AUTHENTICATED),
     'get_health_report_status': ActionRule('get_health_report_status','read',ALL_AUTHENTICATED),
+    'review_icbf_program': ActionRule('review_icbf_program','read',ALL_AUTHENTICATED,description='Abrir y actualizar el contexto multiprograma autorizado.'),
+    'prepare_icbf_formats': ActionRule('prepare_icbf_formats','generation',frozenset({'SUPERADMIN','GERENTE','COORDINADOR','NUTRICIONISTA','AUXILIAR_ADMINISTRATIVO'}),'explicit',description='Preparar RFPP/F2 con el contexto seleccionado y validado.'),
     'compare_periods': ActionRule('compare_periods','read',ALL_AUTHENTICATED),
     'build_custom_report_preview': ActionRule('build_custom_report_preview','read',ALL_AUTHENTICATED),
     'supervise_deliverables': ActionRule('supervise_deliverables','read',ALL_AUTHENTICATED),
