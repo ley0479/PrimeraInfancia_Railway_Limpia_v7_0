@@ -113,6 +113,7 @@ PATH_ROLE_RULES = sorted([
     ('/api/calidad-datos', DATA_OPERATIONS),
     ('/api/base-maestra', DATA_OPERATIONS),
     ('/api/importaciones', DATA_OPERATIONS),
+    ('/api/programas-icbf', DATA_OPERATIONS),
     ('/api/cruce-bases', frozenset({'SUPERADMIN', 'GERENTE', 'COORDINADOR', 'DOCENTE', 'NUTRICIONISTA'})),
     ('/api/planeacion-pedagogica', PEDAGOGICAL),
     ('/api/gestion-pedagogica', PEDAGOGICAL),

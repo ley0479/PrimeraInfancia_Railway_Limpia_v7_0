@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 from modules.programas_icbf.repository import ProgramasIcbfRepository
+from modules.seguridad.services import role_allowed_for_path
 
 
 def require(condition, message):
@@ -12,6 +13,10 @@ def require(condition, message):
 
 
 def main():
+    for role in ("SUPERADMIN", "GERENTE", "COORDINADOR", "AUXILIAR_ADMINISTRATIVO", "NUTRICIONISTA"):
+        require(role_allowed_for_path("/api/programas-icbf/perfiles", role), f"La barrera central bloquea el programa para {role}")
+    for role in ("DOCENTE", "PSICOSOCIAL"):
+        require(not role_allowed_for_path("/api/programas-icbf/perfiles", role), f"La barrera central amplió el programa a {role}")
     with tempfile.TemporaryDirectory() as temporary:
         repo = ProgramasIcbfRepository(str(Path(temporary) / "profiles.sqlite3"))
         repo.init_schema()
