@@ -81,7 +81,9 @@ class F23Service:
         seed = Path(__file__).resolve().parents[2] / "seed_data" / "caracterizacion_f23"
         self.template = seed / "F23_MO12_PP_v2.xlsm"
         self.mapping_path = seed / "mapeo_campos_v2.json"
+        self.catalogs_path = seed / "catalogos_ui_v2.json"
         self.mapping = _parse(self.mapping_path.read_text(encoding="utf-8"), {})
+        self.catalogs = _parse(self.catalogs_path.read_text(encoding="utf-8"), {}) if self.catalogs_path.is_file() else {}
         self.fields = list(self.mapping.get("fields") or [])
 
     def connect(self):
@@ -266,8 +268,14 @@ class F23Service:
             ui["control"] = "date"
         if field_id in self.YES_NO_FIELDS:
             ui.update(control="select", options=["SI", "NO"])
-        if field_id in {"NN-002", "MG-002", "NN-013", "MG-021"}:
-            ui.update(control="select", options=self.COLOMBIA_DEPARTMENTS)
+        if field_id in {"NN-002", "MG-002"}:
+            ui.update(control="select", catalog_key="regionales")
+        elif field_id in {"NN-003", "MG-003"}:
+            ui.update(control="select", catalog_key="regional_centros", depends_on="NN-002" if field_id == "NN-003" else "MG-002")
+        elif field_id in {"NN-013", "MG-021"}:
+            ui.update(control="select", catalog_key="departamentos")
+        elif field_id in {"NN-014", "MG-022"}:
+            ui.update(control="select", catalog_key="departamento_municipios", depends_on="NN-013" if field_id == "NN-014" else "MG-021")
         elif field_id in {"NN-016", "MG-011"}:
             ui.update(control="select", options=self.DOCUMENT_TYPES_NN)
         elif field_id in {"NN-020", "MG-015"}:
@@ -278,6 +286,8 @@ class F23Service:
             ui.update(control="select", options=self.SLEEP_OPTIONS)
         elif field_id == "NN-029":
             ui.update(depends_on="NN-028", show_when=["7. Otro"])
+        elif field_id in {"NN-024", "NN-025", "NN-026", "MG-027"}:
+            ui.update(control="select", catalog_key="lenguas")
         if field_id in {"NN-002", "NN-003", "NN-004", "NN-005", "NN-006", "NN-007", "MG-002", "MG-003", "MG-004", "MG-005", "MG-006", "MG-007"}:
             ui["section"] = "Datos institucionales"
         elif field_id.startswith("NN-") and int(field_id.split("-")[1]) >= 21:
@@ -291,6 +301,9 @@ class F23Service:
             item.update(self._field_ui(field))
             result.append(item)
         return result
+
+    def ui_catalogs(self) -> dict[str, Any]:
+        return self.catalogs
 
     def update_participant(self, fundacion_id: int, record_id: int, payload: dict[str, Any], user_id: int | None) -> dict[str, Any]:
         with self.connect() as conn:

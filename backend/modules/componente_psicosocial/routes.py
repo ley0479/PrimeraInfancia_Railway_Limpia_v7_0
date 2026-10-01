@@ -60,7 +60,7 @@ def register_componente_psicosocial(app,database_path:str,data_dir:str,output_fo
 
     @bp.route("/f23/campos",methods=["GET"])
     @require_roles(*READ_ROLES)
-    def f23_fields():return jsonify({"campos":f23.field_catalog()}),200
+    def f23_fields():return jsonify({"campos":f23.field_catalog(),"catalogos":f23.ui_catalogs()}),200
 
     @bp.route("/f23/sesiones",methods=["GET","POST"])
     @require_roles(*READ_ROLES)
