@@ -52,9 +52,17 @@ def main():
         except LookupError:
             pass
         require(ana["pendientes_total"] > 0, "Inventó respuestas para completar la ficha")
-        first_pending = ana["pendientes"][0]
+        first_pending = next(field_id for field_id in ana["pendientes"] if ana["respuestas"].get(field_id) in (None, ""))
         updated = service.update_participant(1, ana["id"], {"respuestas": {first_pending: "RESPUESTA CONFIRMADA"}, "estados": {first_pending: "CONFIRMADO"}}, 7)
         require(updated["pendientes_total"] == ana["pendientes_total"] - 1, "El guardado parcial no actualizó pendientes")
+        second_session = service.create_session(1, "UDS PRUEBA", "2026-10-01", 7)
+        second_ana = next(item for item in second_session["participantes"] if item["documento"] == "001234")
+        require(second_ana["respuestas"].get(first_pending) == "RESPUESTA CONFIRMADA", "No recuperó la respuesta confirmada de la ficha anterior")
+        require(second_ana["estados"].get(first_pending) == "ANTERIOR_POR_CONFIRMAR", "La respuesta anterior se dio por vigente sin confirmación humana")
+        require(second_ana["recuperados_total"] >= 1, "No informó los campos recuperados")
+        require(next(item for item in second_session["participantes"] if item["documento"] == "009999")["recuperados_total"] == 0, "Copió respuestas a otro participante")
+        confirmed_again = service.update_participant(1, second_ana["id"], {"respuestas": {first_pending: "RESPUESTA CONFIRMADA"}, "estados": {first_pending: "CONFIRMADO"}}, 7)
+        require(confirmed_again["recuperados_total"] == 0 and confirmed_again["estados"][first_pending] == "CONFIRMADO", "No permitió confirmar la información anterior")
         blocked = False
         try:
             service.update_participant(1, ana["id"], {"integrantes": [{}] * 11}, 7)

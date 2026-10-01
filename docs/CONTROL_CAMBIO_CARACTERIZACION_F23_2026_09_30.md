@@ -72,3 +72,17 @@
 - Corrección mínima: ejecutar `F23Service.init_schema()` durante el predeploy autorizado, antes de bloquear DDL.
 - Hallazgo relacionado: los `JOIN` del repositorio psicosocial no declaraban el vínculo `fundacion_id` en ambas tablas y el cortafuegos multi-fundación los rechazó. Se añadieron únicamente esas igualdades de aislamiento.
 - Datos existentes: no se borran ni transforman; las tablas F23 son aditivas.
+
+## Fase 2 — elaboración rápida (iniciada el 2026-09-30)
+
+- Solicitud: “inicia la implementación” de mayor automatización de preguntas.
+- Revisión de partida: `13ccf9d6adf58b65d60d2f7933f0247ca6945af9` (`main`, sin cambios locales).
+- Resultado observable autorizado: al preparar una sesión, recuperar respuestas no vacías previamente confirmadas para el mismo participante y la misma fundación; mostrar sus cantidades y permitir confirmar en bloque datos precargados o recuperados.
+- Archivos/bloques permitidos: `f23_service.py` (preparación y resumen), panel F23 ya existente en `index.html`, su controlador `componente-psicosocial.js` y pruebas F23.
+- Exclusiones: menú, Liam, autenticación, permisos, esquema, plantilla XLSM, generadores y respuestas de otros participantes/fundaciones.
+- Controles: la Base Maestra vigente tiene prioridad; solo se recuperan valores no vacíos cuyo estado anterior fue `CONFIRMADO`; quedan `ANTERIOR_POR_CONFIRMAR` hasta confirmación humana; vacíos y conflictos no se completan automáticamente.
+- Riesgos: reutilizar información desactualizada o cruzar tenants. Pruebas obligatorias: prioridad de Base Maestra, aislamiento por fundación, recuperación por participante, pendientes y confirmación masiva.
+- Reversión: revertir exclusivamente el commit de esta fase; no requiere borrar ni migrar datos.
+- Publicación: `PENDIENTE`; iniciar desarrollo no autoriza despliegue.
+- Evidencia de desarrollo: `test_caracterizacion_f23_v1.py` PASS; `test_centro_planeacion_psicosocial_v2_7_0.py` PASS; sintaxis JavaScript y Python PASS; `test_all_formats_continuity_v2_7_1.py` PASS; `test_liam_action_policy_v7.py` PASS.
+- Menú y Liam: ningún archivo, recurso, ruta o preferencia de esos componentes fue modificado.

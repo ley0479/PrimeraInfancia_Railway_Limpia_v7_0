@@ -122,6 +122,24 @@ class F23Service:
                 return self._pick(source, *aliases)
         return None
 
+    def _previous_confirmed_answers(self, conn, fundacion_id: int, participant_id: int) -> dict[str, Any]:
+        rows = conn.execute(
+            """SELECT p.respuestas_json,p.estados_json
+               FROM f23_participantes p
+               JOIN f23_sesiones s ON s.id=p.sesion_id AND s.fundacion_id=p.fundacion_id
+               WHERE p.fundacion_id=? AND p.participante_id=?
+               ORDER BY s.fecha_referencia DESC,p.id DESC""",
+            (fundacion_id, participant_id),
+        ).fetchall()
+        recovered: dict[str, Any] = {}
+        for row in rows:
+            answers = _parse(row["respuestas_json"], {})
+            states = _parse(row["estados_json"], {})
+            for field_id, value in answers.items():
+                if field_id not in recovered and value not in (None, "") and states.get(field_id) == "CONFIRMADO":
+                    recovered[field_id] = value
+        return recovered
+
     def create_session(self, fundacion_id: int, unit: str, reference_date: str, user_id: int | None) -> dict[str, Any]:
         unit = str(unit or "").strip()
         if not unit:
@@ -147,12 +165,18 @@ class F23Service:
                 answers = {}
                 states = {}
                 pending = []
+                previous = self._previous_confirmed_answers(conn, fundacion_id, int(source["id"]))
                 for field in self.fields:
                     value = self._prefill(field, source, reference_date)
                     field_id = str(field.get("id"))
                     if value not in (None, ""):
                         answers[field_id] = value
                         states[field_id] = "EXISTENTE_POR_VALIDAR"
+                        if field.get("mode") not in {"AUXILIAR", "NO_ESCRIBIR"}:
+                            pending.append(field_id)
+                    elif previous.get(field_id) not in (None, ""):
+                        answers[field_id] = previous[field_id]
+                        states[field_id] = "ANTERIOR_POR_CONFIRMAR"
                         if field.get("mode") not in {"AUXILIAR", "NO_ESCRIBIR"}:
                             pending.append(field_id)
                     elif field.get("mode") not in {"AUXILIAR", "NO_ESCRIBIR"}:
@@ -187,6 +211,8 @@ class F23Service:
             for key, default in (("respuestas_json", {}), ("estados_json", {}), ("pendientes_json", []), ("integrantes_json", [])):
                 value[key.replace("_json", "")] = _parse(value.pop(key), default)
             value["pendientes_total"] = len(value["pendientes"])
+            value["precargados_total"] = sum(1 for state in value["estados"].values() if state == "EXISTENTE_POR_VALIDAR")
+            value["recuperados_total"] = sum(1 for state in value["estados"].values() if state == "ANTERIOR_POR_CONFIRMAR")
             data["participantes"].append(value)
         return data
 
@@ -205,7 +231,7 @@ class F23Service:
                 if field_id not in allowed:
                     continue
                 state = str((payload.get("estados") or {}).get(field_id) or "CONFIRMADO").upper()
-                if state not in {"CONFIRMADO", "PENDIENTE", "NO_APLICA", "NO_RESPONDE", "CONFLICTO", "EXISTENTE_POR_VALIDAR"}:
+                if state not in {"CONFIRMADO", "PENDIENTE", "NO_APLICA", "NO_RESPONDE", "CONFLICTO", "EXISTENTE_POR_VALIDAR", "ANTERIOR_POR_CONFIRMAR"}:
                     raise ValueError(f"Estado no permitido para {field_id}.")
                 if value in (None, "") and state == "CONFIRMADO":
                     state = "PENDIENTE"
