@@ -45,6 +45,9 @@ def main():
         catalog = {item["id"]: item for item in service.field_catalog()}
         require(catalog["NN-021"]["control"] == "select" and catalog["NN-021"]["options"] == ["SI", "NO"], "Discapacidad no usa respuesta cerrada")
         require(catalog["NN-022"]["depends_on"] == "NN-021" and catalog["NN-022"]["show_when"] == ["SI"], "Categoría de discapacidad no depende de la respuesta principal")
+        require(catalog["NN-032"]["options"] == ["AFILIADO", "NO_AFILIADO"] and catalog["NN-033"]["show_when"] == ["NO_AFILIADO"], "Afiliación no conserva opciones y dependencia oficiales")
+        require(catalog["NN-035"]["options"] == ["ESQUEMA_COMPLETO", "ESQUEMA_INCOMPLETO"] and catalog["NN-036"]["depends_on"] == "NN-035", "Vacunación no conserva opciones y dependencia oficiales")
+        require(catalog["NN-050"]["options"] == ["RECIBE_LECHE_MATERNA", "NO_RECIBE_LECHE_MATERNA"] and catalog["NN-051"]["depends_on"] == "NN-050", "Lactancia no conserva opciones y dependencia oficiales")
         require(catalog["NN-016"]["control"] == "select" and len(catalog["NN-016"]["options"]) >= 5, "Tipo de documento no ofrece las opciones oficiales iniciales")
         ui_catalogs = service.ui_catalogs()
         require(catalog["NN-002"]["catalog_key"] == "regionales" and "CHOCÓ" in ui_catalogs["regional_centros"], "Regional no ofrece el catálogo territorial")

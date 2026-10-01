@@ -95,3 +95,4 @@
 - Exclusiones: no asumir Colombia como nacionalidad o país de nacimiento; no auto-responder discapacidad, convivencia, etnia o cuidados; no modificar menú, Liam, plantilla XLSM, permisos ni esquema.
 - Publicación: `PENDIENTE`; requiere pruebas y autorización separada.
 - Subfase territorial: catálogos extraídos de `Listados` mediante lectura XML sin ejecutar macros: 33 regionales, 210 centros zonales, 33 departamentos, 1123 municipios y 89 lenguas. Regional controla centro zonal y departamento controla municipio.
+- Subfase condicional NN: afiliación, vacunación, salud bucal y lactancia conservan los valores codificados del XLSM; sus motivos y detalles se muestran solo ante la respuesta desencadenante.

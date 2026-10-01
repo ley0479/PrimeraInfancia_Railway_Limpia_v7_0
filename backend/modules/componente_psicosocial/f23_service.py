@@ -53,8 +53,7 @@ class F23Service:
     VERSION = "2"
     REGISTER_SHEETS = ("BD-M1", "BD-M2", "BD-M3", "BD-M3 Integrantes")
     YES_NO_FIELDS = {
-        "NN-021", "NN-030", "NN-031", "NN-032", "NN-035", "NN-038", "NN-041",
-        "NN-043", "NN-044", "NN-046", "NN-050", "NN-053", "NN-056",
+        "NN-021", "NN-030", "NN-031", "NN-041", "NN-043", "NN-044", "NN-046",
         "MG-008", "MG-024",
     }
     DOCUMENT_TYPES_NN = [
@@ -288,6 +287,36 @@ class F23Service:
             ui.update(depends_on="NN-028", show_when=["7. Otro"])
         elif field_id in {"NN-024", "NN-025", "NN-026", "MG-027"}:
             ui.update(control="select", catalog_key="lenguas")
+        official_choices = {
+            "NN-032": ["AFILIADO", "NO_AFILIADO"],
+            "NN-035": ["ESQUEMA_COMPLETO", "ESQUEMA_INCOMPLETO"],
+            "NN-038": ["CON_ATENCIÓN_SALUD_BUCAL", "SIN_ATENCIÓN_SALUD_BUCAL"],
+            "NN-050": ["RECIBE_LECHE_MATERNA", "NO_RECIBE_LECHE_MATERNA"],
+            "NN-053": ["SI_EXCLUSIVAMENTE_LECHE_MATERNA", "NO_OTROS_ALIMENTOS"],
+            "NN-056": ["SI_LECHE_MATERNA_EXCLUSIVA", "NO_LECHE_MATERNA_EXCLUSIVA"],
+        }
+        if field_id in official_choices:
+            ui.update(control="select", options=official_choices[field_id])
+        dependencies = {
+            "NN-033": ("NN-032", ["NO_AFILIADO"]),
+            "NN-034": ("NN-033", ["6. Otra"]),
+            "NN-036": ("NN-035", ["ESQUEMA_INCOMPLETO"]),
+            "NN-037": ("NN-036", ["7. Otra"]),
+            "NN-039": ("NN-038", ["SIN_ATENCIÓN_SALUD_BUCAL"]),
+            "NN-040": ("NN-039", ["6. Otro"]),
+            "NN-045": ("NN-044", ["SI"]),
+            "NN-047": ("NN-046", ["SI"]),
+            "NN-048": ("NN-046", ["NO"]),
+            "NN-051": ("NN-050", ["NO_RECIBE_LECHE_MATERNA"]),
+            "NN-052": ("NN-051", ["8. Otro"]),
+            "NN-054": ("NN-053", ["NO_OTROS_ALIMENTOS"]),
+            "NN-055": ("NN-053", ["NO_OTROS_ALIMENTOS"]),
+            "NN-057": ("NN-056", ["NO_LECHE_MATERNA_EXCLUSIVA"]),
+            "NN-058": ("NN-057", ["8. Otro"]),
+        }
+        if field_id in dependencies:
+            parent, values = dependencies[field_id]
+            ui.update(depends_on=parent, show_when=values)
         if field_id in {"NN-002", "NN-003", "NN-004", "NN-005", "NN-006", "NN-007", "MG-002", "MG-003", "MG-004", "MG-005", "MG-006", "MG-007"}:
             ui["section"] = "Datos institucionales"
         elif field_id.startswith("NN-") and int(field_id.split("-")[1]) >= 21:
