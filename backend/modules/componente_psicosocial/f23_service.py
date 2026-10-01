@@ -183,6 +183,25 @@ class F23Service:
                     recovered[field_id] = value
         return recovered
 
+    def _field_applies(self, field: dict[str, Any], answers: dict[str, Any]) -> bool:
+        ui = self._field_ui(field)
+        parent = ui.get("depends_on")
+        expected = ui.get("show_when") or []
+        if not parent or not expected:
+            return True
+        current = _norm(answers.get(str(parent)))
+        return bool(current) and current in {_norm(value) for value in expected}
+
+    def _pending_fields(self, answers: dict[str, Any], states: dict[str, Any]) -> list[str]:
+        pending = []
+        for field in self.fields:
+            field_id = str(field.get("id"))
+            if field.get("mode") in {"AUXILIAR", "NO_ESCRIBIR"} or not self._field_applies(field, answers):
+                continue
+            if states.get(field_id) not in {"CONFIRMADO", "NO_APLICA", "NO_RESPONDE"}:
+                pending.append(field_id)
+        return pending
+
     def create_session(self, fundacion_id: int, unit: str, reference_date: str, user_id: int | None) -> dict[str, Any]:
         unit = str(unit or "").strip()
         if not unit:
@@ -207,7 +226,6 @@ class F23Service:
             for source in snapshots:
                 answers = {}
                 states = {}
-                pending = []
                 previous = self._previous_confirmed_answers(conn, fundacion_id, int(source["id"]))
                 for field in self.fields:
                     value = self._prefill(field, source, reference_date)
@@ -215,15 +233,10 @@ class F23Service:
                     if value not in (None, ""):
                         answers[field_id] = value
                         states[field_id] = "EXISTENTE_POR_VALIDAR"
-                        if field.get("mode") not in {"AUXILIAR", "NO_ESCRIBIR"}:
-                            pending.append(field_id)
                     elif previous.get(field_id) not in (None, ""):
                         answers[field_id] = previous[field_id]
                         states[field_id] = "ANTERIOR_POR_CONFIRMAR"
-                        if field.get("mode") not in {"AUXILIAR", "NO_ESCRIBIR"}:
-                            pending.append(field_id)
-                    elif field.get("mode") not in {"AUXILIAR", "NO_ESCRIBIR"}:
-                        pending.append(field_id)
+                pending = self._pending_fields(answers, states)
                 full_name = source.get("nombre_completo") or " ".join(filter(None, [source.get("nombres"), source.get("apellidos")])).strip()
                 conn.execute("INSERT INTO f23_participantes(fundacion_id,sesion_id,participante_id,documento,nombre_completo,tipo_ficha,fuente_snapshot_json,respuestas_json,estados_json,pendientes_json,integrantes_json,fecha_actualizacion) VALUES(?,?,?,?,?,'NN',?,?,?,?, '[]',?)", (fundacion_id, session_id, int(source["id"]), str(source.get("documento") or ""), full_name, _json(source), _json(answers), _json(states), _json(pending), now))
             conn.execute("INSERT INTO f23_auditoria(fundacion_id,sesion_id,usuario_id,accion,detalle_json,fecha) VALUES(?,?,?,?,?,?)", (fundacion_id, session_id, user_id, "CREAR_SESION", _json({"unidad": unit, "participantes": len(snapshots)}), now))
@@ -256,6 +269,8 @@ class F23Service:
             value["pendientes_total"] = len(value["pendientes"])
             value["precargados_total"] = sum(1 for state in value["estados"].values() if state == "EXISTENTE_POR_VALIDAR")
             value["recuperados_total"] = sum(1 for state in value["estados"].values() if state == "ANTERIOR_POR_CONFIRMAR")
+            value["aplicables_total"] = sum(1 for field in self.fields if field.get("mode") not in {"AUXILIAR", "NO_ESCRIBIR"} and self._field_applies(field, value["respuestas"]))
+            value["resueltos_total"] = value["aplicables_total"] - value["pendientes_total"]
             data["participantes"].append(value)
         return data
 
@@ -352,8 +367,7 @@ class F23Service:
                     state = "PENDIENTE"
                 answers[field_id] = value
                 states[field_id] = state
-            applicable = [str(field.get("id")) for field in self.fields if field.get("mode") not in {"AUXILIAR", "NO_ESCRIBIR"}]
-            pending = [field_id for field_id in applicable if states.get(field_id) not in {"CONFIRMADO", "NO_APLICA", "NO_RESPONDE"}]
+            pending = self._pending_fields(answers, states)
             members = payload.get("integrantes", _parse(row["integrantes_json"], []))
             if len(members) > 10:
                 raise ValueError("El formato oficial admite máximo diez integrantes. No se truncaron datos; se requiere una salida institucional aprobada.")

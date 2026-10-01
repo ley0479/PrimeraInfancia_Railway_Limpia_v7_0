@@ -58,6 +58,12 @@ def main():
         require(session["total_participantes"] == 2 and len(session["participantes"]) == 2, "Mezcló otra fundación o perdió participantes")
         ana = next(item for item in session["participantes"] if item["documento"] == "001234")
         require(ana["respuestas"].get("NN-009") == "4 años, 6 meses", "No calculó la edad a la fecha de caracterización")
+        require("NN-022" not in ana["pendientes"], "Contó la categoría de discapacidad antes de responder la pregunta principal")
+        disability_yes = service.update_participant(1, ana["id"], {"respuestas": {"NN-021": "SI"}, "estados": {"NN-021": "CONFIRMADO"}}, 7)
+        require("NN-022" in disability_yes["pendientes"], "No activó la categoría al confirmar discapacidad")
+        disability_no = service.update_participant(1, ana["id"], {"respuestas": {"NN-021": "NO"}, "estados": {"NN-021": "CONFIRMADO"}}, 7)
+        require("NN-022" not in disability_no["pendientes"], "Mantuvo activa la categoría cuando discapacidad es NO")
+        ana = disability_no
         require(service.participant_context(1, ana["id"])["unidad"] == "UDS PRUEBA", "No resolvió el ámbito de unidad del participante")
         try:
             service.participant_context(2, ana["id"])
@@ -75,7 +81,7 @@ def main():
         require(second_ana["recuperados_total"] >= 1, "No informó los campos recuperados")
         require(next(item for item in second_session["participantes"] if item["documento"] == "009999")["recuperados_total"] == 0, "Copió respuestas a otro participante")
         confirmed_again = service.update_participant(1, second_ana["id"], {"respuestas": {first_pending: "RESPUESTA CONFIRMADA"}, "estados": {first_pending: "CONFIRMADO"}}, 7)
-        require(confirmed_again["recuperados_total"] == 0 and confirmed_again["estados"][first_pending] == "CONFIRMADO", "No permitió confirmar la información anterior")
+        require(confirmed_again["recuperados_total"] == second_ana["recuperados_total"] - 1 and confirmed_again["estados"][first_pending] == "CONFIRMADO", "No permitió confirmar la información anterior")
         blocked = False
         try:
             service.update_participant(1, ana["id"], {"integrantes": [{}] * 11}, 7)
