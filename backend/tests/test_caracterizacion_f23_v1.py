@@ -16,6 +16,10 @@ def require(condition, message):
 
 
 def main():
+    init_source = (Path(__file__).parents[1] / "init_hosting.py").read_text(encoding="utf-8")
+    repo_source = (Path(__file__).parents[1] / "modules" / "componente_psicosocial" / "repository.py").read_text(encoding="utf-8")
+    require("F23Service(config_class.DATABASE_PATH, config_class.OUTPUT_FOLDER).init_schema()" in init_source, "Producción no prepara el esquema F23 antes de bloquear DDL")
+    require("f.fundacion_id=p.fundacion_id" in repo_source and "p2.fundacion_id=a.fundacion_id" in repo_source, "Los JOIN psicosociales no aíslan ambas tablas por fundación")
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         database = root / "f23.sqlite3"

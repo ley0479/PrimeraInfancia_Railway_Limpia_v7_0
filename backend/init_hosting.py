@@ -88,6 +88,11 @@ def bootstrap_core_schema(config_class) -> None:
     ensure_security_schema(str(config_class.DATABASE_PATH))
     from modules.base_maestra.repository import BaseMaestraRepository
     BaseMaestraRepository(config_class.DATABASE_PATH).init_schema()
+    # Caracterización F23: producción deshabilita DDL durante el runtime.
+    # El esquema aditivo debe existir antes de importar/registrar Flask.
+    from modules.componente_psicosocial.f23_service import F23Service
+    F23Service(config_class.DATABASE_PATH, config_class.OUTPUT_FOLDER).init_schema()
+    print('[MIGRATION] caracterizacion F23: PASS', flush=True)
     from migrations.migrate_universal_mapper_v7 import migrate as migrate_universal_mapper
     universal_mapper_migration = migrate_universal_mapper(str(config_class.DATABASE_PATH))
     print('[MIGRATION] universal mapper: ' + json.dumps(universal_mapper_migration, ensure_ascii=False), flush=True)

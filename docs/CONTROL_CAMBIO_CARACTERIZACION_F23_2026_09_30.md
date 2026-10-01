@@ -64,3 +64,11 @@
 - Aceptación funcional humana: `PENDIENTE`.
 - Autorización para publicar: `PENDIENTE`.
 - Despliegue: `NO REALIZADO`.
+
+## Corrección posterior al primer despliegue
+
+- Evidencia productiva: PostgreSQL informó `UndefinedTable: relation "f23_sesiones" does not exist`.
+- Causa: el runtime productivo bloquea DDL mediante `SKIP_RUNTIME_SCHEMA_DDL=1`; el esquema F23 no estaba incluido en `bootstrap_core_schema`.
+- Corrección mínima: ejecutar `F23Service.init_schema()` durante el predeploy autorizado, antes de bloquear DDL.
+- Hallazgo relacionado: los `JOIN` del repositorio psicosocial no declaraban el vínculo `fundacion_id` en ambas tablas y el cortafuegos multi-fundación los rechazó. Se añadieron únicamente esas igualdades de aislamiento.
+- Datos existentes: no se borran ni transforman; las tablas F23 son aditivas.

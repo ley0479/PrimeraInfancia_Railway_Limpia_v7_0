@@ -135,7 +135,7 @@ class ComponentePsicosocialRepository:
         with self.connect() as conn:
             rows=conn.execute(
                 """SELECT p.*,f.cuidador_principal,f.parentesco,f.telefono_principal,f.correo,f.direccion,f.caracterizacion_json
-                   FROM ps_expedientes p JOIN fcr_expedientes_familiares f ON f.id=p.fcr_expediente_familiar_id
+                   FROM ps_expedientes p JOIN fcr_expedientes_familiares f ON f.id=p.fcr_expediente_familiar_id AND f.fundacion_id=p.fundacion_id
                    WHERE """+" AND ".join(where)+" ORDER BY p.unidad_nombre,p.id",params).fetchall()
             result=[]
             for row in rows:
@@ -145,7 +145,7 @@ class ComponentePsicosocialRepository:
                 item["caracterizacion_familiar"]=parse_json(item.get("caracterizacion_json"),{})
                 item["ultima_caracterizacion"]=self._latest_characterization(conn,fundacion_id,int(item["id"]))
                 item["planes_abiertos"]=int(conn.execute("SELECT COUNT(*) FROM ps_planes_acompanamiento WHERE fundacion_id=? AND expediente_id=? AND estado NOT IN ('CERRADO','CANCELADO')",(fundacion_id,item["id"])).fetchone()[0])
-                item["acciones_pendientes"]=int(conn.execute("SELECT COUNT(*) FROM ps_acciones_plan a JOIN ps_planes_acompanamiento p2 ON p2.id=a.plan_id WHERE a.fundacion_id=? AND p2.expediente_id=? AND a.estado NOT IN ('COMPLETADA','VALIDADA','CANCELADA')",(fundacion_id,item["id"])).fetchone()[0])
+                item["acciones_pendientes"]=int(conn.execute("SELECT COUNT(*) FROM ps_acciones_plan a JOIN ps_planes_acompanamiento p2 ON p2.id=a.plan_id AND p2.fundacion_id=a.fundacion_id WHERE a.fundacion_id=? AND p2.expediente_id=? AND a.estado NOT IN ('COMPLETADA','VALIDADA','CANCELADA')",(fundacion_id,item["id"])).fetchone()[0])
                 result.append(item)
         return result
 
@@ -156,7 +156,7 @@ class ComponentePsicosocialRepository:
         with self.connect() as conn:
             item["caracterizaciones"]=[self._characterization(dict(row)) for row in conn.execute("SELECT * FROM ps_caracterizaciones WHERE fundacion_id=? AND expediente_id=? ORDER BY version DESC",(fundacion_id,expediente_id)).fetchall()]
             item["planes"]=[self._plan_detail(conn,dict(row)) for row in conn.execute("SELECT * FROM ps_planes_acompanamiento WHERE fundacion_id=? AND expediente_id=? ORDER BY fecha_creacion DESC",(fundacion_id,expediente_id)).fetchall()]
-            item["actividades_vinculadas"]=[dict(row) for row in conn.execute("""SELECT v.*,a.tipo,a.titulo,a.fecha_programada,a.fecha_ejecucion,a.estado,a.profesional_nombre FROM ps_vinculos_actividad v JOIN fcr_actividades a ON a.id=v.fcr_actividad_id WHERE v.fundacion_id=? AND v.expediente_id=? ORDER BY a.fecha_programada DESC""",(fundacion_id,expediente_id)).fetchall()]
+            item["actividades_vinculadas"]=[dict(row) for row in conn.execute("""SELECT v.*,a.tipo,a.titulo,a.fecha_programada,a.fecha_ejecucion,a.estado,a.profesional_nombre FROM ps_vinculos_actividad v JOIN fcr_actividades a ON a.id=v.fcr_actividad_id AND a.fundacion_id=v.fundacion_id WHERE v.fundacion_id=? AND v.expediente_id=? ORDER BY a.fecha_programada DESC""",(fundacion_id,expediente_id)).fetchall()]
             item["seguimientos"]=[dict(row) for row in conn.execute("SELECT * FROM ps_seguimientos WHERE fundacion_id=? AND expediente_id=? ORDER BY fecha DESC,id DESC",(fundacion_id,expediente_id)).fetchall()]
             item["documentos"]=[dict(row) for row in conn.execute("SELECT * FROM ps_documentos WHERE fundacion_id=? AND expediente_id=? ORDER BY fecha_generacion DESC",(fundacion_id,expediente_id)).fetchall()]
         if user: self.audit(fundacion_id,user,"CONSULTAR_EXPEDIENTE",expediente_id,{"nivel_acceso":item.get("nivel_acceso")})
@@ -337,7 +337,7 @@ class ComponentePsicosocialRepository:
 
     def document(self,fundacion_id:int,document_id:int)->dict[str,Any]:
         with self.connect() as conn:
-            row=conn.execute("SELECT d.*,p.unidad_nombre FROM ps_documentos d JOIN ps_expedientes p ON p.id=d.expediente_id WHERE d.fundacion_id=? AND d.id=?",(fundacion_id,document_id)).fetchone()
+            row=conn.execute("SELECT d.*,p.unidad_nombre FROM ps_documentos d JOIN ps_expedientes p ON p.id=d.expediente_id AND p.fundacion_id=d.fundacion_id WHERE d.fundacion_id=? AND d.id=?",(fundacion_id,document_id)).fetchone()
         if not row: raise LookupError("Documento no encontrado.")
         return dict(row)
 
