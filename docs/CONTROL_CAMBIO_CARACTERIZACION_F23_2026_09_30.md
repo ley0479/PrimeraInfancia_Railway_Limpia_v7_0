@@ -86,3 +86,11 @@
 - Publicación: `PENDIENTE`; iniciar desarrollo no autoriza despliegue.
 - Evidencia de desarrollo: `test_caracterizacion_f23_v1.py` PASS; `test_centro_planeacion_psicosocial_v2_7_0.py` PASS; sintaxis JavaScript y Python PASS; `test_all_formats_continuity_v2_7_1.py` PASS; `test_liam_action_policy_v7.py` PASS.
 - Menú y Liam: ningún archivo, recurso, ruta o preferencia de esos componentes fue modificado.
+
+## Fase 3 — preguntas inteligentes (iniciada el 2026-09-30)
+
+- Solicitud: convertir preguntas repetitivas en desplegables, calcular edad, ampliar precarga y ocultar preguntas subordinadas que no aplican.
+- Revisión de partida: `f1a39d0c5240bb4050abc39cf449c76b9988311f` (`main`, sin cambios locales).
+- Primera entrega: metadatos de control por campo, listas oficiales iniciales (documento, sexo, discapacidad, lugar de descanso y Sí/No), dependencia discapacidad→categoría y descanso→otro, edad a fecha de caracterización y nuevas fuentes de Base Maestra.
+- Exclusiones: no asumir Colombia como nacionalidad o país de nacimiento; no auto-responder discapacidad, convivencia, etnia o cuidados; no modificar menú, Liam, plantilla XLSM, permisos ni esquema.
+- Publicación: `PENDIENTE`; requiere pruebas y autorización separada.

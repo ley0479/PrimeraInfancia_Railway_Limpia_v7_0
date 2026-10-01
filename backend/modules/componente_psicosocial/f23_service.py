@@ -52,6 +52,28 @@ class F23Service:
     CODE = "F23.MO12.PP"
     VERSION = "2"
     REGISTER_SHEETS = ("BD-M1", "BD-M2", "BD-M3", "BD-M3 Integrantes")
+    YES_NO_FIELDS = {
+        "NN-021", "NN-030", "NN-031", "NN-032", "NN-035", "NN-038", "NN-041",
+        "NN-043", "NN-044", "NN-046", "NN-050", "NN-053", "NN-056",
+        "MG-008", "MG-024",
+    }
+    DOCUMENT_TYPES_NN = [
+        "1. REGISTRO CIVIL", "2. TARJETA DE IDENTIDAD", "3. PASAPORTE",
+        "4. PERMISO ESPECIAL DE PERMANENCIA (PEP)", "5. NO TIENE",
+    ]
+    DISABILITY_CATEGORIES = [
+        "1. Física", "2. Intelectual", "3. Psicosocial", "4. Auditiva", "5. Visual",
+        "6. Sordoceguera", "7. Múltiple", "8. Sensorial (gusto, olfato, tacto)",
+        "9. Sistémica", "10. Voz y habla", "11. Piel, pelo y uñas", "12. Ninguna",
+    ]
+    SLEEP_OPTIONS = ["1. Hamaca", "2. Cama", "3. Colchoneta", "4. Estera", "5. Cuna", "6. Plancha", "7. Otro"]
+    COLOMBIA_DEPARTMENTS = [
+        "AMAZONAS", "ANTIOQUIA", "ARAUCA", "ATLÁNTICO", "BOGOTÁ D.C.", "BOLÍVAR", "BOYACÁ",
+        "CALDAS", "CAQUETÁ", "CASANARE", "CAUCA", "CESAR", "CHOCÓ", "CÓRDOBA", "CUNDINAMARCA",
+        "GUAINÍA", "GUAVIARE", "HUILA", "LA GUAJIRA", "MAGDALENA", "META", "NARIÑO",
+        "NORTE DE SANTANDER", "PUTUMAYO", "QUINDÍO", "RISARALDA", "SAN ANDRÉS",
+        "SANTANDER", "SUCRE", "TOLIMA", "VALLE DEL CAUCA", "VAUPÉS", "VICHADA",
+    ]
 
     def __init__(self, database_path: str, output_folder: str):
         self.database_path = str(database_path)
@@ -98,7 +120,27 @@ class F23Service:
         label = _norm(field.get("field"))
         if "fecha de diligenciamiento" in label:
             return reference_date
+        if re.fullmatch(r"\d+ edad", label):
+            birth = self._pick(source, "fecha_nacimiento", "fecha nacimiento")
+            try:
+                born, reference = date.fromisoformat(str(birth)[:10]), date.fromisoformat(reference_date)
+                if born > reference:
+                    return None
+                months = (reference.year - born.year) * 12 + reference.month - born.month - (reference.day < born.day)
+                return f"{months // 12} años, {months % 12} meses"
+            except (TypeError, ValueError):
+                return None
         rules = (
+            (("regional",), ("regional", "nombre regional", "regional uds")),
+            (("centro zonal",), ("centro_zonal", "centro zonal", "nombre centro zonal")),
+            (("nombre agente educativo",), ("docente", "agente educativo", "nombre agente educativo")),
+            (("usuario",), ("usuario", "tipo usuario", "tipo de usuario")),
+            (("pais de nacimiento",), ("pais_nacimiento", "pais de nacimiento")),
+            (("nacionalidad principal",), ("nacionalidad", "nacionalidad principal")),
+            (("segunda nacionalidad",), ("segunda_nacionalidad", "segunda nacionalidad")),
+            (("departamento de residencia",), ("departamento", "departamento residencia")),
+            (("municipio de residencia",), ("municipio", "municipio residencia")),
+            (("numero celular acudiente",), ("telefono_acudiente", "celular acudiente", "telefono")),
             (("codigo cuentame", "codigo de la uds", "codigo uds"), ("codigo_unidad", "codigo uds", "codigo cuentame uds")),
             (("fecha de nacimiento",), ("fecha_nacimiento", "fecha nacimiento")),
             (("tipo de documento",), ("tipo_documento", "tipo documento")),
@@ -216,8 +258,39 @@ class F23Service:
             data["participantes"].append(value)
         return data
 
+    def _field_ui(self, field: dict[str, Any]) -> dict[str, Any]:
+        field_id = str(field.get("id"))
+        label = _norm(field.get("field"))
+        ui: dict[str, Any] = {"control": "textarea", "section": "Familia y vivienda" if field_id.startswith("FAM-") else "Identificación y atenciones"}
+        if "fecha" in label:
+            ui["control"] = "date"
+        if field_id in self.YES_NO_FIELDS:
+            ui.update(control="select", options=["SI", "NO"])
+        if field_id in {"NN-002", "MG-002", "NN-013", "MG-021"}:
+            ui.update(control="select", options=self.COLOMBIA_DEPARTMENTS)
+        elif field_id in {"NN-016", "MG-011"}:
+            ui.update(control="select", options=self.DOCUMENT_TYPES_NN)
+        elif field_id in {"NN-020", "MG-015"}:
+            ui.update(control="select", options=["1. MUJER", "2. HOMBRE", "3. INTERSEXUAL"])
+        elif field_id in {"NN-022", "MG-025"}:
+            ui.update(control="select", options=self.DISABILITY_CATEGORIES, depends_on="NN-021" if field_id == "NN-022" else "MG-024", show_when=["SI"])
+        elif field_id == "NN-028":
+            ui.update(control="select", options=self.SLEEP_OPTIONS)
+        elif field_id == "NN-029":
+            ui.update(depends_on="NN-028", show_when=["7. Otro"])
+        if field_id in {"NN-002", "NN-003", "NN-004", "NN-005", "NN-006", "NN-007", "MG-002", "MG-003", "MG-004", "MG-005", "MG-006", "MG-007"}:
+            ui["section"] = "Datos institucionales"
+        elif field_id.startswith("NN-") and int(field_id.split("-")[1]) >= 21:
+            ui["section"] = "Salud, cuidado y alimentación"
+        return ui
+
     def field_catalog(self) -> list[dict[str, Any]]:
-        return [{key: field.get(key) for key in ("id", "sheet", "field", "mode", "rule", "missing_action")} for field in self.fields]
+        result = []
+        for field in self.fields:
+            item = {key: field.get(key) for key in ("id", "sheet", "field", "mode", "rule", "missing_action")}
+            item.update(self._field_ui(field))
+            result.append(item)
+        return result
 
     def update_participant(self, fundacion_id: int, record_id: int, payload: dict[str, Any], user_id: int | None) -> dict[str, Any]:
         with self.connect() as conn:

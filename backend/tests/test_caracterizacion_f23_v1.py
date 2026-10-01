@@ -42,9 +42,16 @@ def main():
         config = service.configuration(1)
         require(config["template"]["disponible"] and config["template"]["sha256"] == "5340d3e6bfa9f03a09b1400d89c74d5120a81f76a4aa4ea65bae72688dd64319", "No preservó la plantilla oficial")
         require(config["mapeo"]["campos"] == 283, "No cargó los 283 destinos mapeados")
+        catalog = {item["id"]: item for item in service.field_catalog()}
+        require(catalog["NN-021"]["control"] == "select" and catalog["NN-021"]["options"] == ["SI", "NO"], "Discapacidad no usa respuesta cerrada")
+        require(catalog["NN-022"]["depends_on"] == "NN-021" and catalog["NN-022"]["show_when"] == ["SI"], "Categoría de discapacidad no depende de la respuesta principal")
+        require(catalog["NN-016"]["control"] == "select" and len(catalog["NN-016"]["options"]) >= 5, "Tipo de documento no ofrece las opciones oficiales iniciales")
+        require(catalog["NN-002"]["control"] == "select" and "CHOCÓ" in catalog["NN-002"]["options"], "Regional no ofrece el catálogo territorial")
+        require(catalog["NN-013"]["control"] == "select" and len(catalog["NN-013"]["options"]) == 33, "Departamento no ofrece el catálogo completo")
         session = service.create_session(1, "UDS PRUEBA", "2026-09-30", 7)
         require(session["total_participantes"] == 2 and len(session["participantes"]) == 2, "Mezcló otra fundación o perdió participantes")
         ana = next(item for item in session["participantes"] if item["documento"] == "001234")
+        require(ana["respuestas"].get("NN-009") == "4 años, 6 meses", "No calculó la edad a la fecha de caracterización")
         require(service.participant_context(1, ana["id"])["unidad"] == "UDS PRUEBA", "No resolvió el ámbito de unidad del participante")
         try:
             service.participant_context(2, ana["id"])
