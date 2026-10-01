@@ -54,7 +54,16 @@ class F23Service:
     REGISTER_SHEETS = ("BD-M1", "BD-M2", "BD-M3", "BD-M3 Integrantes")
     YES_NO_FIELDS = {
         "NN-021", "NN-030", "NN-031", "NN-041", "NN-043", "NN-044", "NN-046",
-        "MG-008", "MG-024",
+        "MG-008", "MG-024", "MG-028", "MG-029", "MG-036", "MG-037", "MG-038", "MG-039", "MG-040", "MG-041",
+        "MG-042", "MG-043", "MG-045", "MG-046", "MG-047", "MG-048", "MG-049", "MG-053", "MG-059",
+        "MG-060", "MG-061", "MG-062", "MG-065", "MG-066", "MG-067", "MG-068", "MG-069", "MG-070", "MG-072",
+        "FAM-006", "FAM-014", "FAM-017", "FAM-018", "FAM-019", "FAM-020", "FAM-021", "FAM-022",
+        "FAM-023", "FAM-024", "FAM-025", "FAM-026", "FAM-027", "FAM-028", "FAM-029", "FAM-030",
+        "FAM-031", "FAM-032", "FAM-033", "FAM-034", "FAM-035", "FAM-036", "FAM-037", "FAM-038", "FAM-039", "FAM-040", "FAM-041",
+        "FAM-043", "FAM-044", "FAM-045", "FAM-046", "FAM-047", "FAM-048", "FAM-049", "FAM-050", "FAM-051", "FAM-052", "FAM-053",
+        "FAM-057", "FAM-076", "FAM-085", "FAM-087", "FAM-088", "FAM-089", "FAM-090", "FAM-091", "FAM-092", "FAM-093", "FAM-094", "FAM-095", "FAM-096",
+        "FAM-097", "FAM-098", "FAM-099", "FAM-100", "FAM-101", "FAM-102", "FAM-103", "FAM-104", "FAM-105", "FAM-106", "FAM-107", "FAM-108", "FAM-109", "FAM-110", "FAM-111",
+        "FAM-113", "FAM-115", "FAM-116", "FAM-117", "FAM-118",
     }
     DOCUMENT_TYPES_NN = [
         "1. REGISTRO CIVIL", "2. TARJETA DE IDENTIDAD", "3. PASAPORTE",
@@ -280,6 +289,8 @@ class F23Service:
         ui: dict[str, Any] = {"control": "textarea", "section": "Familia y vivienda" if field_id.startswith("FAM-") else "Identificación y atenciones"}
         if "fecha" in label:
             ui["control"] = "date"
+        if field_id in {"MG-033", "MG-054", "MG-055", "MG-056", "FAM-004", "FAM-080", "FAM-112"}:
+            ui.update(control="number", min=0)
         if field_id in self.YES_NO_FIELDS:
             ui.update(control="select", options=["SI", "NO"])
         if field_id in {"NN-002", "MG-002"}:
@@ -309,6 +320,8 @@ class F23Service:
             "NN-050": ["RECIBE_LECHE_MATERNA", "NO_RECIBE_LECHE_MATERNA"],
             "NN-053": ["SI_EXCLUSIVAMENTE_LECHE_MATERNA", "NO_OTROS_ALIMENTOS"],
             "NN-056": ["SI_LECHE_MATERNA_EXCLUSIVA", "NO_LECHE_MATERNA_EXCLUSIVA"],
+            "MG-075": ["AFILIADO", "NO_AFILIADO"],
+            "MG-078": ["ESQUEMA_COMPLETO", "ESQUEMA_INCOMPLETO"],
         }
         if field_id in official_choices:
             ui.update(control="select", options=official_choices[field_id])
@@ -328,6 +341,29 @@ class F23Service:
             "NN-055": ("NN-053", ["NO_OTROS_ALIMENTOS"]),
             "NN-057": ("NN-056", ["NO_LECHE_MATERNA_EXCLUSIVA"]),
             "NN-058": ("NN-057", ["8. Otro"]),
+            "MG-035": ("MG-034", ["7. Otro"]),
+            "MG-044": ("MG-043", ["SI"]),
+            "MG-050": ("MG-048", ["SI"]),
+            "MG-060": ("MG-059", ["SI"]),
+            "MG-061": ("MG-059", ["SI"]),
+            "MG-062": ("MG-059", ["SI"]),
+            "MG-067": ("MG-066", ["SI"]),
+            "MG-068": ("MG-066", ["SI"]),
+            "MG-069": ("MG-066", ["SI"]),
+            "MG-071": ("MG-070", ["SI"]),
+            "MG-073": ("MG-072", ["SI"]),
+            "MG-074": ("MG-072", ["SI"]),
+            "MG-076": ("MG-075", ["NO_AFILIADO"]),
+            "MG-077": ("MG-076", ["6. Otra"]),
+            "MG-079": ("MG-078", ["ESQUEMA_INCOMPLETO"]),
+            "MG-080": ("MG-079", ["7. Otra"]),
+            "FAM-007": ("FAM-006", ["SI"]),
+            "FAM-042": ("FAM-041", ["SI"]),
+            "FAM-054": ("FAM-053", ["SI"]),
+            "FAM-058": ("FAM-057", ["SI"]),
+            "FAM-077": ("FAM-076", ["SI"]),
+            "FAM-086": ("FAM-085", ["SI"]),
+            "FAM-119": ("FAM-118", ["SI"]),
         }
         if field_id in dependencies:
             parent, values = dependencies[field_id]
@@ -343,6 +379,10 @@ class F23Service:
             "NN-054": "edad_otros_alimentos",
             "NN-057": "no_leche_exclusiva",
             "NN-059": "tiempo_complementaria",
+            "MG-026": "grupo_etnico",
+            "MG-034": "duerme",
+            "MG-076": "no_afiliado",
+            "MG-079": "esquema_incompleto",
         }
         if field_id in option_catalogs:
             ui.update(control="select", catalog_key=f"opciones.{option_catalogs[field_id]}")
@@ -350,6 +390,12 @@ class F23Service:
             ui["section"] = "Datos institucionales"
         elif field_id.startswith("NN-") and int(field_id.split("-")[1]) >= 21:
             ui["section"] = "Salud, cuidado y alimentación"
+        elif field_id.startswith("MG-"):
+            number = int(field_id.split("-")[1])
+            ui["section"] = "Educación y condiciones personales" if 28 <= number <= 52 else ("Gestación y salud" if number >= 53 else "Identificación de la gestante")
+        elif field_id.startswith("FAM-"):
+            number = int(field_id.split("-")[1])
+            ui["section"] = "Vivienda y servicios" if number <= 59 else "Dinámica familiar y cuidado"
         return ui
 
     def field_catalog(self) -> list[dict[str, Any]]:

@@ -99,3 +99,6 @@
 - Pendientes aplicables: una pregunta subordinada no se cuenta mientras su condición no esté activa; vuelve a pendientes si la respuesta principal la activa. No se guarda `NO` ni `NO_APLICA` por inferencia.
 - Respuestas cerradas: motivos de afiliación, vacunación, salud bucal, valoración y lactancia, además de etnia y descanso, usan las listas de la plantilla en vez de texto libre.
 - Navegación: el filtro permite trabajar solo pendientes, todos los campos o una sección concreta sin duplicar el formulario.
+- Flujo rápido: seleccionar o escribir una respuesta la marca confirmada; se pueden confirmar los datos visibles tras revisarlos y guardar para avanzar al siguiente participante pendiente.
+- Cobertura MG/Familia: selecciones múltiples pasan a Sí/No y los detalles dependientes se activan para discapacidad, violencia, vulnerabilidad, medicamentos, sustancias, afiliación, vacunación, territorio, riesgos, agua, apoyos, cuidado, actividades y reconocimientos.
+- Controles restantes: fechas usan calendario, cantidades usan entrada numérica y los campos se agrupan en módulos institucionales, identificación, salud, gestación, vivienda y dinámica familiar.
