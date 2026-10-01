@@ -97,3 +97,5 @@
 - Subfase territorial: catálogos extraídos de `Listados` mediante lectura XML sin ejecutar macros: 33 regionales, 210 centros zonales, 33 departamentos, 1123 municipios y 89 lenguas. Regional controla centro zonal y departamento controla municipio.
 - Subfase condicional NN: afiliación, vacunación, salud bucal y lactancia conservan los valores codificados del XLSM; sus motivos y detalles se muestran solo ante la respuesta desencadenante.
 - Pendientes aplicables: una pregunta subordinada no se cuenta mientras su condición no esté activa; vuelve a pendientes si la respuesta principal la activa. No se guarda `NO` ni `NO_APLICA` por inferencia.
+- Respuestas cerradas: motivos de afiliación, vacunación, salud bucal, valoración y lactancia, además de etnia y descanso, usan las listas de la plantilla en vez de texto libre.
+- Navegación: el filtro permite trabajar solo pendientes, todos los campos o una sección concreta sin duplicar el formulario.

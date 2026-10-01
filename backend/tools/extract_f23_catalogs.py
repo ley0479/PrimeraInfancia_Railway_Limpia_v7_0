@@ -90,14 +90,28 @@ def main() -> None:
             label = value.split(". ", 1)[1] if ". " in value else value
             if label and label not in languages:
                 languages.append(label)
+    option_columns = {
+        "grupo_etnico": (6, 165, 171),
+        "duerme": (7, 165, 171),
+        "no_afiliado": (10, 165, 170),
+        "esquema_incompleto": (13, 165, 171),
+        "sin_salud_bucal": (16, 165, 170),
+        "razones_no_cita": (18, 165, 169),
+        "no_recibe_leche": (23, 165, 172),
+        "edad_otros_alimentos": (26, 165, 170),
+        "no_leche_exclusiva": (29, 165, 172),
+        "tiempo_complementaria": (30, 165, 177),
+    }
+    options = {key: column_values(cells, column, start, end) for key, (column, start, end) in option_columns.items()}
     payload = {
         "source": "F23.MO12.PP v2 / hoja Listados",
         "regional_centros": regional_centros,
         "departamento_municipios": departamento_municipios,
         "lenguas": languages,
+        "opciones": options,
     }
     TARGET.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"PASS {TARGET}: {len(regional_centros)} regionales, {sum(map(len, regional_centros.values()))} centros, {len(departamento_municipios)} departamentos, {sum(map(len, departamento_municipios.values()))} municipios, {len(languages)} lenguas")
+    print(f"PASS {TARGET}: {len(regional_centros)} regionales, {sum(map(len, regional_centros.values()))} centros, {len(departamento_municipios)} departamentos, {sum(map(len, departamento_municipios.values()))} municipios, {len(languages)} lenguas, {len(options)} listas de respuesta")
 
 
 if __name__ == "__main__":

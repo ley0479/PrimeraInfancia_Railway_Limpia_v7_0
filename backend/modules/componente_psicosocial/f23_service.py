@@ -332,6 +332,20 @@ class F23Service:
         if field_id in dependencies:
             parent, values = dependencies[field_id]
             ui.update(depends_on=parent, show_when=values)
+        option_catalogs = {
+            "NN-023": "grupo_etnico",
+            "NN-028": "duerme",
+            "NN-033": "no_afiliado",
+            "NN-036": "esquema_incompleto",
+            "NN-039": "sin_salud_bucal",
+            "NN-048": "razones_no_cita",
+            "NN-051": "no_recibe_leche",
+            "NN-054": "edad_otros_alimentos",
+            "NN-057": "no_leche_exclusiva",
+            "NN-059": "tiempo_complementaria",
+        }
+        if field_id in option_catalogs:
+            ui.update(control="select", catalog_key=f"opciones.{option_catalogs[field_id]}")
         if field_id in {"NN-002", "NN-003", "NN-004", "NN-005", "NN-006", "NN-007", "MG-002", "MG-003", "MG-004", "MG-005", "MG-006", "MG-007"}:
             ui["section"] = "Datos institucionales"
         elif field_id.startswith("NN-") and int(field_id.split("-")[1]) >= 21:

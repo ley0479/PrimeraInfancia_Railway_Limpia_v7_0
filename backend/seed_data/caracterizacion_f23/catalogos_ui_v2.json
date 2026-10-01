@@ -1559,5 +1559,100 @@
     "Ocasionalmente",
     "Diario",
     "Nunca"
-  ]
+  ],
+  "opciones": {
+    "grupo_etnico": [
+      "1. Población indígena",
+      "2. Población Negra",
+      "3. Población Afrocolombiana",
+      "4. Población Raizal descendiente del Archipiélago de San Andrés, Providencia y Santa Catalina",
+      "5. Población Gitana o Rrom",
+      "6. Población Palenquera",
+      "7. Ninguno"
+    ],
+    "duerme": [
+      "1.Hamaca",
+      "2. Cama",
+      "3. Colchoneta",
+      "4. Estera",
+      "5. Cuna",
+      "6. Plancha",
+      "7. Otro"
+    ],
+    "no_afiliado": [
+      "1. En trámite",
+      "2. Falta de dinero",
+      "3. No sabe que debe afiliarse",
+      "4. No le interesa",
+      "5. No hay entidad cercana",
+      "6. Otra"
+    ],
+    "esquema_incompleto": [
+      "1. Falta de dinero",
+      "2. No sabe que debe vacunarse",
+      "3. No le interesa",
+      "4. Pertenece a movimiento anti vacunas",
+      "5. No hay entidad cercana.",
+      "6. Motivos religiosos",
+      "7. Otra"
+    ],
+    "sin_salud_bucal": [
+      "1. Falta de dinero",
+      "2. No sabe la utilidad de esta valoración",
+      "3. No le interesa",
+      "4. No hay entidad cercana.",
+      "5. Motivos religiosos",
+      "6. Otro"
+    ],
+    "razones_no_cita": [
+      "1. Falta de dinero",
+      "2. No sabe que debe recibir esta atención",
+      "3. No le interesa",
+      "4. No hay entidad cercana",
+      "5. Otro"
+    ],
+    "no_recibe_leche": [
+      "1. Empleo",
+      "2. Ausencia de la madre",
+      "3. Dificultades en el amamantamiento",
+      "4. Falta de motivación",
+      "5. No sabe como hacerlo",
+      "6. Tratamiento médico",
+      "7. Presión familiar",
+      "8. Otro"
+    ],
+    "edad_otros_alimentos": [
+      "1. (0 meses)",
+      "2. (1 mes)",
+      "3. (2 meses)",
+      "4. (3 meses)",
+      "5. (4 meses)",
+      "6. (5 meses)"
+    ],
+    "no_leche_exclusiva": [
+      "1. Empleo",
+      "2. Ausencia de la madre",
+      "3. Dificultades en el amamantamiento",
+      "4. Falta de motivación",
+      "5. No sabia como hacerlo",
+      "6. Tratamiento médico",
+      "7. Presión familiar",
+      "8. Otro"
+    ],
+    "tiempo_complementaria": [
+      "1. (0 meses)",
+      "2. (1 mes)",
+      "3. (2 meses)",
+      "4. (3 meses)",
+      "5. (4 meses)",
+      "6. (5 meses)",
+      "7. (6 meses)",
+      "8. (7 meses)",
+      "9. (8 meses)",
+      "10. (9 meses)",
+      "11. (10 meses)",
+      "12. (11 meses)",
+      "13. (12 meses)"
+    ]
+  }
 }
