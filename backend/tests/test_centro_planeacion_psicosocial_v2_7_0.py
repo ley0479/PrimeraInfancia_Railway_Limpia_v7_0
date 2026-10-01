@@ -77,6 +77,8 @@ def run() -> None:
         require(len(cases_a) == first_ps_sync["creados"] and len(cases_a) > 0, "Asignación psicosocial de la UCA A incorrecta")
         require(len(cases_b) == tenant_b_sync["creados"] and len(cases_b) > 0, "Aislamiento psicosocial de la UCA B incorrecto")
         require(not ps.list_expedientes(1, {"profesional_id": other_professional["id"]}), "Otro profesional obtuvo expedientes no asignados")
+        dashboard_a = ps.dashboard(1, coordinator_a, {"vista_coordinacion": True})
+        require(dashboard_a["vista"] == "COORDINACION" and dashboard_a["resumen"]["expedientes"] == len(cases_a), "El dashboard coordinador no abrió el componente psicosocial")
 
         case = cases_a[0]
         char1 = ps.create_characterization(1, case["id"], {

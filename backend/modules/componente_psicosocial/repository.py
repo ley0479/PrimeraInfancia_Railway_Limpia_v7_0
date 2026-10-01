@@ -26,7 +26,7 @@ from modules.seguridad.tenant_context import tenant_storage_root
 from modules.motor_gestion_proyecto.services import source_key as mgp_source_key
 
 from .schema import SCHEMA_SQL, SCHEMA_VERSION
-from .services import COMPLETED_STATES, file_sha256, json_dump, normalize, now_iso, parse_json, unit_key
+from .services import COORDINATION_ROLES, COMPLETED_STATES, file_sha256, json_dump, normalize, now_iso, parse_json, unit_key
 
 
 class ComponentePsicosocialRepository:
